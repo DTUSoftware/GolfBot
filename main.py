@@ -12,28 +12,42 @@ DRIVE_DELAY = 0.1  # Delay between each loop of driving
 
 
 class Robot:
-    def __init__(buttons: Button, motors: MoveTank, current_pos: tuple = (0, 0)):
+    def __init__(self, buttons: Button, motors: MoveTank, current_pos: tuple = (0, 0)):
         self.buttons = buttons
         self.motors = motors
         self.current_pos = current_pos
 
-    def forward():
+    def forward(self):
         motors.on(left_speed=SpeedPercent(DRIVE_SPEED), right_speed=SpeedPercent(-DRIVE_SPEED))
 
-    def backwards():
+    def backwards(self):
         motors.on(left_speed=SpeedPercent(-DRIVE_SPEED), right_speed=SpeedPercent(DRIVE_SPEED))
 
-    def turn_left():
+    def turn_left(self):
         motors.on(left_speed=SpeedPercent(TURN_SPEED), right_speed=SpeedPercent(TURN_SPEED))
 
-    def turn_right():
+    def turn_right(self):
         motors.on(left_speed=SpeedPercent(-TURN_SPEED), right_speed=SpeedPercent(-TURN_SPEED))
 
-    def drive(pos: tuple):
+    def drive(self, pos: tuple):
+        debug("forward")
         forward()
+        sleep(2)
+        debug("backwards")
+        backwards()
+        sleep(2)
+        debug("left")
+        turn_left()
+        sleep(2)
+        debug("right")
+        turn_right()
+        sleep(2)
     
-    def set_position(pos: tuple):
+    def set_position(self, pos: tuple):
         self.current_pos = pos
+    
+    def buttons_pressed() -> bool:
+        return self.buttons.any()
 
 
 def debug(*args, **kwargs):
@@ -60,7 +74,7 @@ def race():
     start_time = time.time()
     time_taken = 0
 
-    while time_taken <= 8*60 and not buttons.any():
+    while time_taken <= 8*60 and not robot.buttons_pressed():
         time_taken = time.time() - start_time
         try:
             # ToDo: Show the robot where to go
