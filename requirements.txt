@@ -1,2 +1,2 @@
 python-ev3dev2
-rpyc
+rpyc==3.3.0

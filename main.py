@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-from ev3dev2.motor import MoveTank, MediumMotor, OUTPUT_A, OUTPUT_B, OUTPUT_D, SpeedPercent
-from ev3dev2.button import Button
+# Use python 3.5.3 or similar (tested with Python 3.6.15)
+import rpyc
 import os
 import sys
 import time
@@ -9,25 +9,38 @@ import time
 DRIVE_SPEED = 100  # Speed in percent
 TURN_SPEED = 10  # Speed in percent
 DRIVE_DELAY = 0.1  # Delay between each loop of driving
+IP_ADDRESS = "192.168.1.240" # The IP of the robot
 
+# Connect to the robot and get modules
+conn = rpyc.classic.connect("192.168.1.240")
+ev3_motor = conn.modules['ev3dev2.motor']
+ev3_button = conn.modules['ev3dev2.button']
+
+# Variable for robot
+ROBOT_GLOBAL = None
 
 class Robot:
-    def __init__(self, buttons: Button, motors: MoveTank, current_pos: tuple = (0, 0)):
+    def __init__(self, buttons: ev3_button.Button, motors: ev3_motor.MoveTank, current_pos: tuple = (0, 0)):
         self.buttons = buttons
         self.motors = motors
         self.current_pos = current_pos
+        self.stopped = False
 
     def forward(self):
-        self.motors.on(left_speed=SpeedPercent(-DRIVE_SPEED), right_speed=SpeedPercent(-DRIVE_SPEED))
+        if not self.stopped:
+            self.motors.on(left_speed=ev3_motor.SpeedPercent(-DRIVE_SPEED), right_speed=ev3_motor.SpeedPercent(-DRIVE_SPEED))
 
     def backwards(self):
-        self.motors.on(left_speed=SpeedPercent(DRIVE_SPEED), right_speed=SpeedPercent(DRIVE_SPEED))
+        if not self.stopped:
+            self.motors.on(left_speed=ev3_motor.SpeedPercent(DRIVE_SPEED), right_speed=ev3_motor.SpeedPercent(DRIVE_SPEED))
 
     def turn_left(self):
-        self.motors.on(left_speed=SpeedPercent(-TURN_SPEED), right_speed=SpeedPercent(TURN_SPEED))
+        if not self.stopped:
+            self.motors.on(left_speed=ev3_motor.SpeedPercent(-TURN_SPEED), right_speed=ev3_motor.SpeedPercent(TURN_SPEED))
 
     def turn_right(self):
-        self.motors.on(left_speed=SpeedPercent(TURN_SPEED), right_speed=SpeedPercent(-TURN_SPEED))
+        if not self.stopped:
+            self.motors.on(left_speed=ev3_motor.SpeedPercent(TURN_SPEED), right_speed=ev3_motor.SpeedPercent(-TURN_SPEED))
 
     def drive(self, pos: tuple):
         print("forward")
@@ -43,6 +56,10 @@ class Robot:
         self.turn_right()
         time.sleep(2)
     
+    def stop(self):
+        self.stopped = True
+        self.motors.off()
+    
     def set_position(self, pos: tuple):
         self.current_pos = pos
     
@@ -57,12 +74,14 @@ def debug(*args, **kwargs):
 def setup():
     os.system('setfont Lat15-TerminusBold14')  # Sets the console font
     print('\x1Bc', end='')  # Resets the console
+    global ROBOT_GLOBAL
+    ROBOT_GLOBAL = get_robot()
 
 
 def get_robot(current_pos: tuple = (0,0)) -> Robot:
     # The motors and other things on the robot
-    buttons = Button()  # Any buton on the robot
-    motors = MoveTank(left_motor_port=OUTPUT_A, right_motor_port=OUTPUT_D)  # Motor on output port A and D
+    buttons = ev3_button.Button()  # Any buton on the robot
+    motors = ev3_motor.MoveTank(left_motor_port=ev3_motor.OUTPUT_A, right_motor_port=ev3_motor.OUTPUT_D)  # Motor on output port A and D
 
     return Robot(buttons, motors, current_pos)
 
@@ -70,7 +89,7 @@ def get_robot(current_pos: tuple = (0,0)) -> Robot:
 def race():
     print("Starting race...")
 
-    robot = get_robot()
+    robot = ROBOT_GLOBAL
     start_time = time.time()
     time_taken = 0
 
@@ -89,5 +108,9 @@ def race():
 
 
 if __name__ == '__main__':
-    setup()
-    race()
+    try:
+        setup()
+        race()
+    except KeyboardInterrupt:
+        ROBOT_GLOBAL.stop()
+        raise KeyboardInterrupt()
