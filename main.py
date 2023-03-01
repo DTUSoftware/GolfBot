@@ -18,35 +18,35 @@ class Robot:
         self.current_pos = current_pos
 
     def forward(self):
-        motors.on(left_speed=SpeedPercent(DRIVE_SPEED), right_speed=SpeedPercent(-DRIVE_SPEED))
+        self.motors.on(left_speed=SpeedPercent(-DRIVE_SPEED), right_speed=SpeedPercent(-DRIVE_SPEED))
 
     def backwards(self):
-        motors.on(left_speed=SpeedPercent(-DRIVE_SPEED), right_speed=SpeedPercent(DRIVE_SPEED))
+        self.motors.on(left_speed=SpeedPercent(DRIVE_SPEED), right_speed=SpeedPercent(DRIVE_SPEED))
 
     def turn_left(self):
-        motors.on(left_speed=SpeedPercent(TURN_SPEED), right_speed=SpeedPercent(TURN_SPEED))
+        self.motors.on(left_speed=SpeedPercent(-TURN_SPEED), right_speed=SpeedPercent(TURN_SPEED))
 
     def turn_right(self):
-        motors.on(left_speed=SpeedPercent(-TURN_SPEED), right_speed=SpeedPercent(-TURN_SPEED))
+        self.motors.on(left_speed=SpeedPercent(TURN_SPEED), right_speed=SpeedPercent(-TURN_SPEED))
 
     def drive(self, pos: tuple):
-        debug("forward")
-        forward()
-        sleep(2)
-        debug("backwards")
-        backwards()
-        sleep(2)
-        debug("left")
-        turn_left()
-        sleep(2)
-        debug("right")
-        turn_right()
-        sleep(2)
+        print("forward")
+        self.forward()
+        time.sleep(2)
+        print("backwards")
+        self.backwards()
+        time.sleep(2)
+        print("left")
+        self.turn_left()
+        time.sleep(2)
+        print("right")
+        self.turn_right()
+        time.sleep(2)
     
     def set_position(self, pos: tuple):
         self.current_pos = pos
     
-    def buttons_pressed() -> bool:
+    def buttons_pressed(self) -> bool:
         return self.buttons.any()
 
 
@@ -83,7 +83,7 @@ def race():
             # ToDo: get new current pos from camera instead
             robot.set_position(new_pos)
             # ToDo: Sleep, but actually instead we would just recieve input from the camera/AI, which also takes a small amount of time
-            sleep(DRIVE_DELAY)
+            time.sleep(DRIVE_DELAY)
         except Exception as e:
             print("uh oh... - " + str(e))
 
