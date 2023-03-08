@@ -13,6 +13,21 @@ class Node:
     def add_neighbour(self, node):
         self.neighbours.append(node)
 
+class AStar:
+    def __init__(self, graph):
+        self.graph = graph
+    
+    def set_from(self, from_node):
+        self.from_node = from_node
+
+    def set_target(self, target_node):
+        self.target_node = target_node
+
+    def calculate(self):
+        if not self.graph or not self.from_node or not self.target_node:
+            return []
+        
+
 class Graph:
     def __init__(self, size_x=500, size_y=200):
         self.nodes = []
@@ -70,6 +85,9 @@ class Graph:
                 node_1.neighbours.remove(node_2)
             if node_1 in node_2.neighbours:
                 node_2.neighbours.remove(node_1)
+    
+    def get_path(self, start_node, dst_node):
+        return []
     
     def draw(self, robot_pos: tuple = None, balls=[]):
         for y, row in enumerate(self.nodes):
@@ -162,6 +180,7 @@ class Track:
         self.balls = []
         self.obstacles = []
         self.robot_pos = (0, 0)
+        self.path = []
 
         self.graph = Graph(bounds["x"], bounds["y"])
     
@@ -173,6 +192,18 @@ class Track:
     
     def set_robot_pos(self, robot_pos: tuple):
         self.robot_pos = robot_pos
+    
+    def calculate_path(self):
+        # For every ball calculate the path, then choose the best path
+        paths = []
+        for ball in self.balls:
+            robot_node = self.graph.get_node(self.robot_pos)
+            ball_node = self.graph.get_node((ball.x, ball.y))
+            paths.append(self.graph.get_path(start_node = robot_node, dst_node = ball_node))
+        
+        if paths:
+            self.path = paths[0]
+        self.path = []
     
     def clear_obstacles(self):
         for obstacle in self.obstacles:
@@ -216,5 +247,7 @@ if __name__ == "__main__":
     wall_path.extend([(x, y) for x in range(0, bounds["x"]) for y in [0, bounds["y"]-1]])
     wall_obstacle = Obstacle(track.graph.get_nodes_in_path(wall_path))
     track.add_obstacle(wall_obstacle)
+
+    track.calculate_path()
 
     track.draw()
