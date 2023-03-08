@@ -49,15 +49,23 @@ class Graph:
         else:
             return None
     
+    def get_nodes_in_path(self, path: list):
+        nodes_in_path = []
+        for pos in path:
+            node = self.get_node(pos)
+            if node:
+                nodes_in_path.append(node)
+        return nodes_in_path
+    
     def add_edge(self, node_1, node_2):
-        if node_1 is not node_2:
+        if node_1 is not node_2 and node_1 and node_2:
             if node_2 not in node_1.neighbours:
                 node_1.neighbours.append(node_2)
             if node_1 not in node_2.neighbours:
                 node_2.neighbours.apend(node_1)
     
     def remove_edge(self, node_1, node_2):
-        if node_1 is not node_2:
+        if node_1 is not node_2 and node_1 and node_2:
             if node_2 in node_1.neighbours:
                 node_1.neighbours.remove(node_2)
             if node_1 in node_2.neighbours:
@@ -177,10 +185,13 @@ class Track:
     
     def add_obstacle(self, obstacle):
         for node in obstacle.path:
+            #print(f"Removing node edges for node at {node.x}, {node.y}")
             for x in range(-1, 1+1):
                 for y in range(-1, 1+1):
                     neighbour = self.graph.get_node((node.x+x, node.y+y))
                     self.graph.remove_edge(node, neighbour)
+            if node.neighbours:
+                print(f"Failed to remove all neighbours for obstacle node at {node.x}, {node.y}")
         self.obstacles.append(obstacle)
 
 
@@ -192,12 +203,18 @@ if __name__ == "__main__":
     bounds = {"x": 20, "y": 8}
     track = Track(bounds)
 
-    track.set_robot_pos((5, 5))
+    track.set_robot_pos((15, 5))
     track.add_ball(Ball((1, 2)))
-    track.add_ball(Ball((5, 4)))
+    track.add_ball(Ball((8, 4)))
 
-    obstacle_path = [track.graph.get_node((4, 1)), track.graph.get_node((4, 2)), track.graph.get_node((4, 3)), track.graph.get_node((3, 2)), track.graph.get_node((5, 2))]
-    obstacle = Obstacle(obstacle_path)
+    obstacle_path = [(4, 3), (4, 4), (4, 5), (3, 4), (5, 4)]
+    obstacle = Obstacle(track.graph.get_nodes_in_path(obstacle_path))
     track.add_obstacle(obstacle)
+
+    wall_path = []
+    wall_path.extend([(x, y) for x in [0, bounds["x"]-1] for y in range(0, bounds["y"])])
+    wall_path.extend([(x, y) for x in range(0, bounds["x"]) for y in [0, bounds["y"]-1]])
+    wall_obstacle = Obstacle(track.graph.get_nodes_in_path(wall_path))
+    track.add_obstacle(wall_obstacle)
 
     track.draw()
