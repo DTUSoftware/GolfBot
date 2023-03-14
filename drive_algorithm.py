@@ -180,17 +180,19 @@ class Graph:
             
             closed_list.append(current_node)
         
-        print(closed_list)
-        for elem in closed_list:
-            print(f"({elem[1].node.x}, {elem[1].node.y}) - f: {elem[1].f} g: {elem[1].g} h: {elem[1].h}")
+        # print(closed_list)
+        # for elem in closed_list:
+        #     print(f"({elem[1].node.x}, {elem[1].node.y}) - f: {elem[1].f} g: {elem[1].g} h: {elem[1].h}")
         
+        # DEBUG
         node = closed_list[-1][1]
         print(f"End walkthrough, f: {node.f} g: {node.g} h: {node.h}")
         while node:
-            print(f"({node.node.x}, {node.node.y})")
+            print(f"({node.node.x}, {node.node.y})", end=" ")
             node = node.parent
+        print("")
 
-        return []
+        return closed_list
     
     def draw(self, robot_pos: tuple = None, balls=[]):
         for y, row in enumerate(self.nodes):
@@ -305,8 +307,19 @@ class Track:
             paths.append(self.graph.get_path(start_node = robot_node, dst_node = ball_node))
         
         if paths:
-            self.path = paths[0]
-        self.path = []
+            min_path = {"path": None, "f": None}
+            for path in paths:
+                if path:
+                    if not min_path["path"] or path[-1][0] < min_path["f"]:
+                        min_path["path"] = path
+                        min_path["f"] = path[-1][0]
+            if min_path["path"]:
+                print(f"Best path found with weight {min_path['f']}")
+                self.path = min_path["path"]
+            else:
+                self.path = []
+        else:
+            self.path = []
     
     def clear_obstacles(self):
         for obstacle in self.obstacles:
