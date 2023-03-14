@@ -1,8 +1,12 @@
+import math
+import heapq
 from colorama import init as colorama_init
 from colorama import Fore
 from colorama import Style
 
 colorama_init()
+
+distance_across = math.sqrt(1**2+1**2)
 
 class Node:
     def __init__(self, coordinates: tuple):
@@ -10,8 +14,37 @@ class Node:
         self.y = coordinates[1]
         self.neighbours = []
     
-    def add_neighbour(self, node):
-        self.neighbours.append(node)
+    def add_neighbour(self, node, weight=None):
+        if not weight:
+            if self.x == node.x or self.y == node.y:
+                weight = 1
+            else:
+                weight = distance_across
+        self.neighbours.append({"node": node, "weight": weight})
+    
+    def remove_neighbour(self, node):
+        for i in range(len(self.neighbours)):
+            if self.neighbours[i]["node"] == node:
+                self.neighbours.pop(i)
+                return
+    
+    def get_neighbour_nodes(self):
+        return [neighbour["node"] for neighbour in self.neighbours]
+
+class NodeData:
+    def __init__(self, node, g, h, parent):
+        self.node = node
+        self.g = g
+        self.h = h
+        self.parent = parent
+        
+        self.f = self.g + self.h
+    
+    def __lt__(self, other):
+        return True
+    
+    def __le__(self, other):
+        return True
 
 class AStar:
     def __init__(self, graph):
@@ -38,21 +71,21 @@ class Graph:
             for y, row in enumerate(self.nodes):
                 for x, node in enumerate(row):
                     if x-1 >= 0:
-                        node.add_neighbour(row[x-1])
+                        node.add_neighbour(row[x-1], 1)
                         if y-1 >= 0:
-                            node.add_neighbour(self.nodes[y-1][x-1])
+                            node.add_neighbour(self.nodes[y-1][x-1], distance_across)
                         if y+1 < len(self.nodes):
-                            node.add_neighbour(self.nodes[y+1][x-1])
+                            node.add_neighbour(self.nodes[y+1][x-1], distance_across)
                     if x+1 < len(row):
-                        node.add_neighbour(row[x+1])
+                        node.add_neighbour(row[x+1], 1)
                         if y-1 >= 0:
-                            node.add_neighbour(self.nodes[y-1][x+1])
+                            node.add_neighbour(self.nodes[y-1][x+1], distance_across)
                         if y+1 < len(self.nodes):
-                            node.add_neighbour(self.nodes[y+1][x+1])
+                            node.add_neighbour(self.nodes[y+1][x+1], distance_across)
                     if y-1 >= 0:
-                        node.add_neighbour(self.nodes[y-1][x])
+                        node.add_neighbour(self.nodes[y-1][x], 1)
                     if y+1 < len(self.nodes):
-                        node.add_neighbour(self.nodes[y+1][x])
+                        node.add_neighbour(self.nodes[y+1][x], 1)
 
 
     def add_node(self, coordinates: tuple):
@@ -74,19 +107,89 @@ class Graph:
     
     def add_edge(self, node_1, node_2):
         if node_1 is not node_2 and node_1 and node_2:
-            if node_2 not in node_1.neighbours:
-                node_1.neighbours.append(node_2)
-            if node_1 not in node_2.neighbours:
-                node_2.neighbours.apend(node_1)
+            if node_2 not in node_1.get_neighbour_nodes():
+                node_1.add_neighbour(node_2)
+            if node_1 not in node_2.get_neighbour_nodes():
+                node_2.add_neighbour(node_1)
     
     def remove_edge(self, node_1, node_2):
         if node_1 is not node_2 and node_1 and node_2:
-            if node_2 in node_1.neighbours:
-                node_1.neighbours.remove(node_2)
-            if node_1 in node_2.neighbours:
-                node_2.neighbours.remove(node_1)
+            if node_2 in node_1.get_neighbour_nodes():
+                node_1.remove_neighbour(node_2)
+            if node_1 in node_2.get_neighbour_nodes():
+                node_2.remove_neighbour(node_1)
     
+    # Manhattan Distance heuristic for A*
+    def h(self, start_node, dst_node):
+        return abs(start_node.x - dst_node.x) + abs(start_node.y - dst_node.y)
+    
+    # Get path and cost using A*
     def get_path(self, start_node, dst_node):
+        start_node_data = NodeData(start_node, 0, self.h(start_node, dst_node), None)
+        open_list = [(start_node_data.f, start_node_data)]
+        closed_list = []
+
+        heapq.heapify(open_list)
+
+        current_node = None
+        while open_list:
+            current_node = heapq.heappop(open_list)
+            if current_node[1].node is dst_node:
+                closed_list.append(current_node)
+                break
+            
+            for neighbour in current_node[1].node.neighbours:
+                neighbour_data = NodeData(
+                    node=neighbour["node"], 
+                    g=current_node[1].g + neighbour["weight"], 
+                    h=self.h(neighbour["node"], dst_node), 
+                    parent=current_node[1]
+                )
+                
+
+                closed_list_check = False
+                for i in range(len(closed_list)):
+                    if closed_list[i][1].node == neighbour_data.node:
+                        closed_list_check = True
+                        if neighbour_data.g < closed_list[i][1].g:
+                            closed_list[i] = (neighbour_data.f, neighbour_data)
+                            found = False
+                            for node_elem in list(open_list):
+                                if node_elem[1].node == neighbour_data.node:
+                                    found = True
+                                    break
+                            if not found:
+                                heapq.heappush(open_list, (neighbour_data.f, neighbour_data))
+                        break
+                
+                if not closed_list_check:
+                    open_list_check = False
+                    open_list_list = list(open_list)
+                    for i in range(len(open_list_list)):
+                        if open_list_list[i][1].node == neighbour_data.node:
+                            open_list_check = True
+                            if neighbour_data.g < open_list_list[i][1].g:
+                                open_list_list[i] = (neighbour_data.f, neighbour_data)
+                                open_list = open_list_list
+                                heapq.heapify(open_list)
+                            break
+                
+                    if not open_list_check:
+                        heapq.heappush(open_list, (neighbour_data.f, neighbour_data))
+
+            
+            closed_list.append(current_node)
+        
+        print(closed_list)
+        for elem in closed_list:
+            print(f"({elem[1].node.x}, {elem[1].node.y}) - f: {elem[1].f} g: {elem[1].g} h: {elem[1].h}")
+        
+        node = closed_list[-1][1]
+        print(f"End walkthrough, f: {node.f} g: {node.g} h: {node.h}")
+        while node:
+            print(f"({node.node.x}, {node.node.y})")
+            node = node.parent
+
         return []
     
     def draw(self, robot_pos: tuple = None, balls=[]):
@@ -120,7 +223,7 @@ class Graph:
                 else:
                     nodes_string = nodes_string + " o"
                 neighbours = {"down": 0, "right": 0, "down_right": 0}
-                for neighbour in node.neighbours:
+                for neighbour in node.get_neighbour_nodes():
                     if node.x == neighbour.x:
                         if node.y+1 == neighbour.y:
                             neighbours["down"] = 1
@@ -132,7 +235,7 @@ class Graph:
                 down_node = self.get_node((node.x, node.y+1))
                 if down_node:
                     # check for cross the other way
-                    for neighbour_down in down_node.neighbours:
+                    for neighbour_down in down_node.get_neighbour_nodes():
                         if down_node.y == neighbour_down.y+1 and down_node.x == neighbour_down.x-1:
                             neighbours["down_right"] += 2
                             break
