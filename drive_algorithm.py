@@ -184,15 +184,16 @@ class Graph:
         # for elem in closed_list:
         #     print(f"({elem[1].node.x}, {elem[1].node.y}) - f: {elem[1].f} g: {elem[1].g} h: {elem[1].h}")
         
-        # DEBUG
-        # node = closed_list[-1][1]
+        final_list = []
+        node = closed_list[-1][1]
         # print(f"End walkthrough, f: {node.f} g: {node.g} h: {node.h}")
-        # while node:
-        #     print(f"({node.node.x}, {node.node.y})", end=" ")
-        #     node = node.parent
+        while node:
+            # print(f"({node.node.x}, {node.node.y})", end=" ")
+            final_list.insert(0, node)
+            node = node.parent
         # print("")
 
-        return closed_list
+        return final_list
     
     def draw(self, robot_pos: tuple = None, balls=[], path = []):
         for y, row in enumerate(self.nodes):
@@ -229,8 +230,7 @@ class Graph:
                 if path:
                     node_path_parent = None
                     node_path_child = None
-                    for node_path_tuple in path:
-                        node_path_check = node_path_tuple[1]
+                    for node_path_check in path:
                         if node_path_check.parent:
                             if node_path_check.node == node:
                                 node_path_parent = node_path_check.parent.node
@@ -354,17 +354,18 @@ class Track:
             min_path = {"path": None, "f": None}
             for path in paths:
                 if path:
-                    if not min_path["path"] or path[-1][0] < min_path["f"]:
+                    if not min_path["path"] or path[-1].f < min_path["f"]:
                         min_path["path"] = path
-                        min_path["f"] = path[-1][0]
-            if min_path["path"]:
+                        min_path["f"] = path[-1].f
+            if min_path["path"] and len(min_path["path"]) > 1:
                 print(f"Best path found with weight {min_path['f']}")
                 for i in range(len(min_path["path"])):
-                    node = min_path["path"][i][1].node
+                    node = min_path["path"][i].node
                     end = " -> " if i < len(min_path['path'])-1 else "\n"
                     print(f"({node.x}, {node.y})", end=end)
                 self.path = min_path["path"]
             else:
+                print("Found no path!")
                 self.path = []
         else:
             self.path = []
@@ -398,16 +399,19 @@ class Track:
     
 
 if __name__ == "__main__":
-    bounds = {"x": 20, "y": 8}
+    bounds = {"x": 10, "y": 10}
     track = Track(bounds)
 
-    track.set_robot_pos((2, 5))
+    track.set_robot_pos((8, 7))
     track.add_ball(Ball((1, 2)))
     track.add_ball(Ball((8, 4)))
 
     obstacle_path = [(4, 3), (4, 4), (4, 5), (3, 4), (5, 4)]
     obstacle = Obstacle(track.graph.get_nodes_in_path(obstacle_path))
     track.add_obstacle(obstacle)
+    # obstacle_path = [(1, 5), (3, 5), (4, 5), (5, 5), (6, 5), (7, 5), (8, 5), (9, 5), (10, 5), (11, 5), (12, 5), (13, 5), (14, 5)]
+    # obstacle = Obstacle(track.graph.get_nodes_in_path(obstacle_path))
+    # track.add_obstacle(obstacle)
 
     wall_path = []
     wall_path.extend([(x, y) for x in [0, bounds["x"]-1] for y in range(0, bounds["y"])])
@@ -415,6 +419,10 @@ if __name__ == "__main__":
     wall_obstacle = Obstacle(track.graph.get_nodes_in_path(wall_path))
     track.add_obstacle(wall_obstacle)
 
+    print("=========================\nDrawing with obstacles!\n=========================")
+    track.draw(False)
+
     track.calculate_path()
 
+    print("=========================\nDrawing driving path!\n=========================")
     track.draw(True)
