@@ -185,16 +185,16 @@ class Graph:
         #     print(f"({elem[1].node.x}, {elem[1].node.y}) - f: {elem[1].f} g: {elem[1].g} h: {elem[1].h}")
         
         # DEBUG
-        node = closed_list[-1][1]
-        print(f"End walkthrough, f: {node.f} g: {node.g} h: {node.h}")
-        while node:
-            print(f"({node.node.x}, {node.node.y})", end=" ")
-            node = node.parent
-        print("")
+        # node = closed_list[-1][1]
+        # print(f"End walkthrough, f: {node.f} g: {node.g} h: {node.h}")
+        # while node:
+        #     print(f"({node.node.x}, {node.node.y})", end=" ")
+        #     node = node.parent
+        # print("")
 
         return closed_list
     
-    def draw(self, robot_pos: tuple = None, balls=[]):
+    def draw(self, robot_pos: tuple = None, balls=[], path = []):
         for y, row in enumerate(self.nodes):
             nodes_string = ""
             conections_string = ""
@@ -224,24 +224,68 @@ class Graph:
                         nodes_string = nodes_string + " o"
                 else:
                     nodes_string = nodes_string + " o"
-                neighbours = {"down": 0, "right": 0, "down_right": 0}
-                for neighbour in node.get_neighbour_nodes():
-                    if node.x == neighbour.x:
-                        if node.y+1 == neighbour.y:
-                            neighbours["down"] = 1
-                    elif node.x+1 == neighbour.x:
-                        if node.y == neighbour.y:
-                            neighbours["right"] = 1
-                        elif node.y+1 == neighbour.y:
-                            neighbours["down_right"] += 1
-                down_node = self.get_node((node.x, node.y+1))
-                if down_node:
-                    # check for cross the other way
-                    for neighbour_down in down_node.get_neighbour_nodes():
-                        if down_node.y == neighbour_down.y+1 and down_node.x == neighbour_down.x-1:
-                            neighbours["down_right"] += 2
-                            break
                 
+                neighbours = {"down": 0, "right": 0, "down_right": 0}
+                if path:
+                    node_path_parent = None
+                    node_path_child = None
+                    for node_path_tuple in path:
+                        node_path_check = node_path_tuple[1]
+                        if node_path_check.parent:
+                            if node_path_check.node == node:
+                                node_path_parent = node_path_check.parent.node
+                            if node_path_check.parent.node == node:
+                                node_path_child = node_path_check.node
+                            if node_path_parent and node_path_child:
+                                break
+
+                    if node_path_parent or node_path_child:
+                        # print(f"got node relationships for node ({node.x}, {node.y})")
+                        # if node_path_parent:
+                        #     print(f"node parent debug ({node_path_parent.x}, {node_path_parent.y})")
+                        # if node_path_child:
+                        #     print(f"node child debug ({node_path_child.x}, {node_path_child.y})")
+
+                        if node_path_parent and node_path_parent.y >= node.y and node_path_parent.x >= node.x:
+                            # print(f"node parent ({node_path_parent.x}, {node_path_parent.y})")
+                            if node.x == node_path_parent.x:
+                                if node.y+1 == node_path_parent.y:
+                                    neighbours["down"] = 1
+                            elif node.x+1 == node_path_parent.x:
+                                if node.y == node_path_parent.y:
+                                    neighbours["right"] = 1
+                                elif node.y+1 == node_path_parent.y:
+                                    neighbours["down_right"] += 1
+                        if node_path_child and node_path_child.y >= node.y and node_path_child.x >= node.x:
+                            # print(f"node child ({node_path_child.x}, {node_path_child.y})")
+                            if node.x == node_path_child.x:
+                                if node.y+1 == node_path_child.y:
+                                    neighbours["down"] = 1
+                            elif node.x+1 == node_path_child.x:
+                                if node.y == node_path_child.y:
+                                    neighbours["right"] = 1
+                                elif node.y+1 == node_path_child.y:
+                                    neighbours["down_right"] += 1
+                else:
+                    for neighbour in node.get_neighbour_nodes():
+                        if node.x == neighbour.x:
+                            if node.y+1 == neighbour.y:
+                                neighbours["down"] = 1
+                        elif node.x+1 == neighbour.x:
+                            if node.y == neighbour.y:
+                                neighbours["right"] = 1
+                            elif node.y+1 == neighbour.y:
+                                neighbours["down_right"] += 1
+                    down_node = self.get_node((node.x, node.y+1))
+                    if down_node:
+                        # check for cross the other way
+                        for neighbour_down in down_node.get_neighbour_nodes():
+                            if down_node.y == neighbour_down.y+1 and down_node.x == neighbour_down.x-1:
+                                neighbours["down_right"] += 2
+                                break
+
+                # print(neighbours)
+                    
                 if neighbours["right"]:
                     nodes_string = nodes_string + " -"
                 else:
@@ -315,6 +359,10 @@ class Track:
                         min_path["f"] = path[-1][0]
             if min_path["path"]:
                 print(f"Best path found with weight {min_path['f']}")
+                for i in range(len(min_path["path"])):
+                    node = min_path["path"][i][1].node
+                    end = " -> " if i < len(min_path['path'])-1 else "\n"
+                    print(f"({node.x}, {node.y})", end=end)
                 self.path = min_path["path"]
             else:
                 self.path = []
@@ -342,15 +390,18 @@ class Track:
         self.obstacles.append(obstacle)
 
 
-    def draw(self):
-        self.graph.draw(robot_pos = self.robot_pos, balls = self.balls)
+    def draw(self, with_path = False):
+        if with_path:
+            self.graph.draw(robot_pos = self.robot_pos, balls = self.balls, path = self.path)
+        else:
+            self.graph.draw(robot_pos = self.robot_pos, balls = self.balls)
     
 
 if __name__ == "__main__":
     bounds = {"x": 20, "y": 8}
     track = Track(bounds)
 
-    track.set_robot_pos((15, 5))
+    track.set_robot_pos((2, 5))
     track.add_ball(Ball((1, 2)))
     track.add_ball(Ball((8, 4)))
 
@@ -366,4 +417,4 @@ if __name__ == "__main__":
 
     track.calculate_path()
 
-    track.draw()
+    track.draw(True)
