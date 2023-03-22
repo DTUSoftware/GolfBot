@@ -401,7 +401,7 @@ class Track:
             self.graph.draw(robot_pos = self.robot_pos, balls = self.balls)
 
 def setup_debug():
-    bounds = {"x": 10, "y": 10}
+    bounds = {"x": 30, "y": 30}
     track = Track(bounds)
 
     track.set_robot_pos((8, 7))
