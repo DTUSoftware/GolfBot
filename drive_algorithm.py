@@ -3,10 +3,13 @@ import heapq
 from colorama import init as colorama_init
 from colorama import Fore
 from colorama import Style
+from enum import Enum
 
 colorama_init()
 
 distance_across = math.sqrt(1**2+1**2)
+
+TRACK_GLOBAL = None
 
 class Node:
     def __init__(self, coordinates: tuple):
@@ -396,9 +399,8 @@ class Track:
             self.graph.draw(robot_pos = self.robot_pos, balls = self.balls, path = self.path)
         else:
             self.graph.draw(robot_pos = self.robot_pos, balls = self.balls)
-    
 
-if __name__ == "__main__":
+def setup_debug():
     bounds = {"x": 10, "y": 10}
     track = Track(bounds)
 
@@ -418,6 +420,14 @@ if __name__ == "__main__":
     wall_path.extend([(x, y) for x in range(0, bounds["x"]) for y in [0, bounds["y"]-1]])
     wall_obstacle = Obstacle(track.graph.get_nodes_in_path(wall_path))
     track.add_obstacle(wall_obstacle)
+
+    global TRACK_GLOBAL
+    TRACK_GLOBAL = track
+
+if __name__ == "__main__":
+    setup_debug()
+
+    track = TRACK_GLOBAL
 
     print("=========================\nDrawing with obstacles!\n=========================")
     track.draw(False)
