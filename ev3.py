@@ -7,9 +7,11 @@ import math
 # Variables
 DRIVE_SPEED = 100  # Speed in percent
 TURN_SPEED = 100  # Speed in percent
+FAN_TOGGLE_SPEED = 100  # Speed in percent
 DRIVE_DELAY = 0.1  # Delay between each loop of driving
-FULL_TURN_TIME = 1.2 # Time it takes to spin 360 degrees, in seconds
-IP_ADDRESS = "192.168.1.240" # The IP of the robot
+FULL_TURN_TIME = 1.2  # Time it takes to spin 360 degrees, in seconds
+FAN_MOTOR_DEGREES = 80  # Degrees for turning fans off and on (off, on)
+IP_ADDRESS = "192.168.1.240"  # The IP of the robot
 
 # Connect to the robot and get modules
 conn = rpyc.classic.connect(IP_ADDRESS)
@@ -21,12 +23,14 @@ ROBOT_GLOBAL = None
 
 
 class Robot:
-    def __init__(self, buttons: ev3_button.Button, motors: ev3_motor.MoveTank, current_pos: tuple[int, int] = (0, 0)) -> None:
+    def __init__(self, buttons: ev3_button.Button, motors: ev3_motor.MoveTank, fan_motor = ev3_motor.Motor, current_pos: tuple[int, int] = (0, 0)) -> None:
         self.buttons = buttons
+        self.fan_motor = fan_motor
         self.motors = motors
         self.pos_history: list[tuple[int, int]] = []
         self.current_pos = current_pos
         self.direction = 0.0
+        self.fan_state = False
         self.stopped = False
 
     def forward(self) -> None:
@@ -48,6 +52,13 @@ class Robot:
         if not self.stopped:
             print("turning right")
             self.motors.on(left_speed=ev3_motor.SpeedPercent(TURN_SPEED), right_speed=ev3_motor.SpeedPercent(-TURN_SPEED))
+
+    def toggle_fans(self) -> None:
+        if self.fan_state:
+            self.fan_motor.on_for_degrees(ev3_motor.SpeedPercent(FAN_TOGGLE_SPEED), FAN_MOTOR_DEGREES)
+        else:
+            self.fan_motor.on_for_degrees(ev3_motor.SpeedPercent(-FAN_TOGGLE_SPEED), FAN_MOTOR_DEGREES)
+        self.fan_state = not self.fan_state
 
     # This function is blocking!
     def turn_to_direction(self, direction: float) -> None:
@@ -97,6 +108,8 @@ class Robot:
     def stop(self) -> None:
         self.stopped = True
         self.motors.off()
+        if self.fan_state:
+            self.toggle_fans()
 
     def set_position(self, pos: tuple[int, int]) -> None:
         self.pos_history.append(pos)
@@ -124,5 +137,6 @@ def get_robot(current_pos: tuple[int, int] = (0, 0)) -> Robot:
     # The motors and other things on the robot
     buttons = ev3_button.Button()  # Any buton on the robot
     motors = ev3_motor.MoveTank(left_motor_port=ev3_motor.OUTPUT_A, right_motor_port=ev3_motor.OUTPUT_D)  # Motor on output port A and D
+    fan_motor = ev3_motor.Motor(ev3_motor.OUTPUT_C)
 
-    return Robot(buttons, motors, current_pos)
+    return Robot(buttons, motors, fan_motor, current_pos)
