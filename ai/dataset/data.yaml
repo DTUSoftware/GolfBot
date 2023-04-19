@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 11
+names: ['big-goal', 'blue-golf-balls', 'green-golf-balls', 'obstacle', 'orange-golf-balls', 'purple-pink-golf-balls', 'red-golf-balls', 'robot', 'small-goal', 'white-golf-balls', 'yellow-golf-balls']
+
+roboflow:
+  workspace: cdio
+  project: object-detection-dataset-g5l95
+  version: 5
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/cdio/object-detection-dataset-g5l95/dataset/5
