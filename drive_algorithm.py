@@ -50,7 +50,7 @@ class Obstacle:
 
 
 class NodeData:
-    def __init__(self, node: Node, g: float, h: float, parent: ['NodeData' | None]) -> None:
+    def __init__(self, node: Node, g: float, h: float, parent: Any) -> None:
         self.node = node
         self.g = g
         self.h = h
@@ -135,7 +135,8 @@ class Graph:
     def get_path(self, start_node: Node, dst_node: Node) -> list[NodeData]:
         start_node_data = NodeData(
             start_node, 0, self.h(start_node, dst_node), None)
-        open_list: list[tuple[float, NodeData]] = [(start_node_data.f, start_node_data)]
+        open_list: list[tuple[float, NodeData]] = [
+            (start_node_data.f, start_node_data)]
         closed_list: list[tuple[float, NodeData]] = []
 
         heapq.heapify(open_list)
