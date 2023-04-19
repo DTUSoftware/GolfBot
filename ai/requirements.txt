@@ -1,0 +1,8 @@
+ultralytics
+numpy
+pillow
+requests
+opencv-python
+torch
+torchvision
+torchaudio
