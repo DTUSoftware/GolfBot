@@ -1,0 +1,7 @@
+train: train/images
+val:  valid/images
+test: test/images
+
+nc: 11
+names: ['big-goal', 'blue-golf-balls', 'green-golf-balls', 'obstacle', 'orange-golf-balls', 'purple-pink-golf-balls', 'red-golf-balls', 'robot', 'small-goal', 'white-golf-balls', 'yellow-golf-balls']
+
