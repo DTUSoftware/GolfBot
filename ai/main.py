@@ -13,3 +13,4 @@ model = YOLO(config.PRETRAINED_MODEL)  # load a pretrained model (recommended fo
 model.train(data=config.DATA, epochs=config.EPOCHS)  # train the model
 # metrics = model.val()  # evaluate model performance on the validation set
 success = model.export(format="onnx")  # export the model to ONNX format
+success = model.export(format="pt")  # export the model to pt format too
