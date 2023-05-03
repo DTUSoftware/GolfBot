@@ -9,8 +9,14 @@ import ev3
 import drive_algorithm as drivealg
 
 
-def test_robot_get_pos(old_pos: tuple[int, int]) -> tuple[int, int]:
+def test_robot_get_pos(old_pos: tuple) -> tuple:
     return old_pos[0] + 1, old_pos[1] + 1
+
+
+def toogle_fans_debug(robot: ev3.Robot):
+    input("Press enter to flip the switch")
+    robot.toggle_fans()
+    print(f"Switch is now {robot.fan_state}")
 
 
 def race() -> None:
@@ -24,6 +30,9 @@ def race() -> None:
 
     # while True:
     #     debug_turn()
+
+    while True:
+        toogle_fans_debug(robot=robot)
 
     while time_taken <= 8 * 60 and not robot.buttons_pressed():
         time_taken = time.time() - start_time
@@ -41,7 +50,8 @@ def race() -> None:
             # Recalibrate the direction / angle
             if len(robot.pos_history) > 1:
                 last_pos = robot.pos_history[-2]
-                new_angle = math.atan2(robot.current_pos[1] - last_pos[1], robot.current_pos[0] - last_pos[0])
+                new_angle = math.atan2(
+                    robot.current_pos[1] - last_pos[1], robot.current_pos[0] - last_pos[0])
                 print(f"New robot direction: {new_angle}")
                 robot.set_direction(new_angle)
 
@@ -51,10 +61,12 @@ def race() -> None:
             # Get the first node on the path
             if track.path and len(track.path) > 1:
                 next_node = track.path[1]
-                print(f"Next node pos: ({next_node.node.x}, {next_node.node.y})")
+                print(
+                    f"Next node pos: ({next_node.node.x}, {next_node.node.y})")
 
                 # Tell the robot to drive towards the node
-                robot.drive((next_node.node.x, next_node.node.y))  # THIS CALL IS BLOCKING!
+                # THIS CALL IS BLOCKING!
+                robot.drive((next_node.node.x, next_node.node.y))
 
             # ToDo: Sleep, but actually instead we would just recieve input from the camera/AI, which also takes a small amount of time
             time.sleep(ev3.DRIVE_DELAY)

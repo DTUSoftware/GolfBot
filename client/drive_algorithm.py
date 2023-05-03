@@ -15,7 +15,7 @@ TRACK_GLOBAL = None
 
 
 class Node:
-    def __init__(self, coordinates: tuple[int, int]) -> None:
+    def __init__(self, coordinates: tuple) -> None:
         self.x = coordinates[0]
         self.y = coordinates[1]
         self.neighbours = []
@@ -34,18 +34,18 @@ class Node:
                 self.neighbours.pop(i)
                 return
 
-    def get_neighbour_nodes(self) -> list['Node']:
+    def get_neighbour_nodes(self) -> list('Node'):
         return [neighbour["node"] for neighbour in self.neighbours]
 
 
 class Ball:
-    def __init__(self, pos: tuple[int, int]) -> None:
+    def __init__(self, pos: tuple) -> None:
         self.x = pos[0]
         self.y = pos[1]
 
 
 class Obstacle:
-    def __init__(self, path: list[Node]) -> None:
+    def __init__(self, path: list) -> None:
         self.path = path
 
 
@@ -67,7 +67,7 @@ class NodeData:
 
 class Graph:
     def __init__(self, size_x: int = 500, size_y: int = 200) -> None:
-        self.nodes: list[Node] = []
+        self.nodes: list = []
 
         if size_x and size_y:
             self.nodes = [[Node((x, y)) for x in range(size_x)]
@@ -96,16 +96,16 @@ class Graph:
                     if y+1 < len(self.nodes):
                         node.add_neighbour(self.nodes[y+1][x], 1)
 
-    def add_node(self, coordinates: tuple[int, int]) -> None:
+    def add_node(self, coordinates: tuple) -> None:
         self.nodes.append(Node(coordinates))
 
-    def get_node(self, pos: tuple[int, int]) -> Node | None:
+    def get_node(self, pos: tuple) -> Any:
         if 0 <= pos[0] < len(self.nodes[0]) and 0 <= pos[1] < len(self.nodes):
             return self.nodes[pos[1]][pos[0]]
         else:
             return None
 
-    def get_nodes_in_path(self, path: list) -> list[Node]:
+    def get_nodes_in_path(self, path: list) -> list:
         nodes_in_path = []
         for pos in path:
             node = self.get_node(pos)
@@ -132,7 +132,7 @@ class Graph:
         return abs(start_node.x - dst_node.x) + abs(start_node.y - dst_node.y)
 
     # Get path and cost using A*
-    def get_path(self, start_node: Node, dst_node: Node) -> list[NodeData]:
+    def get_path(self, start_node: Node, dst_node: Node) -> list:
         start_node_data = NodeData(
             start_node, 0, self.h(start_node, dst_node), None)
         open_list: list[tuple[float, NodeData]] = [
@@ -195,7 +195,7 @@ class Graph:
         # for elem in closed_list:
         #     print(f"({elem[1].node.x}, {elem[1].node.y}) - f: {elem[1].f} g: {elem[1].g} h: {elem[1].h}")
 
-        final_list: list[NodeData] = []
+        final_list: list = []
         node = closed_list[-1][1]
         # print(f"End walkthrough, f: {node.f} g: {node.g} h: {node.h}")
         while node:
@@ -206,7 +206,7 @@ class Graph:
 
         return final_list
 
-    def draw(self, robot_pos: tuple[int, int] = None, balls: list[Ball] = None, path: list[NodeData] = None) -> None:
+    def draw(self, robot_pos: tuple = None, balls: list = None, path: list = None) -> None:
         if balls is None:
             balls = []
         if path is None:
@@ -335,7 +335,7 @@ class Track:
         self.balls: list[Ball] = []
         self.obstacles: list[Obstacle] = []
         self.robot_pos = (0, 0)
-        self.path: list[NodeData] = []
+        self.path: list = []
 
         self.graph = Graph(bounds["x"], bounds["y"])
 
@@ -345,12 +345,12 @@ class Track:
     def clear_balls(self) -> None:
         self.balls = []
 
-    def set_robot_pos(self, robot_pos: tuple[int, int]) -> None:
+    def set_robot_pos(self, robot_pos: tuple) -> None:
         self.robot_pos = robot_pos
 
     def calculate_path(self) -> None:
         # For every ball calculate the path, then choose the best path
-        paths: list[list[NodeData]] = []
+        paths: list[list] = []
         for ball in self.balls:
             robot_node = self.graph.get_node(self.robot_pos)
             ball_node = self.graph.get_node((ball.x, ball.y))

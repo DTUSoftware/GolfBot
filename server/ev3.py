@@ -23,11 +23,11 @@ ROBOT_GLOBAL = None
 
 
 class Robot:
-    def __init__(self, buttons: ev3_button.Button, motors: ev3_motor.MoveTank, fan_motor = ev3_motor.Motor, current_pos: tuple[int, int] = (0, 0)) -> None:
+    def __init__(self, buttons: ev3_button.Button, motors: ev3_motor.MoveTank, fan_motor = ev3_motor.Motor, current_pos: tuple = (0, 0)) -> None:
         self.buttons = buttons
         self.fan_motor = fan_motor
         self.motors = motors
-        self.pos_history: list[tuple[int, int]] = []
+        self.pos_history: list(tuple) = []
         self.current_pos = current_pos
         self.direction = 0.0
         self.fan_state = False
@@ -90,7 +90,7 @@ class Robot:
                 while time_taken < time_to_turn and not self.buttons_pressed():
                     time_taken = time.time() - start_time
 
-    def drive(self, pos: tuple[int, int]) -> None:
+    def drive(self, pos: tuple) -> None:
         if not self.stopped:
             # Turn to face the next node
             print(pos)
@@ -111,7 +111,7 @@ class Robot:
         if self.fan_state:
             self.toggle_fans()
 
-    def set_position(self, pos: tuple[int, int]) -> None:
+    def set_position(self, pos: tuple) -> None:
         self.pos_history.append(pos)
         self.current_pos = pos
     
@@ -133,7 +133,7 @@ def setup() -> None:
     ROBOT_GLOBAL = get_robot()
 
 
-def get_robot(current_pos: tuple[int, int] = (0, 0)) -> Robot:
+def get_robot(current_pos: tuple = (0, 0)) -> Robot:
     # The motors and other things on the robot
     buttons = ev3_button.Button()  # Any buton on the robot
     motors = ev3_motor.MoveTank(left_motor_port=ev3_motor.OUTPUT_A, right_motor_port=ev3_motor.OUTPUT_D)  # Motor on output port A and D
