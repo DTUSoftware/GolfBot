@@ -1,133 +1,143 @@
 import math
 import heapq
+from typing import Any
+
 from colorama import init as colorama_init
 from colorama import Fore
 from colorama import Style
+from enum import Enum
 
 colorama_init()
 
 distance_across = math.sqrt(1**2+1**2)
 
+TRACK_GLOBAL = None
+
+
 class Node:
-    def __init__(self, coordinates: tuple):
+    def __init__(self, coordinates: tuple[int, int]) -> None:
         self.x = coordinates[0]
         self.y = coordinates[1]
         self.neighbours = []
-    
-    def add_neighbour(self, node, weight=None):
+
+    def add_neighbour(self, node: 'Node', weight: float = None) -> None:
         if not weight:
             if self.x == node.x or self.y == node.y:
                 weight = 1
             else:
                 weight = distance_across
         self.neighbours.append({"node": node, "weight": weight})
-    
-    def remove_neighbour(self, node):
+
+    def remove_neighbour(self, node: 'Node') -> None:
         for i in range(len(self.neighbours)):
             if self.neighbours[i]["node"] == node:
                 self.neighbours.pop(i)
                 return
-    
-    def get_neighbour_nodes(self):
+
+    def get_neighbour_nodes(self) -> list['Node']:
         return [neighbour["node"] for neighbour in self.neighbours]
 
+
+class Ball:
+    def __init__(self, pos: tuple[int, int]) -> None:
+        self.x = pos[0]
+        self.y = pos[1]
+
+
+class Obstacle:
+    def __init__(self, path: list[Node]) -> None:
+        self.path = path
+
+
 class NodeData:
-    def __init__(self, node, g, h, parent):
+    def __init__(self, node: Node, g: float, h: float, parent: Any) -> None:
         self.node = node
         self.g = g
         self.h = h
         self.parent = parent
-        
+
         self.f = self.g + self.h
-    
-    def __lt__(self, other):
-        return True
-    
-    def __le__(self, other):
+
+    def __lt__(self, other: Any) -> bool:
         return True
 
-class AStar:
-    def __init__(self, graph):
-        self.graph = graph
-    
-    def set_from(self, from_node):
-        self.from_node = from_node
+    def __le__(self, other: Any) -> bool:
+        return True
 
-    def set_target(self, target_node):
-        self.target_node = target_node
-
-    def calculate(self):
-        if not self.graph or not self.from_node or not self.target_node:
-            return []
-        
 
 class Graph:
-    def __init__(self, size_x=500, size_y=200):
-        self.nodes = []
+    def __init__(self, size_x: int = 500, size_y: int = 200) -> None:
+        self.nodes: list[Node] = []
 
         if size_x and size_y:
-            self.nodes = [[Node((x, y)) for x in range(size_x)] for y in range(size_y)]
+            self.nodes = [[Node((x, y)) for x in range(size_x)]
+                          for y in range(size_y)]
 
             for y, row in enumerate(self.nodes):
                 for x, node in enumerate(row):
                     if x-1 >= 0:
                         node.add_neighbour(row[x-1], 1)
                         if y-1 >= 0:
-                            node.add_neighbour(self.nodes[y-1][x-1], distance_across)
+                            node.add_neighbour(
+                                self.nodes[y-1][x-1], distance_across)
                         if y+1 < len(self.nodes):
-                            node.add_neighbour(self.nodes[y+1][x-1], distance_across)
+                            node.add_neighbour(
+                                self.nodes[y+1][x-1], distance_across)
                     if x+1 < len(row):
                         node.add_neighbour(row[x+1], 1)
                         if y-1 >= 0:
-                            node.add_neighbour(self.nodes[y-1][x+1], distance_across)
+                            node.add_neighbour(
+                                self.nodes[y-1][x+1], distance_across)
                         if y+1 < len(self.nodes):
-                            node.add_neighbour(self.nodes[y+1][x+1], distance_across)
+                            node.add_neighbour(
+                                self.nodes[y+1][x+1], distance_across)
                     if y-1 >= 0:
                         node.add_neighbour(self.nodes[y-1][x], 1)
                     if y+1 < len(self.nodes):
                         node.add_neighbour(self.nodes[y+1][x], 1)
 
-
-    def add_node(self, coordinates: tuple):
+    def add_node(self, coordinates: tuple[int, int]) -> None:
         self.nodes.append(Node(coordinates))
-    
-    def get_node(self, pos: tuple):
-        if pos[0] >= 0 and pos[1] >= 0 and pos[1] < len(self.nodes) and pos[0] < len(self.nodes[0]):
+
+    def get_node(self, pos: tuple[int, int]) -> Node | None:
+        if 0 <= pos[0] < len(self.nodes[0]) and 0 <= pos[1] < len(self.nodes):
             return self.nodes[pos[1]][pos[0]]
         else:
             return None
-    
-    def get_nodes_in_path(self, path: list):
+
+    def get_nodes_in_path(self, path: list) -> list[Node]:
         nodes_in_path = []
         for pos in path:
             node = self.get_node(pos)
             if node:
                 nodes_in_path.append(node)
         return nodes_in_path
-    
-    def add_edge(self, node_1, node_2):
+
+    def add_edge(self, node_1: Node, node_2: Node) -> None:
         if node_1 is not node_2 and node_1 and node_2:
             if node_2 not in node_1.get_neighbour_nodes():
                 node_1.add_neighbour(node_2)
             if node_1 not in node_2.get_neighbour_nodes():
                 node_2.add_neighbour(node_1)
-    
-    def remove_edge(self, node_1, node_2):
+
+    def remove_edge(self, node_1: Node, node_2: Node) -> None:
         if node_1 is not node_2 and node_1 and node_2:
             if node_2 in node_1.get_neighbour_nodes():
                 node_1.remove_neighbour(node_2)
             if node_1 in node_2.get_neighbour_nodes():
                 node_2.remove_neighbour(node_1)
-    
+
     # Manhattan Distance heuristic for A*
-    def h(self, start_node, dst_node):
+    def h(self, start_node: Node, dst_node: Node) -> float:
         return abs(start_node.x - dst_node.x) + abs(start_node.y - dst_node.y)
-    
+
     # Get path and cost using A*
-    def get_path(self, start_node, dst_node):
-        start_node_data = NodeData(start_node, 0, self.h(start_node, dst_node), None)
-        open_list = [(start_node_data.f, start_node_data)]
-        closed_list = []
+    def get_path(self, start_node: Node, dst_node: Node) -> list[NodeData]:
+        start_node_data = NodeData(
+            start_node, 0, self.h(start_node, dst_node), None)
+        open_list: list[tuple[float, NodeData]] = [
+            (start_node_data.f, start_node_data)]
+        closed_list: list[tuple[float, NodeData]] = []
 
         heapq.heapify(open_list)
 
@@ -137,15 +147,14 @@ class Graph:
             if current_node[1].node is dst_node:
                 closed_list.append(current_node)
                 break
-            
+
             for neighbour in current_node[1].node.neighbours:
                 neighbour_data = NodeData(
-                    node=neighbour["node"], 
-                    g=current_node[1].g + neighbour["weight"], 
-                    h=self.h(neighbour["node"], dst_node), 
+                    node=neighbour["node"],
+                    g=current_node[1].g + neighbour["weight"],
+                    h=self.h(neighbour["node"], dst_node),
                     parent=current_node[1]
                 )
-                
 
                 closed_list_check = False
                 for i in range(len(closed_list)):
@@ -159,9 +168,10 @@ class Graph:
                                     found = True
                                     break
                             if not found:
-                                heapq.heappush(open_list, (neighbour_data.f, neighbour_data))
+                                heapq.heappush(
+                                    open_list, (neighbour_data.f, neighbour_data))
                         break
-                
+
                 if not closed_list_check:
                     open_list_check = False
                     open_list_list = list(open_list)
@@ -169,22 +179,23 @@ class Graph:
                         if open_list_list[i][1].node == neighbour_data.node:
                             open_list_check = True
                             if neighbour_data.g < open_list_list[i][1].g:
-                                open_list_list[i] = (neighbour_data.f, neighbour_data)
+                                open_list_list[i] = (
+                                    neighbour_data.f, neighbour_data)
                                 open_list = open_list_list
                                 heapq.heapify(open_list)
                             break
-                
-                    if not open_list_check:
-                        heapq.heappush(open_list, (neighbour_data.f, neighbour_data))
 
-            
+                    if not open_list_check:
+                        heapq.heappush(
+                            open_list, (neighbour_data.f, neighbour_data))
+
             closed_list.append(current_node)
-        
+
         # print(closed_list)
         # for elem in closed_list:
         #     print(f"({elem[1].node.x}, {elem[1].node.y}) - f: {elem[1].f} g: {elem[1].g} h: {elem[1].h}")
-        
-        final_list = []
+
+        final_list: list[NodeData] = []
         node = closed_list[-1][1]
         # print(f"End walkthrough, f: {node.f} g: {node.g} h: {node.h}")
         while node:
@@ -194,8 +205,12 @@ class Graph:
         # print("")
 
         return final_list
-    
-    def draw(self, robot_pos: tuple = None, balls=[], path = []):
+
+    def draw(self, robot_pos: tuple[int, int] = None, balls: list[Ball] = None, path: list[NodeData] = None) -> None:
+        if balls is None:
+            balls = []
+        if path is None:
+            path = []
         for y, row in enumerate(self.nodes):
             nodes_string = ""
             conections_string = ""
@@ -225,7 +240,7 @@ class Graph:
                         nodes_string = nodes_string + " o"
                 else:
                     nodes_string = nodes_string + " o"
-                
+
                 neighbours = {"down": 0, "right": 0, "down_right": 0}
                 if path:
                     node_path_parent = None
@@ -285,12 +300,12 @@ class Graph:
                                 break
 
                 # print(neighbours)
-                    
+
                 if neighbours["right"]:
                     nodes_string = nodes_string + " -"
                 else:
                     nodes_string = nodes_string + "  "
-                
+
                 if neighbours["down"]:
                     if neighbours["down_right"] == 1:
                         conections_string = conections_string + " | \\"
@@ -314,42 +329,34 @@ class Graph:
             print(conections_string)
 
 
-class Ball:
-    def __init__(self, pos: tuple):
-        self.x = pos[0]
-        self.y = pos[1]
-
-class Obstacle:
-    def __init__(self, path):
-        self.path = path
-
 class Track:
-    def __init__(self, bounds):
+    def __init__(self, bounds: dict):
         self.bounds = bounds
-        self.balls = []
-        self.obstacles = []
+        self.balls: list[Ball] = []
+        self.obstacles: list[Obstacle] = []
         self.robot_pos = (0, 0)
-        self.path = []
+        self.path: list[NodeData] = []
 
         self.graph = Graph(bounds["x"], bounds["y"])
-    
-    def add_ball(self, ball):
+
+    def add_ball(self, ball: Ball) -> None:
         self.balls.append(ball)
-    
-    def clear_balls(self):
+
+    def clear_balls(self) -> None:
         self.balls = []
-    
-    def set_robot_pos(self, robot_pos: tuple):
+
+    def set_robot_pos(self, robot_pos: tuple[int, int]) -> None:
         self.robot_pos = robot_pos
-    
-    def calculate_path(self):
+
+    def calculate_path(self) -> None:
         # For every ball calculate the path, then choose the best path
-        paths = []
+        paths: list[list[NodeData]] = []
         for ball in self.balls:
             robot_node = self.graph.get_node(self.robot_pos)
             ball_node = self.graph.get_node((ball.x, ball.y))
-            paths.append(self.graph.get_path(start_node = robot_node, dst_node = ball_node))
-        
+            paths.append(self.graph.get_path(
+                start_node=robot_node, dst_node=ball_node))
+
         if paths:
             min_path = {"path": None, "f": None}
             for path in paths:
@@ -369,8 +376,8 @@ class Track:
                 self.path = []
         else:
             self.path = []
-    
-    def clear_obstacles(self):
+
+    def clear_obstacles(self) -> None:
         for obstacle in self.obstacles:
             for node in obstacle.path:
                 for x in range(-1, 1+1):
@@ -378,28 +385,29 @@ class Track:
                         neighbour = self.graph.get_node((node.x+x, node.y+y))
                         self.graph.add_edge(node, neighbour)
         self.obstacles = []
-    
-    def add_obstacle(self, obstacle):
+
+    def add_obstacle(self, obstacle: Obstacle) -> None:
         for node in obstacle.path:
-            #print(f"Removing node edges for node at {node.x}, {node.y}")
+            # print(f"Removing node edges for node at {node.x}, {node.y}")
             for x in range(-1, 1+1):
                 for y in range(-1, 1+1):
                     neighbour = self.graph.get_node((node.x+x, node.y+y))
                     self.graph.remove_edge(node, neighbour)
             if node.neighbours:
-                print(f"Failed to remove all neighbours for obstacle node at {node.x}, {node.y}")
+                print(
+                    f"Failed to remove all neighbours for obstacle node at {node.x}, {node.y}")
         self.obstacles.append(obstacle)
 
-
-    def draw(self, with_path = False):
+    def draw(self, with_path: bool = False) -> None:
         if with_path:
-            self.graph.draw(robot_pos = self.robot_pos, balls = self.balls, path = self.path)
+            self.graph.draw(robot_pos=self.robot_pos,
+                            balls=self.balls, path=self.path)
         else:
-            self.graph.draw(robot_pos = self.robot_pos, balls = self.balls)
-    
+            self.graph.draw(robot_pos=self.robot_pos, balls=self.balls)
 
-if __name__ == "__main__":
-    bounds = {"x": 10, "y": 10}
+
+def setup_debug() -> None:
+    bounds = {"x": 30, "y": 30}
     track = Track(bounds)
 
     track.set_robot_pos((8, 7))
@@ -414,10 +422,21 @@ if __name__ == "__main__":
     # track.add_obstacle(obstacle)
 
     wall_path = []
-    wall_path.extend([(x, y) for x in [0, bounds["x"]-1] for y in range(0, bounds["y"])])
-    wall_path.extend([(x, y) for x in range(0, bounds["x"]) for y in [0, bounds["y"]-1]])
+    wall_path.extend([(x, y) for x in [0, bounds["x"]-1]
+                     for y in range(0, bounds["y"])])
+    wall_path.extend([(x, y) for x in range(0, bounds["x"])
+                     for y in [0, bounds["y"]-1]])
     wall_obstacle = Obstacle(track.graph.get_nodes_in_path(wall_path))
     track.add_obstacle(wall_obstacle)
+
+    global TRACK_GLOBAL
+    TRACK_GLOBAL = track
+
+
+if __name__ == "__main__":
+    setup_debug()
+
+    track = TRACK_GLOBAL
 
     print("=========================\nDrawing with obstacles!\n=========================")
     track.draw(False)
