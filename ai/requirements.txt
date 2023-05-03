@@ -1,15 +1,3 @@
-<<<<<<< Updated upstream
-ultralytics
-numpy
-pillow
-requests
-opencv-python
-torch
-torchvision
-torchaudio
-onnx
-onnxruntime
-=======
 # Ultralytics requirements from https://github.com/ultralytics/ultralytics/blob/main/requirements.txt
 # Usage: pip install -r requirements.txt
 
@@ -55,5 +43,13 @@ thop>=0.1.1  # FLOPs computation
 # roboflow
 
 # Main project requirements
-ultralytics==8.0.20
->>>>>>> Stashed changes
+ultralytics
+numpy
+pillow
+requests
+opencv-python
+torch
+torchvision
+torchaudio
+onnx
+onnxruntime
