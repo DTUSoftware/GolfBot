@@ -32,65 +32,89 @@ class Robot:
         self.direction = 0.0
         self.fan_state = False
         self.stopped = False
+        self.busy = False
 
-    def forward(self) -> None:
+    def forward(self) -> bool:
         if not self.stopped:
             print("going forwards")
             self.motors.on(left_speed=ev3_motor.SpeedPercent(DRIVE_SPEED), right_speed=ev3_motor.SpeedPercent(DRIVE_SPEED))
+            return True
+        return False
 
-    def backwards(self) -> None:
+    def backwards(self) -> bool:
         if not self.stopped:
             print("going backwards")
             self.motors.on(left_speed=ev3_motor.SpeedPercent(-DRIVE_SPEED), right_speed=ev3_motor.SpeedPercent(-DRIVE_SPEED))
+            return True
+        return False
 
-    def turn_left(self) -> None:
+    def turn_left(self, radians=None) -> bool:
         if not self.stopped:
             print("turning left")
-            self.motors.on(left_speed=ev3_motor.SpeedPercent(-TURN_SPEED), right_speed=ev3_motor.SpeedPercent(TURN_SPEED))
+            if radians:
+                self.motors.on_for_degrees(left_speed=ev3_motor.SpeedPercent(-TURN_SPEED),
+                                           right_speed=ev3_motor.SpeedPercent(TURN_SPEED),
+                                           degrees=math.degrees(radians))
+            else:
+                self.motors.on(left_speed=ev3_motor.SpeedPercent(-TURN_SPEED),
+                               right_speed=ev3_motor.SpeedPercent(TURN_SPEED))
+            return True
+        return False
 
-    def turn_right(self) -> None:
+    def turn_right(self, radians=None) -> bool:
         if not self.stopped:
             print("turning right")
-            self.motors.on(left_speed=ev3_motor.SpeedPercent(TURN_SPEED), right_speed=ev3_motor.SpeedPercent(-TURN_SPEED))
+            if radians:
+                self.motors.on_for_degrees(left_speed=ev3_motor.SpeedPercent(TURN_SPEED),
+                                           right_speed=ev3_motor.SpeedPercent(-TURN_SPEED),
+                                           degrees=math.degrees(radians))
+            else:
+                self.motors.on(left_speed=ev3_motor.SpeedPercent(TURN_SPEED),
+                               right_speed=ev3_motor.SpeedPercent(-TURN_SPEED))
+            return True
+        return False
 
-    def toggle_fans(self) -> None:
+    def toggle_fans(self) -> bool:
         if self.fan_state:
             self.fan_motor.on_for_degrees(ev3_motor.SpeedPercent(FAN_TOGGLE_SPEED), FAN_MOTOR_DEGREES)
         else:
             self.fan_motor.on_for_degrees(ev3_motor.SpeedPercent(-FAN_TOGGLE_SPEED), FAN_MOTOR_DEGREES)
         self.fan_state = not self.fan_state
+        return True
 
     # This function is blocking!
-    def turn_to_direction(self, direction: float) -> None:
+    def turn_to_direction(self, direction: float) -> bool:
         if not self.stopped and direction != self.direction and abs(direction - self.direction) != 2*math.pi:
             # get which way to turn
             diff_in_angle = 0
             if self.direction < direction:
                 if (direction - self.direction) > 1*math.pi:
                     diff_in_angle = abs((direction - 2*math.pi)-self.direction)
-                    self.turn_left()
+                    self.turn_left(diff_in_angle)
                 else:
                     diff_in_angle = direction - self.direction
-                    self.turn_right()
+                    self.turn_right(diff_in_angle)
             elif self.direction > direction:
                 if (self.direction - direction) > 1*math.pi:
                     diff_in_angle = abs((self.direction - 2*math.pi)-direction)
-                    self.turn_right()
+                    self.turn_right(diff_in_angle)
                 else:
                     diff_in_angle = self.direction - direction
-                    self.turn_left()
+                    self.turn_left(diff_in_angle)
 
-            time_to_turn = FULL_TURN_TIME * (diff_in_angle / (2*math.pi))
+            # time_to_turn = FULL_TURN_TIME * (diff_in_angle / (2*math.pi))
+            #
+            # print(f"Cd: {self.direction}, Nd: {direction}, diff: {diff_in_angle}, time: {time_to_turn}")
+            #
+            # time_taken = 0
+            # if time_to_turn > 0:
+            #     start_time = time.time()
+            #     while time_taken < time_to_turn and not self.buttons_pressed():
+            #         time_taken = time.time() - start_time
+            return True
+        return False
 
-            print(f"Cd: {self.direction}, Nd: {direction}, diff: {diff_in_angle}, time: {time_to_turn}")
-
-            time_taken = 0
-            if time_to_turn > 0:
-                start_time = time.time()
-                while time_taken < time_to_turn and not self.buttons_pressed():
-                    time_taken = time.time() - start_time
-
-    def drive(self, pos: tuple) -> None:
+    def drive(self, pos: tuple) -> bool:
         if not self.stopped:
             # Turn to face the next node
             print(pos)
@@ -104,13 +128,24 @@ class Robot:
                 print(f"Done turning, driving to the node")
 
             self.forward()
+            return True
+        return False
 
     def stop(self) -> bool:
-        self.stopped = True
-        self.motors.off()
-        if self.fan_state:
-            self.toggle_fans()
-        return True
+        if not self.stopped:
+            self.stopped = True
+            self.motors.off()
+            self.busy = False
+            if self.fan_state:
+                self.toggle_fans()
+            return True
+        return False
+
+    def start(self) -> bool:
+        if self.stopped:
+            self.stopped = False
+            return True
+        return False
 
     def set_position(self, pos: tuple) -> bool:
         self.pos_history.append(pos)

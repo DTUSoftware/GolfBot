@@ -1,5 +1,6 @@
-from flask import Flask, Blueprint
+from flask import Flask, Blueprint, request
 import ev3
+import math
 
 VERSION = "v1"
 
@@ -7,40 +8,81 @@ server = Blueprint('ev3', __name__)
 robot: ev3.Robot
 
 
-@server.route('/drive_forward')
-def drive_forward():
-    robot.forward()
-    return 'forward'
+@server.before_request
+def check_robot_connection():
+    if not robot:
+        return "Robot not initialized.", 500
 
 
-@server.route('/drive_backwards')
-def drive_backwards():
-    robot.backwards()
-    return 'backwards'
+@server.route('/drive')
+def drive():
+    direction = request.args.get("direction")
+    if direction:
+        if "forward" in str(direction).lower():
+            if robot.forward():
+                return "Driving forward.", 200
+            return "Failed to drive forward.", 500
+        elif "back" in str(direction).lower():
+            if robot.backwards():
+                return "Driving backwards.", 200
+            return "Failed to drive backwards.", 500
+        return "Invalid direction, try 'forward' or 'backward'.", 400
+    x = request.args.get("x")
+    y = request.args.get("y")
+    if x and y:
+        if robot.drive((float(x), float(y))):
+            return f"Driving to ({x}, {y}).", 200
+        return f"Failed to try and drive to ({x}, {y}).", 500
+    return "Please provide either 'direction' or position using 'x' and 'y'.", 400
 
 
-@server.route("/turn_left")
-def turn_left():
-    robot.turn_left()
-    return "turn left"
-
-
-@server.route("/turn_right")
-def turn_right():
-    robot.turn_right()
-    return "turn right"
+@server.route("/turn")
+def turn():
+    direction = request.args.get("direction")
+    if direction:
+        if str(direction).lower() == "left":
+            if robot.turn_left():
+                return "Turning left.", 200
+            return "Failed to turn left.", 500
+        elif str(direction).lower() == "right":
+            if robot.turn_right():
+                return "Turning right.", 200
+            return "Failed to turn right.", 500
+        return "Invalid direction, try 'left' or 'right'.", 400
+    radians = request.args.get("radians")
+    degrees = request.args.get("degrees")
+    if radians or degrees:
+        if radians:
+            if robot.turn_to_direction(float(radians)):
+                return f"Turning to {radians}", 200
+            return f"Failed to turn to {radians}.", 500
+        elif degrees:
+            radians = math.radians(float(degrees))
+            if robot.turn_to_direction(radians):
+                return f"Turning to {degrees} ({str(radians)} radians)", 200
+            return f"Failed to turn to {degrees} ({str(radians)} radians).", 500
+    return "Please provide either 'direction', 'radians' or 'degrees'.", 400
 
 
 @server.route("/toggle_fans")
 def toggle_fans():
-    robot.toggle_fans()
-    return "toggle fans"
+    if robot.toggle_fans():
+        return "Toggled the fans.", 200
+    return "Failed to toggle the fans.", 500
 
 
-@server.route("/stop_robot")
+@server.route("/stop")
 def stop_robot():
-    robot.stop()
-    return "stop robot"
+    if robot.stop():
+        return "Stopped the robot.", 200
+    return "Failed to stop the robot. Is it already stopped?", 500
+
+
+@server.route("/start")
+def start_robot():
+    if robot.start():
+        return "Started the robot.", 200
+    return "Failed to start the robot. Is it already started?", 500
 
 
 app = Flask(__name__)
