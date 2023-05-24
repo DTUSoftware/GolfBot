@@ -5,24 +5,34 @@ import sys
 import time
 import math
 import traceback
-import ev3
 import drive_algorithm as drivealg
+import requests
+import random
 
 
-def test_robot_get_pos(old_pos: tuple) -> tuple:
-    return old_pos[0] + 1, old_pos[1] + 1
+ROBOT_API_ENDPOINT = os.environ.get('API_ENDPOINT', "http://localhost:8069/api/v1")
 
 
-def toogle_fans_debug(robot: ev3.Robot):
+def test_robot_get_pos(old_pos: tuple = None) -> tuple:
+    if old_pos:
+        return old_pos[0] + 1, old_pos[1] + 1
+    else:
+        return random.randrange(5, 10), random.randrange(5, 10)
+
+
+def get_robot_status():
+    res = requests.get(f"{ROBOT_API_ENDPOINT}/status")
+    print(res.text)
+
+
+def toogle_fans_debug():
     input("Press enter to flip the switch")
-    robot.toggle_fans()
-    print(f"Switch is now {robot.fan_state}")
+    requests.post(f"{ROBOT_API_ENDPOINT}/toggle_fans")
 
 
 def race() -> None:
     print("Starting race...")
 
-    robot = ev3.ROBOT_GLOBAL
     track = drivealg.TRACK_GLOBAL
 
     start_time = time.time()
@@ -31,10 +41,10 @@ def race() -> None:
     # while True:
     #     debug_turn()
 
-    while True:
-        toogle_fans_debug(robot=robot)
+    # while True:
+    #     toogle_fans_debug()
 
-    while time_taken <= 8 * 60 and not robot.buttons_pressed():
+    while time_taken <= 8 * 60:
         time_taken = time.time() - start_time
         try:
             # Get current robot position and update track robot position
@@ -42,18 +52,10 @@ def race() -> None:
             if track.path and len(track.path) > 1:
                 current_pos = (track.path[1].node.x, track.path[1].node.y)
             else:
-                current_pos = test_robot_get_pos(robot.current_pos)
+                current_pos = test_robot_get_pos()
             print(f"Current robot position: {current_pos}")
-            robot.set_position(current_pos)
-            track.set_robot_pos(robot.current_pos)
-
-            # Recalibrate the direction / angle
-            if len(robot.pos_history) > 1:
-                last_pos = robot.pos_history[-2]
-                new_angle = math.atan2(
-                    robot.current_pos[1] - last_pos[1], robot.current_pos[0] - last_pos[0])
-                print(f"New robot direction: {new_angle}")
-                robot.set_direction(new_angle)
+            track.set_robot_pos(current_pos)
+            requests.post(f"{ROBOT_API_ENDPOINT}/position?x={current_pos[0]}&y={current_pos[1]}")
 
             # Get the path to closest ball
             track.calculate_path()
@@ -65,58 +67,49 @@ def race() -> None:
                     f"Next node pos: ({next_node.node.x}, {next_node.node.y})")
 
                 # Tell the robot to drive towards the node
-                # THIS CALL IS BLOCKING!
-                robot.drive((next_node.node.x, next_node.node.y))
+                # THIS CALL IS NOT BLOCKING!!!
+                requests.post(f"{ROBOT_API_ENDPOINT}/drive?x={next_node.node.x}&y={next_node.node.y}")
 
             # ToDo: Sleep, but actually instead we would just recieve input from the camera/AI, which also takes a small amount of time
-            time.sleep(ev3.DRIVE_DELAY)
+            time.sleep(5)
         except Exception as e:
             print("uh oh... - " + str(e))
             traceback.print_exc()
 
 
-def debug_turn(robot: ev3.Robot) -> None:
-    print("turning to 0")
-    robot.turn_to_direction(0)
-    robot.motors.off()
-    robot.set_direction(0)
+def debug_turn() -> None:
+    radians = 0
+    print(f"turning to {radians}")
+    requests.post(f"{ROBOT_API_ENDPOINT}/turn?radians={radians}")
     time.sleep(1)
-    print("turning to 0.5")
-    robot.turn_to_direction(0.5 * math.pi)
-    robot.motors.off()
-    robot.set_direction(0.5 * math.pi)
+    radians = 0.5 * math.pi
+    print(f"turning to {radians}")
     time.sleep(1)
-    print("turning to 1")
-    robot.turn_to_direction(1 * math.pi)
-    robot.motors.off()
-    robot.set_direction(1 * math.pi)
+    radians = 1 * math.pi
+    print(f"turning to {radians}")
+    requests.post(f"{ROBOT_API_ENDPOINT}/turn?radians={radians}")
     time.sleep(1)
-    print("turning to 1.5")
-    robot.turn_to_direction(1.5 * math.pi)
-    robot.motors.off()
-    robot.set_direction(1.5 * math.pi)
+    radians = 1.5 * math.pi
+    print(f"turning to {radians}")
+    requests.post(f"{ROBOT_API_ENDPOINT}/turn?radians={radians}")
     time.sleep(1)
-    print("turning to 1")
-    robot.turn_to_direction(1 * math.pi)
-    robot.motors.off()
-    robot.set_direction(1 * math.pi)
+    radians = 1 * math.pi
+    print(f"turning to {radians}")
+    requests.post(f"{ROBOT_API_ENDPOINT}/turn?radians={radians}")
     time.sleep(1)
-    print("turning to 0.5")
-    robot.turn_to_direction(0.5 * math.pi)
-    robot.motors.off()
-    robot.set_direction(0.5 * math.pi)
+    radians = 0.5 * math.pi
+    print(f"turning to {radians}")
+    requests.post(f"{ROBOT_API_ENDPOINT}/turn?radians={radians}")
     time.sleep(1)
-    print("turning to 2")
-    robot.turn_to_direction(2 * math.pi)
-    robot.motors.off()
-    robot.set_direction(2 * math.pi)
+    radians = 2 * math.pi
+    print(f"turning to {radians}")
+    requests.post(f"{ROBOT_API_ENDPOINT}/turn?radians={radians}")
     time.sleep(1)
 
 
 if __name__ == '__main__':
     try:
-        # Setup the robot
-        ev3.setup()
+        requests.post(f"{ROBOT_API_ENDPOINT}/start")
 
         # Setup the track / driving algorithm
         drivealg.setup_debug()
@@ -124,5 +117,5 @@ if __name__ == '__main__':
         # Do the race
         race()
     except KeyboardInterrupt:
-        ev3.ROBOT_GLOBAL.stop()
+        requests.post(f"{ROBOT_API_ENDPOINT}/stop")
         raise KeyboardInterrupt()

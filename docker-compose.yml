@@ -16,6 +16,8 @@ services:
 #    build: ./client
 #    restart: always
 #    stop_signal: SIGINT
+#    environment:
+#      - API_ENDPOINT=http://localhost:8069/api/v1
 #    ports:
 #      - 80:80
 #    networks:

@@ -156,6 +156,15 @@ class Robot:
     def set_position(self, pos: tuple) -> bool:
         self.pos_history.append(pos)
         self.current_pos = pos
+
+        # Recalibrate the direction / angle
+        if len(self.pos_history) > 1:
+            last_pos = self.pos_history[-2]
+            new_angle = math.atan2(
+                self.current_pos[1] - last_pos[1], self.current_pos[0] - last_pos[0])
+            print(f"New robot direction: {new_angle}")
+            self.set_direction(new_angle)
+
         return True
     
     def set_direction(self, direction: float) -> bool:

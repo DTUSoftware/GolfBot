@@ -46,7 +46,4 @@ thop>=0.1.1  # FLOPs computation
 ultralytics
 torchaudio
 onnxruntime
-
-python-ev3dev2
-rpyc==3.3.0
 colorama
