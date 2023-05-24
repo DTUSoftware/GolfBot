@@ -14,7 +14,7 @@ def check_robot_connection():
         return "Robot not initialized.", 500
 
 
-@server.route('/drive')
+@server.route('/drive', methods=['POST'])
 def drive():
     direction = request.args.get("direction")
     if direction:
@@ -36,7 +36,7 @@ def drive():
     return "Please provide either 'direction' or position using 'x' and 'y'.", 400
 
 
-@server.route("/turn")
+@server.route("/turn", methods=['POST'])
 def turn():
     direction = request.args.get("direction")
     if direction:
@@ -64,25 +64,34 @@ def turn():
     return "Please provide either 'direction', 'radians' or 'degrees'.", 400
 
 
-@server.route("/toggle_fans")
+@server.route("/toggle_fans", methods=['POST'])
 def toggle_fans():
     if robot.toggle_fans():
         return "Toggled the fans.", 200
     return "Failed to toggle the fans.", 500
 
 
-@server.route("/stop")
+@server.route("/stop", methods=['POST'])
 def stop_robot():
     if robot.stop():
         return "Stopped the robot.", 200
     return "Failed to stop the robot. Is it already stopped?", 500
 
 
-@server.route("/start")
+@server.route("/start", methods=['POST'])
 def start_robot():
     if robot.start():
         return "Started the robot.", 200
     return "Failed to start the robot. Is it already started?", 500
+
+
+@server.route("/status", methods=['GET'])
+def robot_status():
+    return f"Stopped: {robot.stopped}\n" \
+           f"Busy: {robot.busy}\n" \
+           f"Position: {robot.current_pos}\n" \
+           f"Direction: {robot.direction}", \
+           200
 
 
 app = Flask(__name__)

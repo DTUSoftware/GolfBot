@@ -11,7 +11,7 @@ FAN_TOGGLE_SPEED = 100  # Speed in percent
 DRIVE_DELAY = 0.1  # Delay between each loop of driving
 FULL_TURN_TIME = 1.2  # Time it takes to spin 360 degrees, in seconds
 FAN_MOTOR_DEGREES = 80  # Degrees for turning fans off and on (off, on)
-IP_ADDRESS = "192.168.1.240"  # The IP of the robot
+IP_ADDRESS = os.environ.get('ROBOT_IP_ADDRESS', "192.168.1.240")  # The IP of the robot
 
 # Connect to the robot and get modules
 conn = rpyc.classic.connect(IP_ADDRESS)
@@ -35,21 +35,21 @@ class Robot:
         self.busy = False
 
     def forward(self) -> bool:
-        if not self.stopped:
+        if not self.stopped and not self.busy:
             print("going forwards")
             self.motors.on(left_speed=ev3_motor.SpeedPercent(DRIVE_SPEED), right_speed=ev3_motor.SpeedPercent(DRIVE_SPEED))
             return True
         return False
 
     def backwards(self) -> bool:
-        if not self.stopped:
+        if not self.stopped and not self.busy:
             print("going backwards")
             self.motors.on(left_speed=ev3_motor.SpeedPercent(-DRIVE_SPEED), right_speed=ev3_motor.SpeedPercent(-DRIVE_SPEED))
             return True
         return False
 
-    def turn_left(self, radians=None) -> bool:
-        if not self.stopped:
+    def turn_left(self, radians=None, busy_override=False) -> bool:
+        if not self.stopped and (not self.busy or busy_override):
             print("turning left")
             if radians:
                 self.motors.on_for_degrees(left_speed=ev3_motor.SpeedPercent(-TURN_SPEED),
@@ -61,8 +61,8 @@ class Robot:
             return True
         return False
 
-    def turn_right(self, radians=None) -> bool:
-        if not self.stopped:
+    def turn_right(self, radians=None, busy_override=False) -> bool:
+        if not self.stopped and (not self.busy or busy_override):
             print("turning right")
             if radians:
                 self.motors.on_for_degrees(left_speed=ev3_motor.SpeedPercent(TURN_SPEED),
@@ -84,23 +84,24 @@ class Robot:
 
     # This function is blocking!
     def turn_to_direction(self, direction: float) -> bool:
-        if not self.stopped and direction != self.direction and abs(direction - self.direction) != 2*math.pi:
+        if not self.stopped and not self.busy and direction != self.direction and abs(direction - self.direction) != 2*math.pi:
+            self.busy = True
             # get which way to turn
             diff_in_angle = 0
             if self.direction < direction:
                 if (direction - self.direction) > 1*math.pi:
                     diff_in_angle = abs((direction - 2*math.pi)-self.direction)
-                    self.turn_left(diff_in_angle)
+                    self.turn_left(diff_in_angle, busy_override=True)
                 else:
                     diff_in_angle = direction - self.direction
-                    self.turn_right(diff_in_angle)
+                    self.turn_right(diff_in_angle, busy_override=True)
             elif self.direction > direction:
                 if (self.direction - direction) > 1*math.pi:
                     diff_in_angle = abs((self.direction - 2*math.pi)-direction)
-                    self.turn_right(diff_in_angle)
+                    self.turn_right(diff_in_angle, busy_override=True)
                 else:
                     diff_in_angle = self.direction - direction
-                    self.turn_left(diff_in_angle)
+                    self.turn_left(diff_in_angle, busy_override=True)
 
             # time_to_turn = FULL_TURN_TIME * (diff_in_angle / (2*math.pi))
             #
@@ -111,11 +112,12 @@ class Robot:
             #     start_time = time.time()
             #     while time_taken < time_to_turn and not self.buttons_pressed():
             #         time_taken = time.time() - start_time
+            self.busy = False
             return True
         return False
 
     def drive(self, pos: tuple) -> bool:
-        if not self.stopped:
+        if not self.stopped and not self.busy:
             # Turn to face the next node
             print(pos)
             print(self.current_pos)
