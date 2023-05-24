@@ -8,7 +8,7 @@ services:
     environment:
       - ROBOT_IP_ADDRESS=192.168.1.240
     ports:
-      - 8069:80
+      - "8069:80"
     networks:
       - golfbot
 #  robot-client:
