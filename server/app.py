@@ -89,15 +89,16 @@ app = Flask(__name__)
 app.register_blueprint(server, url_prefix=f"/api/{VERSION}")
 
 if __name__ == '__main__':
+    global robot
     try:
         # Setup the robot
         ev3.setup()
         # Get the robot
-        global ROBOT_GLOBAL
         robot = ev3.ROBOT_GLOBAL
 
         # Start the app
         app.run()
     except KeyboardInterrupt:
-        ev3.ROBOT_GLOBAL.stop()
+        if robot:
+            robot.stop()
         raise KeyboardInterrupt()
