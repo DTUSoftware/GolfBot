@@ -1,17 +1,13 @@
 import math
 import heapq
-from typing import Any
-
+from typing import Any, Optional, List, Tuple
 from colorama import init as colorama_init
 from colorama import Fore
 from colorama import Style
-from enum import Enum
 
 colorama_init()
 
-distance_across = math.sqrt(1**2+1**2)
-
-TRACK_GLOBAL = None
+distance_across = math.sqrt(1 ** 2 + 1 ** 2)
 
 
 class Node:
@@ -34,7 +30,7 @@ class Node:
                 self.neighbours.pop(i)
                 return
 
-    def get_neighbour_nodes(self) -> list('Node'):
+    def get_neighbour_nodes(self) -> List['Node']:
         return [neighbour["node"] for neighbour in self.neighbours]
 
 
@@ -67,7 +63,7 @@ class NodeData:
 
 class Graph:
     def __init__(self, size_x: int = 500, size_y: int = 200) -> None:
-        self.nodes: list = []
+        self.nodes: List[Node] = []
 
         if size_x and size_y:
             self.nodes = [[Node((x, y)) for x in range(size_x)]
@@ -75,26 +71,26 @@ class Graph:
 
             for y, row in enumerate(self.nodes):
                 for x, node in enumerate(row):
-                    if x-1 >= 0:
-                        node.add_neighbour(row[x-1], 1)
-                        if y-1 >= 0:
+                    if x - 1 >= 0:
+                        node.add_neighbour(row[x - 1], 1)
+                        if y - 1 >= 0:
                             node.add_neighbour(
-                                self.nodes[y-1][x-1], distance_across)
-                        if y+1 < len(self.nodes):
+                                self.nodes[y - 1][x - 1], distance_across)
+                        if y + 1 < len(self.nodes):
                             node.add_neighbour(
-                                self.nodes[y+1][x-1], distance_across)
-                    if x+1 < len(row):
-                        node.add_neighbour(row[x+1], 1)
-                        if y-1 >= 0:
+                                self.nodes[y + 1][x - 1], distance_across)
+                    if x + 1 < len(row):
+                        node.add_neighbour(row[x + 1], 1)
+                        if y - 1 >= 0:
                             node.add_neighbour(
-                                self.nodes[y-1][x+1], distance_across)
-                        if y+1 < len(self.nodes):
+                                self.nodes[y - 1][x + 1], distance_across)
+                        if y + 1 < len(self.nodes):
                             node.add_neighbour(
-                                self.nodes[y+1][x+1], distance_across)
-                    if y-1 >= 0:
-                        node.add_neighbour(self.nodes[y-1][x], 1)
-                    if y+1 < len(self.nodes):
-                        node.add_neighbour(self.nodes[y+1][x], 1)
+                                self.nodes[y + 1][x + 1], distance_across)
+                    if y - 1 >= 0:
+                        node.add_neighbour(self.nodes[y - 1][x], 1)
+                    if y + 1 < len(self.nodes):
+                        node.add_neighbour(self.nodes[y + 1][x], 1)
 
     def add_node(self, coordinates: tuple) -> None:
         self.nodes.append(Node(coordinates))
@@ -135,9 +131,9 @@ class Graph:
     def get_path(self, start_node: Node, dst_node: Node) -> list:
         start_node_data = NodeData(
             start_node, 0, self.h(start_node, dst_node), None)
-        open_list: list[tuple[float, NodeData]] = [
+        open_list: List[Tuple[float, NodeData]] = [
             (start_node_data.f, start_node_data)]
-        closed_list: list[tuple[float, NodeData]] = []
+        closed_list: List[Tuple[float, NodeData]] = []
 
         heapq.heapify(open_list)
 
@@ -264,38 +260,38 @@ class Graph:
                         if node_path_parent and node_path_parent.y >= node.y and node_path_parent.x >= node.x:
                             # print(f"node parent ({node_path_parent.x}, {node_path_parent.y})")
                             if node.x == node_path_parent.x:
-                                if node.y+1 == node_path_parent.y:
+                                if node.y + 1 == node_path_parent.y:
                                     neighbours["down"] = 1
-                            elif node.x+1 == node_path_parent.x:
+                            elif node.x + 1 == node_path_parent.x:
                                 if node.y == node_path_parent.y:
                                     neighbours["right"] = 1
-                                elif node.y+1 == node_path_parent.y:
+                                elif node.y + 1 == node_path_parent.y:
                                     neighbours["down_right"] += 1
                         if node_path_child and node_path_child.y >= node.y and node_path_child.x >= node.x:
                             # print(f"node child ({node_path_child.x}, {node_path_child.y})")
                             if node.x == node_path_child.x:
-                                if node.y+1 == node_path_child.y:
+                                if node.y + 1 == node_path_child.y:
                                     neighbours["down"] = 1
-                            elif node.x+1 == node_path_child.x:
+                            elif node.x + 1 == node_path_child.x:
                                 if node.y == node_path_child.y:
                                     neighbours["right"] = 1
-                                elif node.y+1 == node_path_child.y:
+                                elif node.y + 1 == node_path_child.y:
                                     neighbours["down_right"] += 1
                 else:
                     for neighbour in node.get_neighbour_nodes():
                         if node.x == neighbour.x:
-                            if node.y+1 == neighbour.y:
+                            if node.y + 1 == neighbour.y:
                                 neighbours["down"] = 1
-                        elif node.x+1 == neighbour.x:
+                        elif node.x + 1 == neighbour.x:
                             if node.y == neighbour.y:
                                 neighbours["right"] = 1
-                            elif node.y+1 == neighbour.y:
+                            elif node.y + 1 == neighbour.y:
                                 neighbours["down_right"] += 1
-                    down_node = self.get_node((node.x, node.y+1))
+                    down_node = self.get_node((node.x, node.y + 1))
                     if down_node:
                         # check for cross the other way
                         for neighbour_down in down_node.get_neighbour_nodes():
-                            if down_node.y == neighbour_down.y+1 and down_node.x == neighbour_down.x-1:
+                            if down_node.y == neighbour_down.y + 1 and down_node.x == neighbour_down.x - 1:
                                 neighbours["down_right"] += 2
                                 break
 
@@ -332,8 +328,8 @@ class Graph:
 class Track:
     def __init__(self, bounds: dict):
         self.bounds = bounds
-        self.balls: list[Ball] = []
-        self.obstacles: list[Obstacle] = []
+        self.balls: List[Ball] = []
+        self.obstacles: List[Obstacle] = []
         self.robot_pos = (0, 0)
         self.path: list = []
 
@@ -350,7 +346,7 @@ class Track:
 
     def calculate_path(self) -> None:
         # For every ball calculate the path, then choose the best path
-        paths: list[list] = []
+        paths: List[list] = []
         for ball in self.balls:
             robot_node = self.graph.get_node(self.robot_pos)
             ball_node = self.graph.get_node((ball.x, ball.y))
@@ -368,7 +364,7 @@ class Track:
                 print(f"Best path found with weight {min_path['f']}")
                 for i in range(len(min_path["path"])):
                     node = min_path["path"][i].node
-                    end = " -> " if i < len(min_path['path'])-1 else "\n"
+                    end = " -> " if i < len(min_path['path']) - 1 else "\n"
                     print(f"({node.x}, {node.y})", end=end)
                 self.path = min_path["path"]
             else:
@@ -380,18 +376,18 @@ class Track:
     def clear_obstacles(self) -> None:
         for obstacle in self.obstacles:
             for node in obstacle.path:
-                for x in range(-1, 1+1):
-                    for y in range(-1, 1+1):
-                        neighbour = self.graph.get_node((node.x+x, node.y+y))
+                for x in range(-1, 1 + 1):
+                    for y in range(-1, 1 + 1):
+                        neighbour = self.graph.get_node((node.x + x, node.y + y))
                         self.graph.add_edge(node, neighbour)
         self.obstacles = []
 
     def add_obstacle(self, obstacle: Obstacle) -> None:
         for node in obstacle.path:
             # print(f"Removing node edges for node at {node.x}, {node.y}")
-            for x in range(-1, 1+1):
-                for y in range(-1, 1+1):
-                    neighbour = self.graph.get_node((node.x+x, node.y+y))
+            for x in range(-1, 1 + 1):
+                for y in range(-1, 1 + 1):
+                    neighbour = self.graph.get_node((node.x + x, node.y + y))
                     self.graph.remove_edge(node, neighbour)
             if node.neighbours:
                 print(
@@ -404,6 +400,9 @@ class Track:
                             balls=self.balls, path=self.path)
         else:
             self.graph.draw(robot_pos=self.robot_pos, balls=self.balls)
+
+
+TRACK_GLOBAL: Optional[Track] = None
 
 
 def setup_debug() -> None:
@@ -422,10 +421,10 @@ def setup_debug() -> None:
     # track.add_obstacle(obstacle)
 
     wall_path = []
-    wall_path.extend([(x, y) for x in [0, bounds["x"]-1]
-                     for y in range(0, bounds["y"])])
+    wall_path.extend([(x, y) for x in [0, bounds["x"] - 1]
+                      for y in range(0, bounds["y"])])
     wall_path.extend([(x, y) for x in range(0, bounds["x"])
-                     for y in [0, bounds["y"]-1]])
+                      for y in [0, bounds["y"] - 1]])
     wall_obstacle = Obstacle(track.graph.get_nodes_in_path(wall_path))
     track.add_obstacle(wall_obstacle)
 
@@ -436,12 +435,13 @@ def setup_debug() -> None:
 if __name__ == "__main__":
     setup_debug()
 
-    track = TRACK_GLOBAL
+    if TRACK_GLOBAL:
+        track = TRACK_GLOBAL
 
-    print("=========================\nDrawing with obstacles!\n=========================")
-    track.draw(False)
+        print("=========================\nDrawing with obstacles!\n=========================")
+        track.draw(False)
 
-    track.calculate_path()
+        track.calculate_path()
 
-    print("=========================\nDrawing driving path!\n=========================")
-    track.draw(True)
+        print("=========================\nDrawing driving path!\n=========================")
+        track.draw(True)

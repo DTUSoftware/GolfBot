@@ -9,7 +9,6 @@ import drive_algorithm as drivealg
 import requests
 import random
 
-
 ROBOT_API_ENDPOINT = os.environ.get('API_ENDPOINT', "http://localhost:8069/api/v1")
 
 

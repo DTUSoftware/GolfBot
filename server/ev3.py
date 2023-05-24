@@ -2,9 +2,12 @@ import rpyc
 import os
 import sys
 import math
+
 # import time
 
 # Variables
+from typing import List
+
 DRIVE_SPEED = 100  # Speed in percent
 TURN_SPEED = 100  # Speed in percent
 FAN_TOGGLE_SPEED = 100  # Speed in percent
@@ -23,11 +26,12 @@ ROBOT_GLOBAL = None
 
 
 class Robot:
-    def __init__(self, buttons: ev3_button.Button, motors: ev3_motor.MoveTank, fan_motor = ev3_motor.Motor, current_pos: tuple = (0, 0)) -> None:
+    def __init__(self, buttons: ev3_button.Button, motors: ev3_motor.MoveTank, fan_motor=ev3_motor.Motor,
+                 current_pos: tuple = (0, 0)) -> None:
         self.buttons = buttons
         self.fan_motor = fan_motor
         self.motors = motors
-        self.pos_history: list(tuple) = []
+        self.pos_history: List[tuple] = []
         self.current_pos = current_pos
         self.direction = 0.0
         self.fan_state = False
@@ -37,14 +41,16 @@ class Robot:
     def forward(self) -> bool:
         if not self.stopped and not self.busy:
             print("going forwards")
-            self.motors.on(left_speed=ev3_motor.SpeedPercent(DRIVE_SPEED), right_speed=ev3_motor.SpeedPercent(DRIVE_SPEED))
+            self.motors.on(left_speed=ev3_motor.SpeedPercent(DRIVE_SPEED),
+                           right_speed=ev3_motor.SpeedPercent(DRIVE_SPEED))
             return True
         return False
 
     def backwards(self) -> bool:
         if not self.stopped and not self.busy:
             print("going backwards")
-            self.motors.on(left_speed=ev3_motor.SpeedPercent(-DRIVE_SPEED), right_speed=ev3_motor.SpeedPercent(-DRIVE_SPEED))
+            self.motors.on(left_speed=ev3_motor.SpeedPercent(-DRIVE_SPEED),
+                           right_speed=ev3_motor.SpeedPercent(-DRIVE_SPEED))
             return True
         return False
 
@@ -84,20 +90,21 @@ class Robot:
 
     # This function is blocking!
     def turn_to_direction(self, direction: float) -> bool:
-        if not self.stopped and not self.busy and direction != self.direction and abs(direction - self.direction) != 2*math.pi:
+        if not self.stopped and not self.busy and direction != self.direction and abs(
+                direction - self.direction) != 2 * math.pi:
             self.busy = True
             # get which way to turn
             diff_in_angle = 0
             if self.direction < direction:
-                if (direction - self.direction) > 1*math.pi:
-                    diff_in_angle = abs((direction - 2*math.pi)-self.direction)
+                if (direction - self.direction) > 1 * math.pi:
+                    diff_in_angle = abs((direction - 2 * math.pi) - self.direction)
                     self.turn_left(diff_in_angle, busy_override=True)
                 else:
                     diff_in_angle = direction - self.direction
                     self.turn_right(diff_in_angle, busy_override=True)
             elif self.direction > direction:
-                if (self.direction - direction) > 1*math.pi:
-                    diff_in_angle = abs((self.direction - 2*math.pi)-direction)
+                if (self.direction - direction) > 1 * math.pi:
+                    diff_in_angle = abs((self.direction - 2 * math.pi) - direction)
                     self.turn_right(diff_in_angle, busy_override=True)
                 else:
                     diff_in_angle = self.direction - direction
@@ -129,7 +136,8 @@ class Robot:
             if angle_to_node == self.direction:
                 print(f"Robot already in correct direction, presumably... Driving to node")
             else:
-                print(f"Robot has to be in direction {angle_to_node} to get to the next node, current direction is {self.direction} - turning...")
+                print(
+                    f"Robot has to be in direction {angle_to_node} to get to the next node, current direction is {self.direction} - turning...")
                 self.turn_to_direction(angle_to_node)  # THIS CALL IS BLOCKING!
                 print(f"Done turning, driving to the node")
 
@@ -166,7 +174,7 @@ class Robot:
             self.set_direction(new_angle)
 
         return True
-    
+
     def set_direction(self, direction: float) -> bool:
         self.direction = direction
         return True
@@ -189,7 +197,8 @@ def setup() -> None:
 def get_robot(current_pos: tuple = (0, 0)) -> Robot:
     # The motors and other things on the robot
     buttons = ev3_button.Button()  # Any buton on the robot
-    motors = ev3_motor.MoveTank(left_motor_port=ev3_motor.OUTPUT_A, right_motor_port=ev3_motor.OUTPUT_D)  # Motor on output port A and D
+    motors = ev3_motor.MoveTank(left_motor_port=ev3_motor.OUTPUT_A,
+                                right_motor_port=ev3_motor.OUTPUT_D)  # Motor on output port A and D
     fan_motor = ev3_motor.Motor(ev3_motor.OUTPUT_C)
 
     return Robot(buttons, motors, fan_motor, current_pos)
