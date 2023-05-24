@@ -8,18 +8,18 @@ services:
     environment:
       - ROBOT_IP_ADDRESS=192.168.1.240
     ports:
-      - 8080:80
+      - 8069:80
     networks:
       - golfbot
-  robot-client:
-    hostname: robot-client
-    build: ./client
-    restart: always
-    stop_signal: SIGINT
-    ports:
-      - 80:80
-    networks:
-      - golfbot
+#  robot-client:
+#    hostname: robot-client
+#    build: ./client
+#    restart: always
+#    stop_signal: SIGINT
+#    ports:
+#      - 80:80
+#    networks:
+#      - golfbot
 networks:
   golfbot:
     name: golfbot
