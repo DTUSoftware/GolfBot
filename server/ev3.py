@@ -1,8 +1,8 @@
 import rpyc
 import os
 import sys
-import time
 import math
+# import time
 
 # Variables
 DRIVE_SPEED = 100  # Speed in percent
@@ -112,6 +112,10 @@ class Robot:
             #     start_time = time.time()
             #     while time_taken < time_to_turn and not self.buttons_pressed():
             #         time_taken = time.time() - start_time
+
+            # Update the direction
+            self.direction = direction
+
             self.busy = False
             return True
         return False

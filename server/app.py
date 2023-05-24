@@ -85,6 +85,21 @@ def start_robot():
     return "Failed to start the robot. Is it already started?", 500
 
 
+@server.route("/position", methods=['GET', 'POST'])
+def robot_position():
+    if request.method == "GET":
+        return robot.current_pos, 200
+    elif request.method == "POST":
+        x = request.args.get("x")
+        y = request.args.get("y")
+        if x and y:
+            if robot.set_position((float(x), float(y))):
+                return f"Set position to ({x}, {y}).", 200
+            return f"Failed to set position to ({x}, {y}).", 500
+        return "Please provide position using 'x' and 'y'.", 400
+    return "Invalid method.", 500
+
+
 @server.route("/status", methods=['GET'])
 def robot_status():
     return f"Stopped: {robot.stopped}\n" \
