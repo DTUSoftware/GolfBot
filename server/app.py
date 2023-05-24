@@ -1,39 +1,61 @@
 from flask import Flask, Blueprint
+import ev3
 
-bp = Blueprint('ev3', __name__)
+VERSION = "v1"
+
+server = Blueprint('ev3', __name__)
+robot: ev3.Robot
 
 
-@bp.route('/drive_forward')
+@server.route('/drive_forward')
 def drive_forward():
+    robot.forward()
     return 'forward'
 
 
-@bp.route('/drive_backwards')
+@server.route('/drive_backwards')
 def drive_backwards():
+    robot.backwards()
     return 'backwards'
 
 
-@bp.route("/turn_left")
+@server.route("/turn_left")
 def turn_left():
+    robot.turn_left()
     return "turn left"
 
 
-@bp.route("/turn_right")
+@server.route("/turn_right")
 def turn_right():
+    robot.turn_right()
     return "turn right"
 
 
-@bp.route("/toggle_fans")
+@server.route("/toggle_fans")
 def toggle_fans():
+    robot.toggle_fans()
     return "toggle fans"
 
-@bp.route("/stop_robot")
+
+@server.route("/stop_robot")
 def stop_robot():
+    robot.stop()
     return "stop robot"
 
 
 app = Flask(__name__)
-app.register_blueprint(bp, url_prefix='/api/v1')
+app.register_blueprint(server, url_prefix=f"/api/{VERSION}")
 
 if __name__ == '__main__':
-    app.run()
+    try:
+        # Setup the robot
+        ev3.setup()
+        # Get the robot
+        global ROBOT_GLOBAL
+        robot = ev3.ROBOT_GLOBAL
+
+        # Start the app
+        app.run()
+    except KeyboardInterrupt:
+        ev3.ROBOT_GLOBAL.stop()
+        raise KeyboardInterrupt()

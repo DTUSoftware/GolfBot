@@ -100,23 +100,26 @@ class Robot:
                 print(f"Robot already in correct direction, presumably... Driving to node")
             else:
                 print(f"Robot has to be in direction {angle_to_node} to get to the next node, current direction is {self.direction} - turning...")
-                self.turn_to_direction(angle_to_node) # THIS CALL IS BLOCKING!
+                self.turn_to_direction(angle_to_node)  # THIS CALL IS BLOCKING!
                 print(f"Done turning, driving to the node")
 
             self.forward()
 
-    def stop(self) -> None:
+    def stop(self) -> bool:
         self.stopped = True
         self.motors.off()
         if self.fan_state:
             self.toggle_fans()
+        return True
 
-    def set_position(self, pos: tuple) -> None:
+    def set_position(self, pos: tuple) -> bool:
         self.pos_history.append(pos)
         self.current_pos = pos
+        return True
     
-    def set_direction(self, direction: float) -> None:
+    def set_direction(self, direction: float) -> bool:
         self.direction = direction
+        return True
 
     def buttons_pressed(self) -> bool:
         return self.buttons.any()
