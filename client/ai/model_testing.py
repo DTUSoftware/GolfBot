@@ -1,11 +1,9 @@
-import torch
 import cv2
 import config
-
-# Load the model from the local .pt file
 from ultralytics import YOLO
 from ultralytics.yolo.utils.plotting import Annotator
 
+# Load the model from the local .pt file
 model = YOLO(config.CURRENT_MODEL + ".pt")
 
 # Open a connection to the webcam
@@ -37,5 +35,5 @@ while True:
 
 # Release the webcam when done
 cap.release()
-
+# Destroy
 cv2.destroyAllWindows()

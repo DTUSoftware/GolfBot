@@ -35,9 +35,10 @@ class Node:
 
 
 class Ball:
-    def __init__(self, pos: tuple) -> None:
+    def __init__(self, pos: tuple, golden=False) -> None:
         self.x = pos[0]
         self.y = pos[1]
+        self.golden = golden
 
 
 class Obstacle:
@@ -345,9 +346,20 @@ class Track:
         self.robot_pos = robot_pos
 
     def calculate_path(self) -> None:
+        if not self.balls:
+            self.path = []
+            return
+
+        # Get every ball that's not golden
+        balls_to_catch = [ball for ball in self.balls if not ball.golden]
+        # If no balls that aren't golden
+        if not balls_to_catch:
+            # Include the golden ball
+            balls_to_catch = self.balls
+
         # For every ball calculate the path, then choose the best path
         paths: List[list] = []
-        for ball in self.balls:
+        for ball in balls_to_catch:
             robot_node = self.graph.get_node(self.robot_pos)
             ball_node = self.graph.get_node((ball.x, ball.y))
             paths.append(self.graph.get_path(
@@ -428,6 +440,15 @@ def setup_debug() -> None:
     wall_obstacle = Obstacle(track.graph.get_nodes_in_path(wall_path))
     track.add_obstacle(wall_obstacle)
 
+    global TRACK_GLOBAL
+    TRACK_GLOBAL = track
+
+
+def setup(bounds: dict) -> None:
+    bounds["x"] = math.ceil(bounds["x"])
+    bounds["y"] = math.ceil(bounds["y"])
+
+    track = Track(bounds)
     global TRACK_GLOBAL
     TRACK_GLOBAL = track
 
