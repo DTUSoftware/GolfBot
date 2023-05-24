@@ -19,9 +19,9 @@ class Node:
     def add_neighbour(self, node: 'Node', weight: float = None) -> None:
         if not weight:
             if self.x == node.x or self.y == node.y:
-                weight = 1
+                weight = max(abs(self.x - node.x), abs(self.y - node.y))
             else:
-                weight = distance_across
+                weight = math.sqrt(abs(self.x - node.x) ** 2 + abs(self.y - node.y) ** 2)
         self.neighbours.append({"node": node, "weight": weight})
 
     def remove_neighbour(self, node: 'Node') -> None:

@@ -42,7 +42,7 @@ def box_confidence(box):
 
 def box_to_pos(box) -> tuple:
     x1, y1, x2, y2 = box.xyxy[0]  # get box coordinates in (top, left, bottom, right) format
-    return (x1 + x2) / 2, (y1 + y2) / 2
+    return int((x1 + x2) / 2), int((y1 + y2) / 2)
 
 
 def race() -> None:
