@@ -1,5 +1,7 @@
 import os
 import cv2
+import json
+import datetime
 import drive_algorithm as drivealg
 
 VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 1))
@@ -7,6 +9,34 @@ VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 1))
 track_setup_mode = None
 draw_path = []
 objects = []
+
+
+def save_preset(filename):
+    if not os.path.exists("track_presets"):
+        os.mkdir("track_presets")
+    with open(f"track_presets/{filename}.json", "w+") as preset_file:
+        json.dump(objects, preset_file)
+
+
+def list_presets():
+    if not os.path.exists("track_presets"):
+        os.mkdir("track_presets")
+    return os.listdir("track_presets")
+
+
+def load_preset(preset):
+    if not os.path.exists(f"track_presets/{preset}"):
+        return
+    with open(f"track_presets/{preset}", "r") as preset_file:
+        data = json.load(preset_file)
+        for obj in data:
+            path = obj["path"]
+            new_path = []
+            for point in path:
+                new_path.append((point[0], point[1]))
+            obj["path"] = new_path
+        global objects
+        objects = data
 
 
 def setup_track_mouse_input(event, x, y, flags, param):
@@ -46,6 +76,9 @@ def setup_track() -> drivealg.Track:
     # Default width and height
     width = 1920.0
     height = 1080.0
+
+    # Whether loaded as a preset or not
+    is_preset = False
 
     # Get variables from video stream
     global track_setup_mode
@@ -101,11 +134,22 @@ def setup_track() -> drivealg.Track:
             if track_setup_mode and draw_path:
                 # Remove last added item
                 draw_path.pop(-1)
+        elif key == ord("l"):  # Load preset
+            while True:
+                presets = list_presets()
+                preset = input(f"Choose a preset:\n{presets}\n\n")
+                if preset == "quit":
+                    break
+                elif preset in presets:
+                    load_preset(preset)
+                    is_preset = True
+                    break
         elif key == ord("w"):  # Save
             objects.append({"object_type": track_setup_mode, "path": draw_path})
             track_setup_mode = None
             draw_path = []
             text = None
+            is_preset = False
         elif key == ord("a"):  # Abort
             track_setup_mode = None
             draw_path = []
@@ -114,6 +158,10 @@ def setup_track() -> drivealg.Track:
     # Release the webcam and close window
     cap.release()
     cv2.destroyAllWindows()
+
+    # If not preset, save objects as new preset
+    if not is_preset:
+        save_preset(datetime.datetime.now().strftime("%Y%m%d%H%M%S"))
 
     # Setup the track / driving algorithm with given parameters
     track = drivealg.setup({"x": width, "y": height})
