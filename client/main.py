@@ -1,22 +1,18 @@
 #!/usr/bin/env python3
-# Use python 3.5.3 or similar (tested with Python 3.6.15)
 import os
-import sys
 import time
 import math
 import traceback
-
-import cv2
-
-import drive_algorithm as drivealg
 import requests
 import random
 from queue import Queue
-from threading import Thread, Event
+from threading import Thread
 from ai.main import run_ai
+from drive_algorithm import Ball, Track
+from track_setup import setup_track
 
 ROBOT_API_ENDPOINT = os.environ.get('API_ENDPOINT', "http://localhost:8069/api/v1")
-GOLF_BALL_CONFIDENCE_GATE = 0.5
+GOLF_BALL_CONFIDENCE_GATE = float(os.environ.get('GOLF_BALL_CONFIDENCE_GATE', 0.5))
 
 
 def test_robot_get_pos(old_pos: tuple = None) -> tuple:
@@ -45,10 +41,9 @@ def box_to_pos(box) -> tuple:
     return int((x1 + x2) / 2), int((y1 + y2) / 2)
 
 
-def race() -> None:
+def race(track: Track) -> None:
     print("Starting race...")
 
-    track = drivealg.TRACK_GLOBAL
     camera_queue = Queue()
 
     ai_thread = Thread(target=run_ai, args=(camera_queue,), daemon=True)
@@ -105,13 +100,13 @@ def race() -> None:
             for ball_box in golf_ball_results:
                 confidence = box_confidence(ball_box)
                 if confidence > GOLF_BALL_CONFIDENCE_GATE:
-                    ball = drivealg.Ball(box_to_pos(ball_box))
+                    ball = Ball(box_to_pos(ball_box))
                     track.add_ball(ball)
             # Add golden balls to track
             for ball_box in golden_ball_results:
                 confidence = box_confidence(ball_box)
                 if confidence > GOLF_BALL_CONFIDENCE_GATE:
-                    ball = drivealg.Ball(box_to_pos(ball_box), golden=True)
+                    ball = Ball(box_to_pos(ball_box), golden=True)
                     track.add_ball(ball)
 
             # Get the path to closest ball
@@ -169,22 +164,11 @@ if __name__ == '__main__':
         # Start robot
         requests.post(f"{ROBOT_API_ENDPOINT}/start")
 
-        # Get frame size of video
-        cap = cv2.VideoCapture(1)
-        width = 1920.0
-        height = 1080.0
-        if cap.isOpened():
-            width = cap.get(3)
-            height = cap.get(4)
-        # Release the webcam and close window
-        cap.release()
-        cv2.destroyAllWindows()
-
-        # Setup the track / driving algorithm
-        drivealg.setup({"x": width, "y": height})
+        # Setup the track
+        track = setup_track()
 
         # Do the race
-        race()
+        race(track)
     except KeyboardInterrupt:
         requests.post(f"{ROBOT_API_ENDPOINT}/stop")
         raise KeyboardInterrupt()

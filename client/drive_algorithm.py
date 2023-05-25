@@ -46,6 +46,12 @@ class Obstacle:
         self.path = path
 
 
+class Goal:
+    def __init__(self, path: list, small=False) -> None:
+        self.path = path
+        self.small = small
+
+
 class NodeData:
     def __init__(self, node: Node, g: float, h: float, parent: Any) -> None:
         self.node = node
@@ -104,10 +110,45 @@ class Graph:
 
     def get_nodes_in_path(self, path: list) -> list:
         nodes_in_path = []
-        for pos in path:
+        for i in range(len(path)):
+            pos = path[i]
             node = self.get_node(pos)
             if node:
                 nodes_in_path.append(node)
+                if i >= 1:
+                    # Get all nodes between the current node and the previous node
+                    # Time for good-ol high school algebra for equation for line between two points, yaaay
+                    y1 = float(path[i - 1][1])
+                    y2 = float(pos[1])
+                    x1 = float(path[i - 1][0])
+                    x2 = float(pos[0])
+
+                    # Are they even apart by more than 1?
+                    if abs(x1 - x2) > 1:
+                        slope = (y1 - y2) / (x1 - x2)
+                        y_intercept = (x1*y2 - x2*y1) / (x1 - x2)
+                        x_min = min(x1, x2)
+                        x_max = max(x1, x2)
+                        for x in range(int(x_min+1), int(x_max)):
+                            y = int(slope * float(x) + y_intercept)
+                            pos = (x, y)
+                            if pos not in path:
+                                node = self.get_node(pos)
+                                if node:
+                                    nodes_in_path.append(node)
+                    elif abs(y1 - y2) > 1:
+                        slope = (x1 - x2) / (y1 - y2)
+                        x_intercept = (y1 * x2 - y2 * x1) / (y1 - y2)
+                        y_min = min(y1, y2)
+                        y_max = max(y1, y2)
+                        for y in range(int(y_min+1), int(y_max)):
+                            x = int(slope * float(y) + x_intercept)
+                            pos = (x, y)
+                            if pos not in path:
+                                node = self.get_node(pos)
+                                if node:
+                                    nodes_in_path.append(node)
+
         return nodes_in_path
 
     def add_edge(self, node_1: Node, node_2: Node) -> None:
@@ -331,6 +372,8 @@ class Track:
         self.bounds = bounds
         self.balls: List[Ball] = []
         self.obstacles: List[Obstacle] = []
+        self.small_goal: Optional[Goal] = None
+        self.big_goal: Optional[Goal] = None
         self.robot_pos = (0, 0)
         self.path: list = []
 
@@ -406,6 +449,12 @@ class Track:
                     f"Failed to remove all neighbours for obstacle node at {node.x}, {node.y}")
         self.obstacles.append(obstacle)
 
+    def add_goal(self, goal: Goal) -> None:
+        if goal.small:
+            self.small_goal = goal
+        else:
+            self.big_goal = goal
+
     def draw(self, with_path: bool = False) -> None:
         if with_path:
             self.graph.draw(robot_pos=self.robot_pos,
@@ -444,13 +493,14 @@ def setup_debug() -> None:
     TRACK_GLOBAL = track
 
 
-def setup(bounds: dict) -> None:
+def setup(bounds: dict) -> Track:
     bounds["x"] = math.ceil(bounds["x"])
     bounds["y"] = math.ceil(bounds["y"])
 
     track = Track(bounds)
     global TRACK_GLOBAL
     TRACK_GLOBAL = track
+    return track
 
 
 if __name__ == "__main__":

@@ -1,9 +1,12 @@
+import os
 import cv2
 import config
 from ultralytics import YOLO
 from ultralytics.yolo.utils.plotting import Annotator
 from threading import Event
 from queue import Queue
+
+VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 1))
 
 
 # To be run as a thread
@@ -12,7 +15,7 @@ def run_ai(queue: Queue):
     model = YOLO(config.CURRENT_MODEL + ".pt")
 
     # Open a connection to the webcam
-    cap = cv2.VideoCapture(1)
+    cap = cv2.VideoCapture(VIDEO_INPUT)
 
     while cap.isOpened():
         # Capture a frame from the webcam

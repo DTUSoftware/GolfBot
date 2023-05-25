@@ -1,13 +1,11 @@
+# Use python 3.5.3 or similar (tested with Python 3.6.15)
 import rpyc
 import os
 import sys
 import math
-
-# import time
-
-# Variables
 from typing import List
 
+# Variables
 DRIVE_SPEED = 100  # Speed in percent
 TURN_SPEED = 100  # Speed in percent
 FAN_TOGGLE_SPEED = 100  # Speed in percent
