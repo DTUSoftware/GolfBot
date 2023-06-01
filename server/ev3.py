@@ -55,6 +55,7 @@ class Robot:
         if not self.stopped and (not self.busy or busy_override):
             print("turning left")
             if radians:
+                print("degrees: " + str(math.degrees(radians)))
                 self.motors.on_for_degrees(left_speed=ev3_motor.SpeedPercent(-TURN_SPEED),
                                            right_speed=ev3_motor.SpeedPercent(TURN_SPEED),
                                            degrees=math.degrees(radians))
@@ -68,9 +69,13 @@ class Robot:
         if not self.stopped and (not self.busy or busy_override):
             print("turning right")
             if radians:
+                print("degrees: " + str(math.degrees(radians)))
                 self.motors.on_for_degrees(left_speed=ev3_motor.SpeedPercent(TURN_SPEED),
                                            right_speed=ev3_motor.SpeedPercent(-TURN_SPEED),
                                            degrees=math.degrees(radians))
+                # self.motors.left_motor.run_to_rel_pos(position_sp=math.degrees(radians), speed_sp=ev3_motor.SpeedPercent(TURN_SPEED))
+                # self.motors.left_motor.run_to_rel_pos(position_sp=-math.degrees(radians), speed_sp=ev3_motor.SpeedPercent(TURN_SPEED))
+                # self.motors.wait_until_not_moving()
             else:
                 self.motors.on(left_speed=ev3_motor.SpeedPercent(TURN_SPEED),
                                right_speed=ev3_motor.SpeedPercent(-TURN_SPEED))
@@ -87,42 +92,42 @@ class Robot:
 
     # This function is blocking!
     def turn_to_direction(self, direction: float) -> bool:
-        if not self.stopped and not self.busy and direction != self.direction and abs(
-                direction - self.direction) != 2 * math.pi:
-            self.busy = True
-            # get which way to turn
-            diff_in_angle = 0
-            if self.direction < direction:
-                if (direction - self.direction) > 1 * math.pi:
-                    diff_in_angle = abs((direction - 2 * math.pi) - self.direction)
-                    self.turn_left(diff_in_angle, busy_override=True)
-                else:
-                    diff_in_angle = direction - self.direction
-                    self.turn_right(diff_in_angle, busy_override=True)
-            elif self.direction > direction:
-                if (self.direction - direction) > 1 * math.pi:
-                    diff_in_angle = abs((self.direction - 2 * math.pi) - direction)
-                    self.turn_right(diff_in_angle, busy_override=True)
-                else:
-                    diff_in_angle = self.direction - direction
-                    self.turn_left(diff_in_angle, busy_override=True)
+        if self.stopped or self.busy or direction == self.direction or abs(direction - self.direction) == 2 * math.pi:
+            return False
 
-            # time_to_turn = FULL_TURN_TIME * (diff_in_angle / (2*math.pi))
-            #
-            # print(f"Cd: {self.direction}, Nd: {direction}, diff: {diff_in_angle}, time: {time_to_turn}")
-            #
-            # time_taken = 0
-            # if time_to_turn > 0:
-            #     start_time = time.time()
-            #     while time_taken < time_to_turn and not self.buttons_pressed():
-            #         time_taken = time.time() - start_time
+        self.busy = True
+        # get which way to turn
+        diff_in_angle = 0
 
-            # Update the direction
-            self.direction = direction
+        direction = direction % (2 * math.pi)
+        print("direction: " + str(direction))
+        print("self.direction: " + str(self.direction))
 
-            self.busy = False
-            return True
-        return False
+        ROBOT_TURN_RATIO = 2
+
+        if self.direction < direction:
+            if (direction - self.direction) > math.pi:
+                # diff_in_angle = abs(direction - self.direction)
+                diff_in_angle = abs((direction - 2 * math.pi) - self.direction)
+                self.turn_left(diff_in_angle*ROBOT_TURN_RATIO, busy_override=True)
+            else:
+                diff_in_angle = abs(direction - self.direction)
+                self.turn_right(diff_in_angle*ROBOT_TURN_RATIO, busy_override=True)
+        else:
+            if (self.direction - direction) > math.pi:
+                # diff_in_angle = abs(self.direction - direction)
+                diff_in_angle = abs((self.direction - 2 * math.pi) - direction)
+                self.turn_right(diff_in_angle*ROBOT_TURN_RATIO, busy_override=True)
+            else:
+                diff_in_angle = abs(self.direction - direction)
+                self.turn_left(diff_in_angle*ROBOT_TURN_RATIO, busy_override=True)
+
+        # Update the direction
+        print("diff: " + str(diff_in_angle))
+        self.direction = direction
+
+        self.busy = False
+        return True
 
     def drive(self, pos: tuple) -> bool:
         if not self.stopped and not self.busy:
@@ -134,7 +139,9 @@ class Robot:
                 print("Robot already in correct direction, presumably... Driving to node")
             else:
                 print(
-                    "Robot has to be in direction " + str(angle_to_node) + " to get to the next node, current direction is " + str(self.direction) + " - turning...")
+                    "Robot has to be in direction " + str(
+                        angle_to_node) + " to get to the next node, current direction is " + str(
+                        self.direction) + " - turning...")
                 self.turn_to_direction(angle_to_node)  # THIS CALL IS BLOCKING!
                 print("Done turning, driving to the node")
 

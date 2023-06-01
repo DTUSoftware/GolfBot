@@ -7,6 +7,7 @@ services:
     stop_signal: SIGINT
     environment:
       - ROBOT_IP_ADDRESS=192.168.1.240
+      - PYTHONUNBUFFERED=TRUE
     ports:
       - "8069:80"
     networks:
