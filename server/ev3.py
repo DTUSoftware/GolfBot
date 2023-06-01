@@ -6,10 +6,9 @@ import math
 from typing import List
 
 # Variables
-DRIVE_SPEED = 100  # Speed in percent
-TURN_SPEED = 100  # Speed in percent
+DRIVE_SPEED = 20  # Speed in percent
+TURN_SPEED = 20  # Speed in percent
 FAN_TOGGLE_SPEED = 100  # Speed in percent
-DRIVE_DELAY = 0.1  # Delay between each loop of driving
 FULL_TURN_TIME = 1.2  # Time it takes to spin 360 degrees, in seconds
 FAN_MOTOR_DEGREES = 80  # Degrees for turning fans off and on (off, on)
 IP_ADDRESS = os.environ.get('ROBOT_IP_ADDRESS', "192.168.1.240")  # The IP of the robot
@@ -168,7 +167,7 @@ class Robot:
             last_pos = self.pos_history[-2]
             new_angle = math.atan2(
                 self.current_pos[1] - last_pos[1], self.current_pos[0] - last_pos[0])
-            print("New robot direction: " + new_angle)
+            print("New robot direction: " + str(new_angle))
             self.set_direction(new_angle)
 
         return True

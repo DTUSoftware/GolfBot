@@ -5,6 +5,7 @@ import datetime
 import drive_algorithm as drivealg
 
 VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 1))
+TRACK_PRESET = os.environ.get('TRACK_PRESET', "track.json")
 
 track_setup_mode = None
 draw_path = []
@@ -76,6 +77,9 @@ def setup_track() -> drivealg.Track:
     # Default width and height
     width = 1920.0
     height = 1080.0
+
+    # Try and load environment preset
+    load_preset(TRACK_PRESET)
 
     # Whether loaded as a preset or not
     is_preset = False

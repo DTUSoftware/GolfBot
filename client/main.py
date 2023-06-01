@@ -13,7 +13,7 @@ from drive_algorithm import Ball, Track
 from track_setup import setup_track
 
 ROBOT_API_ENDPOINT = os.environ.get('API_ENDPOINT', "http://localhost:8069/api/v1")
-GOLF_BALL_CONFIDENCE_GATE = float(os.environ.get('GOLF_BALL_CONFIDENCE_GATE', 0.5))
+GOLF_BALL_CONFIDENCE_GATE = float(os.environ.get('GOLF_BALL_CONFIDENCE_GATE', 0.45))
 
 
 def test_robot_get_pos(old_pos: tuple = None) -> tuple:
@@ -44,19 +44,9 @@ def box_to_pos(box) -> tuple:
 
 def race(track: Track) -> None:
     print("Starting AI thread...")
-    # pool = multiprocessing.Pool()
-    # multiprocessing_manager = multiprocessing.Manager()
-    # camera_queue = multiprocessing_manager.Queue()
-    # workers = pool.apply_async(run_ai, (camera_queue,))
-
-
-    # camera_queue = multiprocessing.Queue(maxsize=0)
-    # ai_thread = multiprocessing.Process(target=run_ai, args=(camera_queue,), daemon=True)
-    # ai_thread.daemon = True
-    # ai_thread.start()
 
     # Create the camera and AI queues
-    camera_queue = queue.Queue()
+    camera_queue = queue.Queue(maxsize=1)
 
     # Start the camera processing thread
     camera_thread = threading.Thread(target=run_ai, args=(camera_queue,))
@@ -192,8 +182,13 @@ def debug_turn() -> None:
 
 if __name__ == '__main__':
     try:
-        # Start robot
-        requests.post(f"{ROBOT_API_ENDPOINT}/start")
+        while True:
+            try:
+                # Start robot
+                requests.post(f"{ROBOT_API_ENDPOINT}/start")
+                break
+            except ConnectionError as e:
+                pass
 
         # Setup the track
         track = setup_track()
