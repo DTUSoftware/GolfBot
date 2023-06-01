@@ -1,0 +1,27 @@
+version: "3.9"
+services:
+  robot-api:
+    hostname: robot-api
+    build: ./server
+    restart: always
+    stop_signal: SIGINT
+    environment:
+      - ROBOT_IP_ADDRESS=192.168.1.240
+    ports:
+      - "8069:80"
+    networks:
+      - golfbot
+#  robot-client:
+#    hostname: robot-client
+#    build: ./client
+#    restart: always
+#    stop_signal: SIGINT
+#    environment:
+#      - API_ENDPOINT=http://localhost:8069/api/v1
+#    ports:
+#      - 80:80
+#    networks:
+#      - golfbot
+networks:
+  golfbot:
+    name: golfbot
