@@ -78,16 +78,19 @@ def setup_track() -> drivealg.Track:
     width = 1920.0
     height = 1080.0
 
-    # Try and load environment preset
-    load_preset(TRACK_PRESET)
-
-    # Whether loaded as a preset or not
-    is_preset = False
-
     # Get variables from video stream
     global track_setup_mode
     global draw_path
     global objects
+
+    # Try and load environment preset
+    load_preset(TRACK_PRESET)
+    # Whether loaded as a preset or not
+    if objects:
+        is_preset = True
+    else:
+        is_preset = False
+
     track_setup_mode = None
     draw_path = []
     text = None
