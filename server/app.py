@@ -5,13 +5,20 @@ import math
 VERSION = "v1"
 
 server = Blueprint('ev3', __name__)
-robot: ev3.Robot
+robot = None
 
 
 @server.before_request
 def check_robot_connection():
+    global robot
     if not robot:
-        return "Robot not initialized.", 500
+        # Setup the robot
+        ev3.setup()
+        # Get the robot
+        robot = ev3.ROBOT_GLOBAL
+
+        if not robot:
+            return "Robot cannot be initialized.", 500
 
 
 @server.route('/drive', methods=['POST'])
@@ -30,9 +37,9 @@ def drive():
     x = request.args.get("x")
     y = request.args.get("y")
     if x and y:
-        if robot.drive((float(x), float(y))):
-            return f"Driving to ({x}, {y}).", 200
-        return f"Failed to try and drive to ({x}, {y}).", 500
+        if robot.drive((int(x), int(y))):
+            return "Driving to (" + x + ", " + y + ").", 200
+        return "Failed to try and drive to (" + x + ", " + y + ").", 500
     return "Please provide either 'direction' or position using 'x' and 'y'.", 400
 
 
@@ -54,13 +61,13 @@ def turn():
     if radians or degrees:
         if radians:
             if robot.turn_to_direction(float(radians)):
-                return f"Turning to {radians}", 200
-            return f"Failed to turn to {radians}.", 500
+                return "Turning to " + radians, 200
+            return "Failed to turn to " + radians, 500
         elif degrees:
             radians = math.radians(float(degrees))
             if robot.turn_to_direction(radians):
-                return f"Turning to {degrees} ({str(radians)} radians)", 200
-            return f"Failed to turn to {degrees} ({str(radians)} radians).", 500
+                return "Turning to " + degrees + " (" + str(radians) + " radians)", 200
+            return "Failed to turn to " + degrees + " (" + str(radians) + " radians).", 500
     return "Please provide either 'direction', 'radians' or 'degrees'.", 400
 
 
@@ -88,32 +95,31 @@ def start_robot():
 @server.route("/position", methods=['GET', 'POST'])
 def robot_position():
     if request.method == "GET":
-        return robot.current_pos, 200
+        return str(robot.current_pos), 200
     elif request.method == "POST":
         x = request.args.get("x")
         y = request.args.get("y")
         if x and y:
-            if robot.set_position((float(x), float(y))):
-                return f"Set position to ({x}, {y}).", 200
-            return f"Failed to set position to ({x}, {y}).", 500
+            if robot.set_position((int(x), int(y))):
+                return "Set position to (" + x + ", " + y + ").", 200
+            return "Failed to set position to (" + x + ", " + y + ").", 500
         return "Please provide position using 'x' and 'y'.", 400
     return "Invalid method.", 500
 
 
 @server.route("/status", methods=['GET'])
 def robot_status():
-    return f"Stopped: {robot.stopped}\n" \
-           f"Busy: {robot.busy}\n" \
-           f"Position: {robot.current_pos}\n" \
-           f"Direction: {robot.direction}", \
+    return "Stopped: " + robot.stopped + "\n" \
+           "Busy:  " + robot.busy + "\n" \
+           "Position: " + robot.current_pos + "\n" \
+           "Direction: " + robot.direction, \
            200
 
 
 app = Flask(__name__)
-app.register_blueprint(server, url_prefix=f"/api/{VERSION}")
+app.register_blueprint(server, url_prefix="/api/" + VERSION)
 
 if __name__ == '__main__':
-    global robot
     try:
         # Setup the robot
         ev3.setup()

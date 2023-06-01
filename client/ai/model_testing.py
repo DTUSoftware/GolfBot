@@ -1,13 +1,20 @@
 import cv2
-import config
+import os
 from ultralytics import YOLO
 from ultralytics.yolo.utils.plotting import Annotator
 
+VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 1))
+CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/26041010")
+PRETRAINED_MODEL = os.environ.get("PRETRAINED_MODEL", "yolov8n.pt")
+DATA = os.environ.get("DATA", "datasets/RoboFlow1904/data.yaml")
+EPOCHS = int(os.environ.get("EPOCHS", 3))
+IMGSZ = int(os.environ.get("IMGSZ", 640))  # needs to be a multiple of 32
+
 # Load the model from the local .pt file
-model = YOLO(config.CURRENT_MODEL + ".pt")
+model = YOLO(CURRENT_MODEL + ".pt")
 
 # Open a connection to the webcam
-cap = cv2.VideoCapture(1)
+cap = cv2.VideoCapture(VIDEO_INPUT)
 
 while True:
     # Capture a frame from the webcam

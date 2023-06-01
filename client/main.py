@@ -5,8 +5,9 @@ import math
 import traceback
 import requests
 import random
-from queue import Queue
-from threading import Thread
+# import multiprocessing
+import threading
+import queue
 from ai.main import run_ai
 from drive_algorithm import Ball, Track
 from track_setup import setup_track
@@ -42,12 +43,33 @@ def box_to_pos(box) -> tuple:
 
 
 def race(track: Track) -> None:
-    print("Starting race...")
+    print("Starting AI thread...")
+    # pool = multiprocessing.Pool()
+    # multiprocessing_manager = multiprocessing.Manager()
+    # camera_queue = multiprocessing_manager.Queue()
+    # workers = pool.apply_async(run_ai, (camera_queue,))
 
-    camera_queue = Queue()
 
-    ai_thread = Thread(target=run_ai, args=(camera_queue,), daemon=True)
+    # camera_queue = multiprocessing.Queue(maxsize=0)
+    # ai_thread = multiprocessing.Process(target=run_ai, args=(camera_queue,), daemon=True)
+    # ai_thread.daemon = True
+    # ai_thread.start()
 
+    # Create the camera and AI queues
+    camera_queue = queue.Queue()
+
+    # Start the camera processing thread
+    camera_thread = threading.Thread(target=run_ai, args=(camera_queue,))
+    camera_thread.daemon = True  # Set the thread as daemon so it exits when the main thread ends
+    camera_thread.start()
+
+    print("Getting initial AI result.")
+    ai_results = camera_queue.get()
+    print("Got result, marking as ready.")
+    camera_queue.task_done()
+    print("AI thread ready.")
+
+    print("Strating race...")
     start_time = time.time()
     time_taken = 0
 
@@ -60,7 +82,9 @@ def race(track: Track) -> None:
     while time_taken <= 8 * 60:
         try:
             # Get results from AI
-            ai_results, evt = camera_queue.get()
+            # ai_results, evt = camera_queue.get(block=True, timeout=None)
+            ai_results = camera_queue.get(block=False)
+            print("Got results from AI!")
 
             robot_results = []
             golf_ball_results = []
@@ -73,7 +97,7 @@ def race(track: Track) -> None:
                     if "robot" in class_name:
                         robot_results.append(box)
                     elif "golf-balls" in class_name:
-                        if any(["golden", "yellow"]) in class_name:
+                        if any(x in class_name for x in ["golden", "yellow"]):
                             golden_ball_results.append(box)
                         else:
                             golf_ball_results.append(box)
@@ -83,17 +107,20 @@ def race(track: Track) -> None:
             golden_ball_results.sort(key=box_confidence)
 
             # Get current robot position and update track robot position
-            robot_box = robot_results[0]
-            current_pos = box_to_pos(robot_box)
-            print(f"Using robot with confidence {box_confidence(robot_box):.2f} at position ({current_pos[0]}, {current_pos[1]})")
-            # if track.path and len(track.path) > 1:
-            #     current_pos = (track.path[1].node.x, track.path[1].node.y)
-            # else:
-            #     current_pos = test_robot_get_pos()
+            if robot_results:
+                robot_box = robot_results[0]
+                current_pos = box_to_pos(robot_box)
+                print(f"Using robot with confidence {box_confidence(robot_box):.2f} at position ({current_pos[0]}, {current_pos[1]})")
+                # if track.path and len(track.path) > 1:
+                #     current_pos = (track.path[1].node.x, track.path[1].node.y)
+                # else:
+                #     current_pos = test_robot_get_pos()
 
-            # print(f"Current robot position: {current_pos}")
-            track.set_robot_pos(current_pos)
-            requests.post(f"{ROBOT_API_ENDPOINT}/position?x={current_pos[0]}&y={current_pos[1]}")
+                # print(f"Current robot position: {current_pos}")
+                track.set_robot_pos(current_pos)
+                requests.post(f"{ROBOT_API_ENDPOINT}/position?x={current_pos[0]}&y={current_pos[1]}")
+            else:
+                print("No robot on track!")
 
             # Add balls to track
             track.clear_balls()
@@ -122,7 +149,11 @@ def race(track: Track) -> None:
                 requests.post(f"{ROBOT_API_ENDPOINT}/drive?x={next_node.node.x}&y={next_node.node.y}")
 
             # Let AI know we are done with the data
-            evt.set()
+            print("Marked as done with event")
+            # evt.set()
+            camera_queue.task_done()
+        except queue.Empty:
+            pass
         except Exception as e:
             print("uh oh... - " + str(e))
             traceback.print_exc()
@@ -172,3 +203,5 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         requests.post(f"{ROBOT_API_ENDPOINT}/stop")
         raise KeyboardInterrupt()
+    except ConnectionError:
+        print("Failed to connect to robot. Is the API on?")

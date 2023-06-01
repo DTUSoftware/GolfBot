@@ -29,7 +29,7 @@ class Robot:
         self.buttons = buttons
         self.fan_motor = fan_motor
         self.motors = motors
-        self.pos_history: List[tuple] = []
+        self.pos_history = []
         self.current_pos = current_pos
         self.direction = 0.0
         self.fan_state = False
@@ -132,12 +132,12 @@ class Robot:
             print(self.current_pos)
             angle_to_node = math.atan2(self.current_pos[1] - pos[1], self.current_pos[0] - pos[0])
             if angle_to_node == self.direction:
-                print(f"Robot already in correct direction, presumably... Driving to node")
+                print("Robot already in correct direction, presumably... Driving to node")
             else:
                 print(
-                    f"Robot has to be in direction {angle_to_node} to get to the next node, current direction is {self.direction} - turning...")
+                    "Robot has to be in direction " + str(angle_to_node) + " to get to the next node, current direction is " + str(self.direction) + " - turning...")
                 self.turn_to_direction(angle_to_node)  # THIS CALL IS BLOCKING!
-                print(f"Done turning, driving to the node")
+                print("Done turning, driving to the node")
 
             self.forward()
             return True
@@ -168,7 +168,7 @@ class Robot:
             last_pos = self.pos_history[-2]
             new_angle = math.atan2(
                 self.current_pos[1] - last_pos[1], self.current_pos[0] - last_pos[0])
-            print(f"New robot direction: {new_angle}")
+            print("New robot direction: " + new_angle)
             self.set_direction(new_angle)
 
         return True
@@ -186,8 +186,8 @@ def debug(*args, **kwargs) -> None:
 
 
 def setup() -> None:
-    os.system('setfont Lat15-TerminusBold14')  # Sets the console font
-    print('\x1Bc', end='')  # Resets the console
+    # os.system('setfont Lat15-TerminusBold14')  # Sets the console font
+    # print('\x1Bc', end='')  # Resets the console
     global ROBOT_GLOBAL
     ROBOT_GLOBAL = get_robot()
 
