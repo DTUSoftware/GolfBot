@@ -1,6 +1,7 @@
 import os
 import cv2
 from ultralytics import YOLO
+import torch
 # from ultralytics.yolo.utils.plotting import Annotator
 # import multiprocessing
 import queue
@@ -12,6 +13,10 @@ DATA = os.environ.get("DATA", "datasets/RoboFlow1904/data.yaml")
 EPOCHS = int(os.environ.get("EPOCHS", 3))
 IMGSZ = int(os.environ.get("IMGSZ", 640))  # needs to be a multiple of 32
 DEBUG = "true" in os.environ.get('DEBUG', "True").lower()
+
+# Set device for AI processing
+device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+print(f"Using device: {device.type} (index {device.index})")
 
 
 # To be run as a thread
@@ -48,7 +53,7 @@ def run_ai(queue: queue.Queue):
         # Send the frame to the model for prediction
         if DEBUG:
             print("[AI] Predict")
-        results = model.predict(frame)
+        results = model.predict(frame, device=device)
 
         # Send the results to the driving algorithm
         if DEBUG:

@@ -1,5 +1,6 @@
 import cv2
 import os
+import torch
 from ultralytics import YOLO
 from ultralytics.yolo.utils.plotting import Annotator
 
@@ -9,6 +10,10 @@ PRETRAINED_MODEL = os.environ.get("PRETRAINED_MODEL", "yolov8n.pt")
 DATA = os.environ.get("DATA", "datasets/RoboFlow1904/data.yaml")
 EPOCHS = int(os.environ.get("EPOCHS", 3))
 IMGSZ = int(os.environ.get("IMGSZ", 640))  # needs to be a multiple of 32
+
+# Set device for AI processing
+device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+print(f"Using device: {device.type} (index {device.index})")
 
 # Load the model from the local .pt file
 model = YOLO(CURRENT_MODEL + ".pt")
@@ -21,7 +26,7 @@ while True:
     ret, frame = cap.read()
 
     # Send the frame to the model for prediction
-    results = model.predict(frame)
+    results = model.predict(frame, device=device)
 
     # Draw bounding boxes and labels on the image
     annotator = Annotator(frame)
