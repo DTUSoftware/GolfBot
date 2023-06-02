@@ -26,7 +26,7 @@ def drive():
     speed_left = request.args.get("speed_left")
     speed_right = request.args.get("speed_right")
     if speed_left and speed_right:
-        if robot.set_speed(speed_left, speed_right):
+        if robot.set_speed(float(speed_left), float(speed_right)):
             return "Speeds set.", 200
         return "Failed to set speed.", 500
     direction = request.args.get("direction")

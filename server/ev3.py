@@ -131,6 +131,9 @@ class Robot:
 
     def set_speed(self, left_speed, right_speed) -> bool:
         if not self.stopped and not self.busy:
+            print(str("Now driving with speed:\n" +
+                      "- Left: " + str(left_speed) + "\n" +
+                      "- Right: " + str(right_speed)))
             self.motors.left_motor.run_direct(duty_cycle_sp=left_speed)
             self.motors.right_motor.run_direct(duty_cycle_sp=right_speed)
             return True
@@ -181,7 +184,7 @@ class Robot:
             last_pos = self.pos_history[-2]
             new_angle = math.atan2(
                 self.current_pos[1] - last_pos[1], self.current_pos[0] - last_pos[0])
-            print("New robot direction: " + str(new_angle))
+            # print("New robot direction: " + str(new_angle))
             self.set_direction(new_angle)
 
         return True

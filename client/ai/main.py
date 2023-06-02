@@ -1,9 +1,11 @@
 import os
+import sys
 import cv2
 from ultralytics import YOLO
 import torch
 # from ultralytics.yolo.utils.plotting import Annotator
 # import multiprocessing
+import asyncio
 import queue
 
 VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 1))
@@ -13,58 +15,73 @@ DATA = os.environ.get("DATA", "datasets/RoboFlow1904/data.yaml")
 EPOCHS = int(os.environ.get("EPOCHS", 3))
 IMGSZ = int(os.environ.get("IMGSZ", 640))  # needs to be a multiple of 32
 DEBUG = "true" in os.environ.get('DEBUG', "True").lower()
-
-# Set device for AI processing
-torchDevice = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-device = 0 if "cuda" in torchDevice.type else "cpu"
-print(f"Using device: {device} ({torchDevice.type}: index {torchDevice.index})")
+DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "True").lower()
 
 
 # To be run as a thread
-def run_ai(queue: queue.Queue):
+def run_ai(cameraQueue: queue.Queue):
+    if DISABLE_LOGGING:
+        # THIS DISABLES LOGGING
+        if sys.platform == "win32":
+            sys.stdout = open('nul', 'w')
+            sys.stderr = open('nul', 'w')
+        else:
+            sys.stdout = open('/dev/null', 'w')
+            sys.stderr = open('/dev/null', 'w')
+
+    # Set device for AI processing
+    torchDevice = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    device = 0 if "cuda" in torchDevice.type else "cpu"
+    if DEBUG and not DISABLE_LOGGING:
+        print(f"[AI] Using device: {device} ({torchDevice.type}: index {torchDevice.index})")
+
     # Load the model from the local .pt file
-    if DEBUG:
+    if DEBUG and not DISABLE_LOGGING:
         print("[AI] Loading model...")
     global CURRENT_MODEL
     if not os.path.exists(CURRENT_MODEL + ".pt"):
         if os.path.exists("./ai/" + CURRENT_MODEL + ".pt"):
             CURRENT_MODEL = "./ai/" + CURRENT_MODEL
         else:
-            if DEBUG:
+            if DEBUG and not DISABLE_LOGGING:
                 print("[AI] No model found!")
             return
     model = YOLO(CURRENT_MODEL + ".pt")
 
     # Open a connection to the webcam
-    if DEBUG:
+    if DEBUG and not DISABLE_LOGGING:
         print("[AI] Opening video capture...")
     cap = cv2.VideoCapture(VIDEO_INPUT)
 
     while cap.isOpened():
         # Capture a frame from the webcam
-        if DEBUG:
-            print("[AI] Reading frame...")
+        # if DEBUG:
+        #     print("[AI] Reading frame...")
         success, frame = cap.read()
 
         if not success:
-            if DEBUG:
+            if DEBUG and not DISABLE_LOGGING:
                 print("[AI] Breaking!")
             break
 
         # Send the frame to the model for prediction
-        if DEBUG:
-            print("[AI] Predict")
+        # if DEBUG:
+        #     print("[AI] Predict")
         results = model.predict(frame, device=device)
 
         # Send the results to the driving algorithm
-        if DEBUG:
-            print("[AI] Sending event to driving algorithm")
+        # if DEBUG:
+        #     print("[AI] Sending event to driving algorithm")
         # evt = multiprocessing.Event()
         # queue.put((results, evt))
-        queue.put(results)
+        try:
+            cameraQueue.put_nowait(results)
+        except queue.Empty:
+            if DEBUG and not DISABLE_LOGGING:
+                print("[AI] Queue full, cannot store image")
 
         # Draw bounding boxes and labels on the image
-        if DEBUG:
+        if DEBUG and not DISABLE_LOGGING:
             print("[AI] Drawing boxes...")
         # annotator = Annotator(frame)
         # for r in results:
@@ -86,9 +103,14 @@ def run_ai(queue: queue.Queue):
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
+        # await asyncio.sleep(1)
 
     # Release the webcam when done and close window
-    if DEBUG:
+    if DEBUG and not DISABLE_LOGGING:
         print("[AI] Releasing!")
     cap.release()
     cv2.destroyAllWindows()
+
+
+# if __name__ == "__main__":
+#     asyncio.run(run_ai(asyncio.Queue(maxsize=1)))

@@ -173,6 +173,8 @@ class Graph:
 
     # Get path and cost using A*
     def get_path(self, start_node: Node, dst_node: Node) -> list:
+        # if DEBUG:
+        #     print(f"Getting path between {start_node.x}, {start_node.y} and {dst_node.x}, {dst_node.y}")
         start_node_data = NodeData(
             start_node, 0, self.h(start_node, dst_node), None)
         open_list: List[Tuple[float, NodeData]] = [
@@ -181,8 +183,17 @@ class Graph:
 
         heapq.heapify(open_list)
 
+        # TODO: fix this hack with i, shouldn't be needed
+        i = 0
         current_node = None
         while open_list:
+            i += 1
+            # if DEBUG:
+            #     print(i)
+            if i > 2000:
+                if DEBUG:
+                    print("While look fucky wucky")
+                break
             current_node = heapq.heappop(open_list)
             if current_node[1].node is dst_node:
                 closed_list.append(current_node)
@@ -239,6 +250,8 @@ class Graph:
         node = closed_list[-1][1]
         # print(f"End walkthrough, f: {node.f} g: {node.g} h: {node.h}")
         while node:
+            # if DEBUG:
+            #     print("NODE WHILE LOOP")
             # print(f"({node.node.x}, {node.node.y})", end=" ")
             final_list.insert(0, node)
             node = node.parent
@@ -396,7 +409,11 @@ class Track:
         self.robot_pos = robot_pos
 
     def calculate_path(self) -> None:
+        # if DEBUG:
+        #     print("Calculating path")
         if not self.balls:
+            # if DEBUG:
+            #     print("No balls, returning empty path")
             self.path = []
             return
 
@@ -404,18 +421,28 @@ class Track:
         balls_to_catch = [ball for ball in self.balls if not ball.golden]
         # If no balls that aren't golden
         if not balls_to_catch:
+            if DEBUG:
+                print("Only the golden ball is left, fetching it")
             # Include the golden ball
             balls_to_catch = self.balls
 
         # For every ball calculate the path, then choose the best path
+        # if DEBUG:
+        #     print("Calculating path for every ball")
         paths: List[list] = []
         for ball in balls_to_catch:
+            # if DEBUG:
+            #     print(f"Trying for ball: ({ball.x}, {ball.y})")
             robot_node = self.graph.get_node(self.robot_pos)
             ball_node = self.graph.get_node((ball.x, ball.y))
             paths.append(self.graph.get_path(
                 start_node=robot_node, dst_node=ball_node))
+            # if DEBUG:
+            #     print("Done finding path")
 
         if paths:
+            # if DEBUG:
+            #     print("Got paths, finding best path")
             min_path = {"path": None, "f": None}
             for path in paths:
                 if path:
@@ -436,6 +463,7 @@ class Track:
                     print("Found no path!")
                 self.path = []
         else:
+            print("Got no paths, returning empty")
             self.path = []
 
     def clear_obstacles(self) -> None:

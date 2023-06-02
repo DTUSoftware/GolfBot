@@ -52,3 +52,5 @@ ultralytics
 torchaudio
 onnxruntime
 colorama
+asyncio
+aiohttp
