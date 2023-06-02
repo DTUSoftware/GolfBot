@@ -23,6 +23,12 @@ def check_robot_connection():
 
 @server.route('/drive', methods=['POST'])
 def drive():
+    speed_left = request.args.get("speed_left")
+    speed_right = request.args.get("speed_right")
+    if speed_left and speed_right:
+        if robot.set_speed(speed_left, speed_right):
+            return "Speeds set.", 200
+        return "Failed to set speed.", 500
     direction = request.args.get("direction")
     if direction:
         if "forward" in str(direction).lower():
@@ -40,7 +46,8 @@ def drive():
         if robot.drive((int(x), int(y))):
             return "Driving to (" + x + ", " + y + ").", 200
         return "Failed to try and drive to (" + x + ", " + y + ").", 500
-    return "Please provide either 'direction' or position using 'x' and 'y'.", 400
+    return "Please provide either a speed (using 'speed_left' and 'speed_right'), a direction using 'direction' or " \
+           "position using 'x' and 'y'.", 400
 
 
 @server.route("/turn", methods=['POST'])
@@ -109,12 +116,10 @@ def robot_position():
 
 @server.route("/status", methods=['GET'])
 def robot_status():
-    return "Stopped: " + str(robot.stopped) + "\n" \
-                                              "Busy:  " + str(robot.busy) + "\n" \
-                                                                            "Position: " + str(robot.current_pos) + "\n" \
-                                                                                                                    "Direction: " + str(
-        robot.direction), \
-           200
+    return ("Stopped: " + str(robot.stopped) + "\n" +
+            "Busy:  " + str(robot.busy) + "\n" +
+            "Position: " + str(robot.current_pos) + "\n" +
+            "Direction: " + str(robot.direction)), 200
 
 
 app = Flask(__name__)

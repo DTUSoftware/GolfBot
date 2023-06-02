@@ -9,12 +9,25 @@ import random
 import threading
 import queue
 from ai.main import run_ai
-from drive_algorithm import Ball, Track
+from drive_algorithm import Ball, Track, Node
 from track_setup import setup_track
 
 ROBOT_API_ENDPOINT = os.environ.get('API_ENDPOINT', "http://localhost:8069/api/v1")
 GOLF_BALL_CONFIDENCE_GATE = float(os.environ.get('GOLF_BALL_CONFIDENCE_GATE', 0.45))
 DEBUG = "true" in os.environ.get('DEBUG', "True").lower()
+
+# PID constants
+KP = float(os.environ.get('PID_KP', 1.0))  # Proportional gain
+KI = float(os.environ.get('PID_KI', 0.1))  # Integral gain
+KD = float(os.environ.get('PID_KD', 0.05))  # Derivative gain
+
+# Robot parameters
+WHEEL_RADIUS = (float(os.environ.get('WHEEL_DIAMETER', 68.8))/2)/10  # Radius of the robot's wheels in cm
+DIST_BETWEEN_WHEELS = float(os.environ.get('DIST_BETWEEN_WHEELS', 83.0*2))/10  # Distance between the robot's wheels in cm
+
+# PID variables
+integral = 0
+previous_error = 0
 
 
 def test_robot_get_pos(old_pos: tuple = None) -> tuple:
@@ -101,8 +114,56 @@ def calculate_and_adjust(track):
         print(f"Next node pos: ({next_node.node.x}, {next_node.node.y})")
 
         # Tell the robot to drive towards the node
-        # THIS CALL IS NOT BLOCKING!!!
-        requests.post(f"{ROBOT_API_ENDPOINT}/drive?x={next_node.node.x}&y={next_node.node.y}")
+        # drive_to_coordinates(next_node.node)
+        adjust_speed_using_pid(track, next_node.node)
+
+
+# Inspired by https://en.wikipedia.org/wiki/PID_controller and
+# https://www.sciencedirect.com/science/article/pii/S0967066101000661
+def adjust_speed_using_pid(track: Track, target_node: Node):
+    # Get current robot position
+    current_position = track.robot_pos
+
+    # Calculate target heading to the next path point
+    target_point = target_node
+    target_heading = math.atan2(target_point.y - current_position[1], target_point.x - current_position[0])
+
+    # Get the current heading
+    current_heading = track.robot_direction
+
+    # Calculate heading error
+    error = target_heading - current_heading
+
+    # Adjust error to be within -pi to pi range
+    if error > math.pi:
+        error -= 2 * math.pi
+    elif error < -math.pi:
+        error += 2 * math.pi
+
+    # Update integral term
+    global integral
+    integral += error
+
+    # Update derivative term
+    global previous_error
+    derivative = error - previous_error
+
+    # Calculate PID output
+    output = KP * error + KI * integral + KD * derivative
+
+    # Update previous error
+    previous_error = error
+
+    # Calculate wheel speeds based on PID output
+    speed_left = (2 * output * DIST_BETWEEN_WHEELS + error) / (2 * WHEEL_RADIUS)
+    speed_right = (2 * output * DIST_BETWEEN_WHEELS - error) / (2 * WHEEL_RADIUS)
+
+    # Set motor speeds
+    requests.post(f"{ROBOT_API_ENDPOINT}/drive?speed_left={speed_left}&speed_right={speed_right}")
+
+
+def drive_to_coordinates(node: Node):
+    requests.post(f"{ROBOT_API_ENDPOINT}/drive?x={node.x}&y={node.y}")
 
 
 def do_race_iteration(track: Track, camera_queue: queue.Queue):
@@ -110,7 +171,7 @@ def do_race_iteration(track: Track, camera_queue: queue.Queue):
         if DEBUG:
             # Get robot status
             get_robot_status()
-        
+
         # Get results from AI
         # ai_results, evt = camera_queue.get(block=True, timeout=None)
         ai_results = camera_queue.get(block=False)
