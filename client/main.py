@@ -7,8 +7,8 @@ import requests
 import random
 import asyncio
 import aiohttp
-from concurrent.futures import ProcessPoolExecutor
-#import multiprocessing
+#from concurrent.futures import ProcessPoolExecutor
+import multiprocessing
 import threading
 import queue
 from ai.main import run_ai
@@ -213,7 +213,7 @@ async def drive_to_coordinates(node: Node, session: aiohttp.ClientSession):
             print(response.status)
 
 
-async def do_race_iteration(track: Track, camera_queue: queue.Queue, session: aiohttp.ClientSession):
+async def do_race_iteration(track: Track, camera_queue: multiprocessing.Queue, session: aiohttp.ClientSession):
     try:
         # Get results from AI
         # ai_results, evt = camera_queue.get(block=True, timeout=None)
@@ -249,7 +249,7 @@ async def do_race_iteration(track: Track, camera_queue: queue.Queue, session: ai
         traceback.print_exc()
 
 
-async def race(camera_queue: queue.Queue, track: Track, session: aiohttp.ClientSession) -> None:
+async def race(camera_queue: multiprocessing.Queue, track: Track, session: aiohttp.ClientSession) -> None:
     if DEBUG:
         print("Getting initial AI result.")
     while True:
@@ -278,7 +278,7 @@ async def race(camera_queue: queue.Queue, track: Track, session: aiohttp.ClientS
     print("Done with race!")
 
 
-async def main(camera_queue: queue.Queue, track):
+async def main(camera_queue: multiprocessing.Queue, track):
     print("Running main...")
     try:
         async with aiohttp.ClientSession() as session:
@@ -311,14 +311,16 @@ async def main(camera_queue: queue.Queue, track):
         print("Failed to connect to robot. Is the API on?")
 
 
-def main_entrypoint(camera_queue: queue.Queue, track):
+async def main_entrypoint(camera_queue: multiprocessing.Queue, track):
     print("Running main entrypoint")
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
-    loop.run_until_complete(main(camera_queue, track))
-    loop.close()
+    # loop = asyncio.new_event_loop()
+    # asyncio.set_event_loop(loop)
+    #
+    # loop.run_until_complete(main(camera_queue, track))
+    # loop.close()
     # asyncio.run(main(camera_queue))
+
+    await asyncio.gather(main(camera_queue, track), run_ai(camera_queue))
 
 
 if __name__ == '__main__':
@@ -354,22 +356,42 @@ if __name__ == '__main__':
 
     print("Preparing the robot and AI... Please wait!")
     # Create the camera and AI queues
-    camera_queue = queue.Queue(maxsize=1)
+    # camera_queue = multiprocessing.Queue(maxsize=1)
 
     # loop = asyncio.get_running_loop()
     # executor = ProcessPoolExecutor(1)
     # ai = loop.run_in_executor(executor, run_ai, camera_queue.sync_q)
 
     # Start the camera processing thread
-    camera_thread = threading.Thread(target=run_ai, args=(camera_queue,))
-    camera_thread.daemon = True  # Set the thread as daemon so it exits when the main thread ends
-    camera_thread.start()
-    print("Started camera thread")
+    # camera_thread = threading.Thread(target=run_ai, args=(camera_queue,))
+    # camera_thread.daemon = True  # Set the thread as daemon so it exits when the main thread ends
+    # camera_thread.start()
+    # print("Started camera thread")
+    #
+    # main_thread = threading.Thread(target=main_entrypoint, args=(camera_queue, track))
+    # main_thread.daemon = False
+    # main_thread.start()
 
-    main_thread = threading.Thread(target=main_entrypoint, args=(camera_queue, track))
-    main_thread.daemon = False
-    main_thread.start()
     # asyncio.run(main(camera_queue))
     # loop = asyncio.get_event_loop()
     # loop.create_task(main(camera_queue, track))
     # loop.run_forever()
+
+    manager = multiprocessing.Manager()
+    # try:
+    #     manager.start()
+    # except multiprocessing.ProcessError:
+    #     pass
+
+    # Create the camera and AI queues
+    camera_queue = manager.Queue(maxsize=1)
+
+    asyncio.run(main_entrypoint(camera_queue, track))
+
+    # ai_process = multiprocessing.Process(target=run_ai, args=(camera_queue,))
+    # ai_thread = threading.Thread(target=run_ai, args=(camera_queue,))
+    # ai_thread.daemon = True
+    # ai_thread.start()
+    # main_process = multiprocessing.Process(target=main_entrypoint, args=(camera_queue, track))
+    # main_process.start()
+    # main_entrypoint(camera_queue, track)

@@ -4,9 +4,10 @@ import cv2
 from ultralytics import YOLO
 import torch
 # from ultralytics.yolo.utils.plotting import Annotator
-# import multiprocessing
+import multiprocessing
 import asyncio
 import queue
+from concurrent.futures import ProcessPoolExecutor
 
 VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 1))
 CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/20230601_2")
@@ -17,9 +18,10 @@ IMGSZ = int(os.environ.get("IMGSZ", 640))  # needs to be a multiple of 32
 DEBUG = "true" in os.environ.get('DEBUG', "True").lower()
 DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "True").lower()
 
+# executor = ProcessPoolExecutor(1)
 
 # To be run as a thread
-def run_ai(cameraQueue: queue.Queue):
+async def run_ai(cameraQueue: multiprocessing.Queue):
     if DISABLE_LOGGING:
         # THIS DISABLES LOGGING
         if sys.platform == "win32":
@@ -76,7 +78,7 @@ def run_ai(cameraQueue: queue.Queue):
         # queue.put((results, evt))
         try:
             cameraQueue.put_nowait(results)
-        except queue.Empty:
+        except queue.Full:
             if DEBUG and not DISABLE_LOGGING:
                 print("[AI] Queue full, cannot store image")
 
@@ -103,7 +105,7 @@ def run_ai(cameraQueue: queue.Queue):
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
-        # await asyncio.sleep(1)
+        await asyncio.sleep(0)
 
     # Release the webcam when done and close window
     if DEBUG and not DISABLE_LOGGING:
