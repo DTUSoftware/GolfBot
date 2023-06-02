@@ -4,7 +4,7 @@ import torch
 from ultralytics import YOLO
 from ultralytics.yolo.utils.plotting import Annotator
 
-VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 1))
+VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 0))
 CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/20230601")
 PRETRAINED_MODEL = os.environ.get("PRETRAINED_MODEL", "yolov8n.pt")
 DATA = os.environ.get("DATA", "datasets/RoboFlow1904/data.yaml")
@@ -12,8 +12,9 @@ EPOCHS = int(os.environ.get("EPOCHS", 3))
 IMGSZ = int(os.environ.get("IMGSZ", 640))  # needs to be a multiple of 32
 
 # Set device for AI processing
-device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-print(f"Using device: {device.type} (index {device.index})")
+torchDevice = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+device = 0 if "cuda" in torchDevice.type else "cpu"
+print(f"Using device: {device} ({torchDevice.type}: index {torchDevice.index})")
 
 # Load the model from the local .pt file
 model = YOLO(CURRENT_MODEL + ".pt")

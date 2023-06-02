@@ -15,8 +15,9 @@ IMGSZ = int(os.environ.get("IMGSZ", 640))  # needs to be a multiple of 32
 DEBUG = "true" in os.environ.get('DEBUG', "True").lower()
 
 # Set device for AI processing
-device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-print(f"Using device: {device.type} (index {device.index})")
+torchDevice = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+device = 0 if "cuda" in torchDevice.type else "cpu"
+print(f"Using device: {device} ({torchDevice.type}: index {torchDevice.index})")
 
 
 # To be run as a thread

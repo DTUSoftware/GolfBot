@@ -10,8 +10,9 @@ EPOCHS = int(os.environ.get("EPOCHS", 3))
 IMGSZ = int(os.environ.get("IMGSZ", 640))  # needs to be a multiple of 32
 
 # Set device for AI processing
-device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-print(f"Using device: {device.type} (index {device.index})")
+torchDevice = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+device = 0 if "cuda" in torchDevice.type else "cpu"
+print(f"Using device: {device} ({torchDevice.type}: index {torchDevice.index})")
 
 ## Lots of example code and documentation from 
 ## https://github.com/ultralytics/ultralytics
