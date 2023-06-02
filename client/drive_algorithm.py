@@ -378,6 +378,7 @@ class Track:
         self.small_goal: Optional[Goal] = None
         self.big_goal: Optional[Goal] = None
         self.robot_pos = (0, 0)
+        self.robot_direction = 0.0
         self.path: list = []
 
         self.graph = Graph(bounds["x"], bounds["y"])
@@ -389,6 +390,9 @@ class Track:
         self.balls = []
 
     def set_robot_pos(self, robot_pos: tuple) -> None:
+        # Recalibrate the direction / angle
+        self.robot_direction = math.atan2(self.robot_pos[1] - robot_pos[1], self.robot_pos[0] - robot_pos[0])
+        # Update position
         self.robot_pos = robot_pos
 
     def calculate_path(self) -> None:

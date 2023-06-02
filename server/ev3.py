@@ -129,6 +129,13 @@ class Robot:
         self.busy = False
         return True
 
+    def set_speed(self, left_speed, right_speed) -> bool:
+        if not self.stopped and not self.busy:
+            self.motors.left_motor.run_direct(duty_cycle_sp=left_speed)
+            self.motors.right_motor.run_direct(duty_cycle_sp=right_speed)
+            return True
+        return False
+
     def drive(self, pos: tuple) -> bool:
         if not self.stopped and not self.busy:
             # Turn to face the next node
