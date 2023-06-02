@@ -2,9 +2,12 @@ import os
 import math
 import heapq
 from typing import Any, Optional, List, Tuple
+
+import numpy as np
 from colorama import init as colorama_init
 from colorama import Fore
 from colorama import Style
+import matplotlib.pyplot as plt
 
 DEBUG = "true" in os.environ.get('DEBUG', "True").lower()
 
@@ -472,21 +475,41 @@ class Track:
         else:
             self.graph.draw(robot_pos=self.robot_pos, balls=self.balls)
 
+    def plot(self):
+        self.calculate_path()
+        points_in_path = [[], []]
+        for nodeData in self.path:
+            points_in_path[0].append(nodeData.node.x)
+            points_in_path[1].append(nodeData.node.y)
+
+        plt.figure()
+        plt.scatter(points_in_path[0], points_in_path[1])
+        plt.xticks(np.arange(min(points_in_path[0]), max(points_in_path[0]) + 1, 1))
+        plt.yticks(np.arange(min(points_in_path[1]), max(points_in_path[1]) + 1, 1))
+        plt.gca().invert_yaxis()
+        plt.grid()
+        # Add labels and title
+        plt.xlabel('X-axis')
+        plt.ylabel('Y-axis')
+        plt.title('Plotting Points')
+
+        # Display the plot
+        plt.show()
+
 
 TRACK_GLOBAL: Optional[Track] = None
 
 
 def setup_debug() -> None:
-    bounds = {"x": 30, "y": 30}
-    track = Track(bounds)
+    bounds = {"x": 15, "y": 18}
+    track = setup(bounds)
 
     track.set_robot_pos((8, 7))
-    track.add_ball(Ball((1, 2)))
-    track.add_ball(Ball((8, 4)))
+    track.add_ball(Ball((9, 11)))
 
     obstacle_path = [(4, 3), (4, 4), (4, 5), (3, 4), (5, 4)]
     obstacle = Obstacle(track.graph.get_nodes_in_path(obstacle_path))
-    track.add_obstacle(obstacle)
+    # track.add_obstacle(obstacle)
     # obstacle_path = [(1, 5), (3, 5), (4, 5), (5, 5), (6, 5), (7, 5), (8, 5), (9, 5), (10, 5), (11, 5), (12, 5), (13, 5), (14, 5)]
     # obstacle = Obstacle(track.graph.get_nodes_in_path(obstacle_path))
     # track.add_obstacle(obstacle)
@@ -497,7 +520,7 @@ def setup_debug() -> None:
     wall_path.extend([(x, y) for x in range(0, bounds["x"])
                       for y in [0, bounds["y"] - 1]])
     wall_obstacle = Obstacle(track.graph.get_nodes_in_path(wall_path))
-    track.add_obstacle(wall_obstacle)
+    # track.add_obstacle(wall_obstacle)
 
     global TRACK_GLOBAL
     TRACK_GLOBAL = track
@@ -526,3 +549,4 @@ if __name__ == "__main__":
 
         print("=========================\nDrawing driving path!\n=========================")
         track.draw(True)
+        track.plot()
