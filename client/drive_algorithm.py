@@ -1,3 +1,4 @@
+import os
 import math
 import heapq
 from typing import Any, Optional, List, Tuple
@@ -5,8 +6,9 @@ from colorama import init as colorama_init
 from colorama import Fore
 from colorama import Style
 
-colorama_init()
+DEBUG = "true" in os.environ.get('DEBUG', "True").lower()
 
+colorama_init()
 distance_across = math.sqrt(1 ** 2 + 1 ** 2)
 
 
@@ -126,10 +128,10 @@ class Graph:
                     # Are they even apart by more than 1?
                     if abs(x1 - x2) > 1:
                         slope = (y1 - y2) / (x1 - x2)
-                        y_intercept = (x1*y2 - x2*y1) / (x1 - x2)
+                        y_intercept = (x1 * y2 - x2 * y1) / (x1 - x2)
                         x_min = min(x1, x2)
                         x_max = max(x1, x2)
-                        for x in range(int(x_min+1), int(x_max)):
+                        for x in range(int(x_min + 1), int(x_max)):
                             y = int(slope * float(x) + y_intercept)
                             pos = (x, y)
                             if pos not in path:
@@ -141,7 +143,7 @@ class Graph:
                         x_intercept = (y1 * x2 - y2 * x1) / (y1 - y2)
                         y_min = min(y1, y2)
                         y_max = max(y1, y2)
-                        for y in range(int(y_min+1), int(y_max)):
+                        for y in range(int(y_min + 1), int(y_max)):
                             x = int(slope * float(y) + x_intercept)
                             pos = (x, y)
                             if pos not in path:
@@ -363,8 +365,9 @@ class Graph:
                     conections_string = conections_string + "    "
 
                 # print(f"({x.x}, {x.y})", end=" ")
-            print(nodes_string)
-            print(conections_string)
+            if DEBUG:
+                print(nodes_string)
+                print(conections_string)
 
 
 class Track:
@@ -416,14 +419,17 @@ class Track:
                         min_path["path"] = path
                         min_path["f"] = path[-1].f
             if min_path["path"] and len(min_path["path"]) > 1:
-                print(f"Best path found with weight {min_path['f']}")
+                if DEBUG:
+                    print(f"Best path found with weight {min_path['f']}")
                 for i in range(len(min_path["path"])):
                     node = min_path["path"][i].node
                     end = " -> " if i < len(min_path['path']) - 1 else "\n"
-                    print(f"({node.x}, {node.y})", end=end)
+                    if DEBUG:
+                        print(f"({node.x}, {node.y})", end=end)
                 self.path = min_path["path"]
             else:
-                print("Found no path!")
+                if DEBUG:
+                    print("Found no path!")
                 self.path = []
         else:
             self.path = []
@@ -444,7 +450,7 @@ class Track:
                 for y in range(-1, 1 + 1):
                     neighbour = self.graph.get_node((node.x + x, node.y + y))
                     self.graph.remove_edge(node, neighbour)
-            if node.neighbours:
+            if node.neighbours and DEBUG:
                 print(
                     f"Failed to remove all neighbours for obstacle node at {node.x}, {node.y}")
         self.obstacles.append(obstacle)

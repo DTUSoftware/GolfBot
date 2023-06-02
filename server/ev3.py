@@ -109,18 +109,18 @@ class Robot:
             if (direction - self.direction) > math.pi:
                 # diff_in_angle = abs(direction - self.direction)
                 diff_in_angle = abs((direction - 2 * math.pi) - self.direction)
-                self.turn_left(diff_in_angle*ROBOT_TURN_RATIO, busy_override=True)
+                self.turn_left(diff_in_angle * ROBOT_TURN_RATIO, busy_override=True)
             else:
                 diff_in_angle = abs(direction - self.direction)
-                self.turn_right(diff_in_angle*ROBOT_TURN_RATIO, busy_override=True)
+                self.turn_right(diff_in_angle * ROBOT_TURN_RATIO, busy_override=True)
         else:
             if (self.direction - direction) > math.pi:
                 # diff_in_angle = abs(self.direction - direction)
                 diff_in_angle = abs((self.direction - 2 * math.pi) - direction)
-                self.turn_right(diff_in_angle*ROBOT_TURN_RATIO, busy_override=True)
+                self.turn_right(diff_in_angle * ROBOT_TURN_RATIO, busy_override=True)
             else:
                 diff_in_angle = abs(self.direction - direction)
-                self.turn_left(diff_in_angle*ROBOT_TURN_RATIO, busy_override=True)
+                self.turn_left(diff_in_angle * ROBOT_TURN_RATIO, busy_override=True)
 
         # Update the direction
         print("diff: " + str(diff_in_angle))

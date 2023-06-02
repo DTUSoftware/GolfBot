@@ -110,9 +110,10 @@ def robot_position():
 @server.route("/status", methods=['GET'])
 def robot_status():
     return "Stopped: " + str(robot.stopped) + "\n" \
-           "Busy:  " + str(robot.busy) + "\n" \
-           "Position: " + str(robot.current_pos) + "\n" \
-           "Direction: " + str(robot.direction), \
+                                              "Busy:  " + str(robot.busy) + "\n" \
+                                                                            "Position: " + str(robot.current_pos) + "\n" \
+                                                                                                                    "Direction: " + str(
+        robot.direction), \
            200
 
 

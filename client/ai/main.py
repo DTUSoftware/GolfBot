@@ -11,46 +11,55 @@ PRETRAINED_MODEL = os.environ.get("PRETRAINED_MODEL", "yolov8n.pt")
 DATA = os.environ.get("DATA", "datasets/RoboFlow1904/data.yaml")
 EPOCHS = int(os.environ.get("EPOCHS", 3))
 IMGSZ = int(os.environ.get("IMGSZ", 640))  # needs to be a multiple of 32
+DEBUG = "true" in os.environ.get('DEBUG', "True").lower()
 
 
 # To be run as a thread
 def run_ai(queue: queue.Queue):
     # Load the model from the local .pt file
-    print("[AI] Loading model...")
+    if DEBUG:
+        print("[AI] Loading model...")
     global CURRENT_MODEL
     if not os.path.exists(CURRENT_MODEL + ".pt"):
         if os.path.exists("./ai/" + CURRENT_MODEL + ".pt"):
             CURRENT_MODEL = "./ai/" + CURRENT_MODEL
         else:
-            print("[AI] No model found!")
+            if DEBUG:
+                print("[AI] No model found!")
             return
     model = YOLO(CURRENT_MODEL + ".pt")
 
     # Open a connection to the webcam
-    print("[AI] Opening video capture...")
+    if DEBUG:
+        print("[AI] Opening video capture...")
     cap = cv2.VideoCapture(VIDEO_INPUT)
 
     while cap.isOpened():
         # Capture a frame from the webcam
-        print("[AI] Reading frame...")
+        if DEBUG:
+            print("[AI] Reading frame...")
         success, frame = cap.read()
 
         if not success:
-            print("[AI] Breaking!")
+            if DEBUG:
+                print("[AI] Breaking!")
             break
 
         # Send the frame to the model for prediction
-        print("[AI] Predict")
+        if DEBUG:
+            print("[AI] Predict")
         results = model.predict(frame)
 
         # Send the results to the driving algorithm
-        print("[AI] Sending event to driving algorithm")
+        if DEBUG:
+            print("[AI] Sending event to driving algorithm")
         # evt = multiprocessing.Event()
         # queue.put((results, evt))
         queue.put(results)
 
         # Draw bounding boxes and labels on the image
-        print("[AI] Drawing boxes...")
+        if DEBUG:
+            print("[AI] Drawing boxes...")
         # annotator = Annotator(frame)
         # for r in results:
         #     boxes = r.boxes
@@ -73,6 +82,7 @@ def run_ai(queue: queue.Queue):
             break
 
     # Release the webcam when done and close window
-    print("[AI] Releasing!")
+    if DEBUG:
+        print("[AI] Releasing!")
     cap.release()
     cv2.destroyAllWindows()
