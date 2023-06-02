@@ -6,7 +6,7 @@ from ultralytics import YOLO
 import queue
 
 VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 1))
-CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/20230601_2")
+CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/20230601")
 PRETRAINED_MODEL = os.environ.get("PRETRAINED_MODEL", "yolov8n.pt")
 DATA = os.environ.get("DATA", "datasets/RoboFlow1904/data.yaml")
 EPOCHS = int(os.environ.get("EPOCHS", 3))
