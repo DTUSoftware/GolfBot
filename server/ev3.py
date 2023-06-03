@@ -3,7 +3,9 @@ import rpyc
 import os
 import sys
 import math
-from typing import List
+from typing import Optional
+from ev3dev2.button import Button
+from ev3dev2.motor import MoveTank, SpeedPercent, Motor
 
 # Variables
 DRIVE_SPEED = 20  # Speed in percent
@@ -11,19 +13,20 @@ TURN_SPEED = 20  # Speed in percent
 FAN_TOGGLE_SPEED = 100  # Speed in percent
 FULL_TURN_TIME = 1.2  # Time it takes to spin 360 degrees, in seconds
 FAN_MOTOR_DEGREES = 80  # Degrees for turning fans off and on (off, on)
+ROBOT_TURN_RATIO = 2
 IP_ADDRESS = os.environ.get('ROBOT_IP_ADDRESS', "192.168.1.240")  # The IP of the robot
 
 # Connect to the robot and get modules
-conn = rpyc.classic.connect(IP_ADDRESS)
-ev3_motor = conn.modules['ev3dev2.motor']
-ev3_button = conn.modules['ev3dev2.button']
+conn = None
+ev3_motor = None
+ev3_button = None
 
 # Variable for robot
 ROBOT_GLOBAL = None
 
 
 class Robot:
-    def __init__(self, buttons: ev3_button.Button, motors: ev3_motor.MoveTank, fan_motor=ev3_motor.Motor,
+    def __init__(self, buttons: Button, motors: MoveTank, fan_motor: Motor,
                  current_pos: tuple = (0, 0)) -> None:
         self.buttons = buttons
         self.fan_motor = fan_motor
@@ -38,16 +41,16 @@ class Robot:
     def forward(self) -> bool:
         if not self.stopped and not self.busy:
             print("going forwards")
-            self.motors.on(left_speed=ev3_motor.SpeedPercent(DRIVE_SPEED),
-                           right_speed=ev3_motor.SpeedPercent(DRIVE_SPEED))
+            self.motors.on(left_speed=SpeedPercent(DRIVE_SPEED),
+                           right_speed=SpeedPercent(DRIVE_SPEED))
             return True
         return False
 
     def backwards(self) -> bool:
         if not self.stopped and not self.busy:
             print("going backwards")
-            self.motors.on(left_speed=ev3_motor.SpeedPercent(-DRIVE_SPEED),
-                           right_speed=ev3_motor.SpeedPercent(-DRIVE_SPEED))
+            self.motors.on(left_speed=SpeedPercent(-DRIVE_SPEED),
+                           right_speed=SpeedPercent(-DRIVE_SPEED))
             return True
         return False
 
@@ -56,12 +59,12 @@ class Robot:
             print("turning left")
             if radians:
                 print("degrees: " + str(math.degrees(radians)))
-                self.motors.on_for_degrees(left_speed=ev3_motor.SpeedPercent(-TURN_SPEED),
-                                           right_speed=ev3_motor.SpeedPercent(TURN_SPEED),
+                self.motors.on_for_degrees(left_speed=SpeedPercent(-TURN_SPEED),
+                                           right_speed=SpeedPercent(TURN_SPEED),
                                            degrees=math.degrees(radians))
             else:
-                self.motors.on(left_speed=ev3_motor.SpeedPercent(-TURN_SPEED),
-                               right_speed=ev3_motor.SpeedPercent(TURN_SPEED))
+                self.motors.on(left_speed=SpeedPercent(-TURN_SPEED),
+                               right_speed=SpeedPercent(TURN_SPEED))
             return True
         return False
 
@@ -70,23 +73,23 @@ class Robot:
             print("turning right")
             if radians:
                 print("degrees: " + str(math.degrees(radians)))
-                self.motors.on_for_degrees(left_speed=ev3_motor.SpeedPercent(TURN_SPEED),
-                                           right_speed=ev3_motor.SpeedPercent(-TURN_SPEED),
+                self.motors.on_for_degrees(left_speed=SpeedPercent(TURN_SPEED),
+                                           right_speed=SpeedPercent(-TURN_SPEED),
                                            degrees=math.degrees(radians))
                 # self.motors.left_motor.run_to_rel_pos(position_sp=math.degrees(radians), speed_sp=ev3_motor.SpeedPercent(TURN_SPEED))
                 # self.motors.left_motor.run_to_rel_pos(position_sp=-math.degrees(radians), speed_sp=ev3_motor.SpeedPercent(TURN_SPEED))
                 # self.motors.wait_until_not_moving()
             else:
-                self.motors.on(left_speed=ev3_motor.SpeedPercent(TURN_SPEED),
-                               right_speed=ev3_motor.SpeedPercent(-TURN_SPEED))
+                self.motors.on(left_speed=SpeedPercent(TURN_SPEED),
+                               right_speed=SpeedPercent(-TURN_SPEED))
             return True
         return False
 
     def toggle_fans(self) -> bool:
         if self.fan_state:
-            self.fan_motor.on_for_degrees(ev3_motor.SpeedPercent(FAN_TOGGLE_SPEED), FAN_MOTOR_DEGREES)
+            self.fan_motor.on_for_degrees(speed=SpeedPercent(FAN_TOGGLE_SPEED), degrees=FAN_MOTOR_DEGREES)
         else:
-            self.fan_motor.on_for_degrees(ev3_motor.SpeedPercent(-FAN_TOGGLE_SPEED), FAN_MOTOR_DEGREES)
+            self.fan_motor.on_for_degrees(speed=SpeedPercent(-FAN_TOGGLE_SPEED), degrees=FAN_MOTOR_DEGREES)
         self.fan_state = not self.fan_state
         return True
 
@@ -102,8 +105,6 @@ class Robot:
         direction = direction % (2 * math.pi)
         print("direction: " + str(direction))
         print("self.direction: " + str(self.direction))
-
-        ROBOT_TURN_RATIO = 2
 
         if self.direction < direction:
             if (direction - self.direction) > math.pi:
@@ -131,6 +132,9 @@ class Robot:
 
     def set_speed(self, left_speed, right_speed) -> bool:
         if not self.stopped and not self.busy:
+            print(str("Now driving with speed:\n" +
+                      "- Left: " + str(left_speed) + "\n" +
+                      "- Right: " + str(right_speed)))
             self.motors.left_motor.run_direct(duty_cycle_sp=left_speed)
             self.motors.right_motor.run_direct(duty_cycle_sp=right_speed)
             return True
@@ -181,7 +185,7 @@ class Robot:
             last_pos = self.pos_history[-2]
             new_angle = math.atan2(
                 self.current_pos[1] - last_pos[1], self.current_pos[0] - last_pos[0])
-            print("New robot direction: " + str(new_angle))
+            # print("New robot direction: " + str(new_angle))
             self.set_direction(new_angle)
 
         return True
@@ -205,11 +209,23 @@ def setup() -> None:
     ROBOT_GLOBAL = get_robot()
 
 
-def get_robot(current_pos: tuple = (0, 0)) -> Robot:
+def get_robot(current_pos: tuple = (0, 0)) -> Optional[Robot]:
+    global conn, ev3_motor, ev3_button
+    if not conn:
+        try:
+            conn = rpyc.classic.connect(IP_ADDRESS)
+            ev3_motor = conn.modules['ev3dev2.motor']
+            ev3_button = conn.modules['ev3dev2.button']
+        except Exception as e:
+            print("Failed to connect to robot: " + str(e))
+            return None
+    if not conn or not ev3_motor or not ev3_button:
+        return None
+
     # The motors and other things on the robot
     buttons = ev3_button.Button()  # Any buton on the robot
     motors = ev3_motor.MoveTank(left_motor_port=ev3_motor.OUTPUT_A,
-                                right_motor_port=ev3_motor.OUTPUT_D)  # Motor on output port A and D
+                                          right_motor_port=ev3_motor.OUTPUT_D)  # Motor on output port A and D
     fan_motor = ev3_motor.Motor(ev3_motor.OUTPUT_C)
 
     return Robot(buttons, motors, fan_motor, current_pos)
