@@ -129,6 +129,7 @@ if __name__ == '__main__':
     try:
         # Setup the robot
         ev3.setup()
+
         # Get the robot
         robot = ev3.ROBOT_GLOBAL
 
