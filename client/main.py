@@ -3,6 +3,8 @@ import os
 import time
 import math
 import traceback
+from typing import Optional
+
 import requests
 import random
 import asyncio
@@ -32,6 +34,7 @@ ROBOT_BASE_SPEED = float(os.environ.get('ROBOT_BASE_SPEED', 50.0))
 # PID variables
 integral = 0
 previous_error = 0
+last_target_node = None
 
 
 def test_robot_get_pos(old_pos: tuple = None) -> tuple:
@@ -121,21 +124,39 @@ async def update_balls_from_ai_result(track, golf_ball_results, golden_ball_resu
             track.add_ball(ball)
 
 
+# TODO: rewrite this
+def pick_target(track: Track) -> Optional[Node]:
+    if not track.path or len(track.path) <= 1:
+        return None
+
+    # If small path, go straight for goal
+    if len(track.path) <= 20:
+        return track.path[-1]
+
+    # If bigger path, get the path which is on 1/4 of the way
+    return track.path[math.ceil(len(track.path)/4)]
+
+    # If nothing else, get the first node on the path
+    # return track.path[1]
+
+
 async def calculate_and_adjust(track, session: aiohttp.ClientSession):
     # if DEBUG:
     #     print("Calculating path and adjusting speed")
+
     # Get the path to closest ball
     track.calculate_path()
     # track.draw(True)
-    # Get the first node on the path
-    if track.path and len(track.path) > 1:
-        next_node = track.path[1]
+
+    # Get the node to go to
+    next_node = pick_target(track)
+    if next_node:
         if DEBUG:
-            print(f"Next node pos: ({next_node.node.x}, {next_node.node.y})")
+            print(f"Next node pos: ({next_node.x}, {next_node.y})")
 
         # Tell the robot to drive towards the node
-        # drive_to_coordinates(next_node.node)
-        await adjust_speed_using_pid(track, next_node.node, session)
+        # drive_to_coordinates(next_node)
+        await adjust_speed_using_pid(track, next_node, session)
     # if DEBUG:
     #     print("Done calculating path and adjusting speed")
 
@@ -152,8 +173,7 @@ async def adjust_speed_using_pid(track: Track, target_node: Node, session: aioht
         return
 
     # Calculate target heading to the next path point
-    target_point = target_node
-    target_heading = math.atan2(target_point.y - current_position[1], target_point.x - current_position[0])
+    target_heading = target_node.get_heading(current_position)
 
     # Get the current heading
     current_heading = track.robot_direction
@@ -167,12 +187,19 @@ async def adjust_speed_using_pid(track: Track, target_node: Node, session: aioht
     elif error < -math.pi:
         error += 2 * math.pi
 
+    # Reset integral and previous error if target position is very different
+    global integral, previous_error, last_target_node
+    if last_target_node and is_target_different(track, target_node, last_target_node):
+        integral = 0
+        previous_error = 0
+
     # Update integral term
-    global integral
     integral += error
 
+    # Anti-windup - Limit the integral term
+    integral = max(min(integral, 100), -100)
+
     # Update derivative term
-    global previous_error
     derivative = error - previous_error
 
     # Calculate PID output
@@ -191,8 +218,8 @@ async def adjust_speed_using_pid(track: Track, target_node: Node, session: aioht
     # Calculate wheel speeds based on PID output
     # speed_left = (2 * output * DIST_BETWEEN_WHEELS + error) / (2 * WHEEL_RADIUS)
     # speed_right = (2 * output * DIST_BETWEEN_WHEELS - error) / (2 * WHEEL_RADIUS)
-    speed_left = min(output + ROBOT_BASE_SPEED, 100)
-    speed_right = min(-output + ROBOT_BASE_SPEED, 100)
+    speed_left = max(min(output + ROBOT_BASE_SPEED, 100), -100)
+    speed_right = max(min(-output + ROBOT_BASE_SPEED, 100), -100)
 
     if DEBUG:
         print(f"Speed: L:{speed_left} R:{speed_right}")
@@ -202,6 +229,27 @@ async def adjust_speed_using_pid(track: Track, target_node: Node, session: aioht
             f"{ROBOT_API_ENDPOINT}/drive?speed_left={speed_left}&speed_right={speed_right}") as response:
         if DEBUG:
             print(response.status)
+
+    # Update last target node
+    last_target_node = target_node
+
+
+def is_target_different(track: Track, target_node: Node, other_node: Node) -> bool:
+    # Define a threshold for difference based on your requirements
+    # Assume a difference of 1.0 cm is significant, we use pixels though, so it depends on the distance and camera
+    position_threshold = 15.0
+
+    # Calculate the position difference
+    position_diff = math.sqrt((target_node.x - other_node.x)**2 + (target_node.y - other_node.y)**2)
+
+    # Calculate the direction difference
+    direction_diff = abs(target_node.get_heading(track.robot_pos) - other_node.get_heading(track.robot_pos))
+
+    # Check if target is significantly different from the last target
+    if position_diff > position_threshold or direction_diff > math.pi/4:
+        return True
+
+    return False
 
 
 async def drive_to_coordinates(node: Node, session: aiohttp.ClientSession):

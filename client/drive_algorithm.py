@@ -35,6 +35,9 @@ class Node:
     def get_neighbour_nodes(self) -> List['Node']:
         return [neighbour["node"] for neighbour in self.neighbours]
 
+    def get_heading(self, from_position: tuple) -> float:
+        return math.atan2(self.y - from_position[1], self.x - from_position[0])
+
 
 class Ball:
     def __init__(self, pos: tuple, golden=False) -> None:
