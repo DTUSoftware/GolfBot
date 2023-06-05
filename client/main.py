@@ -21,7 +21,7 @@ DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "False").lower()
 DEBUG = ("true" in os.environ.get('DEBUG', "True").lower()) and not DISABLE_LOGGING
 
 # PID constants
-KP = float(os.environ.get('PID_KP', 5))  # Proportional gain
+KP = float(os.environ.get('PID_KP', 5))  # Proportional gain  3.04
 KI = float(os.environ.get('PID_KI', 0.1))  # Integral gain - 0.1
 KD = float(os.environ.get('PID_KD', 0.05))  # Derivative gain - 0.05
 
@@ -35,6 +35,7 @@ ROBOT_BASE_SPEED = float(os.environ.get('ROBOT_BASE_SPEED', 50.0))
 integral = 0
 previous_error = 0
 last_target_node = None
+
 
 
 def test_robot_get_pos(old_pos: tuple = None) -> tuple:
@@ -99,7 +100,7 @@ async def update_robot_from_ai_result(track, robot_results, session: aiohttp.Cli
                 f"Using robot with confidence {box_confidence(robot_box):.2f} at position ({current_pos[0]}, {current_pos[1]})")
         track.set_robot_pos(current_pos)
         async with session.post(f"{ROBOT_API_ENDPOINT}/position?x={current_pos[0]}&y={current_pos[1]}") as response:
-            if DEBUG:
+            if response.status != 200:
                 print(response.status)
     else:
         if DEBUG:
@@ -155,10 +156,21 @@ async def calculate_and_adjust(track, session: aiohttp.ClientSession):
             print(f"Next node pos: ({next_node.node.x}, {next_node.node.y})")
 
         # Tell the robot to drive towards the node
-        # drive_to_coordinates(next_node)
+        # await drive_to_coordinates(next_node.node, session)
         await adjust_speed_using_pid(track, next_node.node, session)
+    else:
+        if DEBUG:
+            print("No node to travel to, setting speed to 0!")
+        await set_speeds(session, 0, 0)
     # if DEBUG:
     #     print("Done calculating path and adjusting speed")
+
+
+async def set_speeds(session, speed_left, speed_right):
+    async with session.post(
+            f"{ROBOT_API_ENDPOINT}/drive?speed_left={speed_left}&speed_right={speed_right}") as response:
+        if response.status != 200:
+            print(f"Error on adjusting speed: {response.status}")
 
 
 # Inspired by https://en.wikipedia.org/wiki/PID_controller and
@@ -188,7 +200,7 @@ async def adjust_speed_using_pid(track: Track, target_node: Node, session: aioht
         error += 2 * math.pi
 
     # Reset integral and previous error if target position is very different
-    global integral, previous_error, last_target_node
+    global integral, previous_error, last_target_node, KI
     if last_target_node and is_target_different(track, target_node, last_target_node):
         integral = 0
         previous_error = 0
@@ -201,6 +213,12 @@ async def adjust_speed_using_pid(track: Track, target_node: Node, session: aioht
 
     # Update derivative term
     derivative = error - previous_error
+
+    # DEBUG Testing of finding good variables
+    KI += 0.0001
+    print(f"=============================================================\n"
+          f"USING A KI VALUE OF {KI}\n"
+          f"=============================================================")
 
     # Calculate PID output
     output = KP * error + KI * integral + KD * derivative
@@ -225,10 +243,7 @@ async def adjust_speed_using_pid(track: Track, target_node: Node, session: aioht
         print(f"Speed: L:{speed_left} R:{speed_right}")
 
     # Set motor speeds
-    async with session.post(
-            f"{ROBOT_API_ENDPOINT}/drive?speed_left={speed_left}&speed_right={speed_right}") as response:
-        if response.status != 200:
-            print(f"Error on adjusting speed: {response.status}")
+    await set_speeds(session, speed_left, speed_right)
 
     # Update last target node
     last_target_node = target_node
@@ -237,7 +252,7 @@ async def adjust_speed_using_pid(track: Track, target_node: Node, session: aioht
 def is_target_different(track: Track, target_node: Node, other_node: Node) -> bool:
     # Define a threshold for difference based on your requirements
     # Assume a difference of 1.0 cm is significant, we use pixels though, so it depends on the distance and camera
-    position_threshold = 15.0
+    position_threshold = 75.0
 
     # Calculate the position difference
     position_diff = math.sqrt((target_node.x - other_node.x)**2 + (target_node.y - other_node.y)**2)
@@ -254,8 +269,11 @@ def is_target_different(track: Track, target_node: Node, other_node: Node) -> bo
 
 async def drive_to_coordinates(node: Node, session: aiohttp.ClientSession):
     async with session.post(f"{ROBOT_API_ENDPOINT}/drive?x={node.x}&y={node.y}") as response:
-        if DEBUG:
+        if response.status != 200:
             print(response.status)
+        else:
+            # Let the robot drive a lil' bit
+            await asyncio.sleep(1)
 
 
 async def do_race_iteration(track: Track, camera_queue: multiprocessing.JoinableQueue, session: aiohttp.ClientSession):
