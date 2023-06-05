@@ -155,8 +155,8 @@ async def calculate_and_adjust(track, session: aiohttp.ClientSession):
         await set_speeds(session, 0, 0)
         return
 
-    # await get_pid_target_and_adjust(track, session)
-    # return
+    await get_pid_target_and_adjust(track, session)
+    return
 
     # Get the node to go to
     next_node = pick_target(track)
@@ -197,7 +197,7 @@ async def get_pid_target_and_adjust(track: Track, session: aiohttp.ClientSession
                 last_target_path.pop(0)
 
             if DEBUG:
-                print(f"Current optimized path: {last_target_path}")
+                print(f"Current optimized path: {[(nodedata.node.x, nodedata.node.y) for nodedata in last_target_path]}")
             # Call adjust to adjust for error, and to clear point from list if we reach the target
             await adjust_speed_using_pid(track, last_target_path[0].node, session)
     if DEBUG:
@@ -245,7 +245,7 @@ async def get_pid_target_and_adjust(track: Track, session: aiohttp.ClientSession
     
     last_target_path = new_path
     if DEBUG:
-        print(f"Current target optimized path: {last_target_path}")
+        print(f"Current target optimized path: {[(nodedata.node.x, nodedata.node.y) for nodedata in last_target_path]}")
 
     # Adjust and go to
     if last_target_path:
@@ -280,9 +280,9 @@ async def adjust_speed_using_pid(track: Track, target_node: Node, session: aioht
 
     # Reset integral and previous error if target position is very different
     global integral, previous_error, last_target_node, KI
-    if last_target_node and is_target_different(track, target_node, last_target_node):
-        integral = 0
-        previous_error = 0
+    # if last_target_node and is_target_different(track, target_node, last_target_node):
+    #     integral = 0
+    #     previous_error = 0
 
     # Update integral term
     integral += error
