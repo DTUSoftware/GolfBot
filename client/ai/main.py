@@ -1,10 +1,9 @@
 import os
 import sys
 import cv2
+import logging
 from ultralytics import YOLO
 import torch
-import multiprocessing
-import queue
 
 VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 1))
 CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/20230601_2")
@@ -13,7 +12,7 @@ DEBUG = ("true" in os.environ.get('DEBUG', "True").lower()) and not DISABLE_LOGG
 
 
 # To be run as a thread
-def run_ai(cameraQueue: multiprocessing.JoinableQueue):
+def run_ai(camera_queue: torch.multiprocessing.JoinableQueue):
     if DISABLE_LOGGING:
         # THIS DISABLES LOGGING
         if sys.platform == "win32":
@@ -22,6 +21,7 @@ def run_ai(cameraQueue: multiprocessing.JoinableQueue):
         else:
             sys.stdout = open('/dev/null', 'w')
             # sys.stderr = open('/dev/null', 'w')
+        logging.getLogger("yolov5").setLevel(logging.WARNING)
 
     # Set device for AI processing
     torch_device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
@@ -66,11 +66,23 @@ def run_ai(cameraQueue: multiprocessing.JoinableQueue):
         # Send the results to the driving algorithm
         # if DEBUG:
         #     print("[AI] Sending event to driving algorithm")
-        try:
-            cameraQueue.put_nowait(results)
-        except queue.Full:
-            if DEBUG:
-                print("[AI] Queue full, cannot store image")
+
+        # results.share_memory()
+
+        if not camera_queue.full():
+            # Put everything in shared memory
+            shared_results = []
+            for result in results:
+                shared_results.append(result.cpu())
+
+            try:
+                camera_queue.put_nowait(shared_results)
+            except Exception as e:
+                if DEBUG:
+                    print("[AI] Queue full, cannot store image")
+                    print(str(e))
+        else:
+            print("Queue full, will not store elements.")
 
         # Draw bounding boxes and labels on the image
         if DEBUG:
@@ -104,5 +116,11 @@ def run_ai(cameraQueue: multiprocessing.JoinableQueue):
     cv2.destroyAllWindows()
 
 
-# if __name__ == "__main__":
-#     asyncio.run(run_ai(asyncio.Queue(maxsize=1)))
+if __name__ == "__main__":
+    torch.multiprocessing.set_start_method('spawn', force=True)
+    # manager = torch.multiprocessing.Manager()
+    queue = torch.multiprocessing.JoinableQueue(maxsize=1)
+    process = torch.multiprocessing.Process(target=run_ai, args=(queue,))
+    process.start()
+    process.join()
+    # run_ai(queue)

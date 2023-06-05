@@ -9,10 +9,10 @@ import requests
 import random
 import asyncio
 import aiohttp
-import multiprocessing
+from torch import multiprocessing
 import queue
 from ai.main import run_ai
-from drive_algorithm import Ball, Track, Node
+from drive_algorithm import Ball, Track, Node, NodeData
 from track_setup import setup_track
 
 ROBOT_API_ENDPOINT = os.environ.get('API_ENDPOINT', "http://localhost:8069/api/v1")
@@ -125,7 +125,7 @@ async def update_balls_from_ai_result(track, golf_ball_results, golden_ball_resu
 
 
 # TODO: rewrite this
-def pick_target(track: Track) -> Optional[Node]:
+def pick_target(track: Track) -> Optional[NodeData]:
     if not track.path or len(track.path) <= 1:
         return None
 
@@ -152,11 +152,11 @@ async def calculate_and_adjust(track, session: aiohttp.ClientSession):
     next_node = pick_target(track)
     if next_node:
         if DEBUG:
-            print(f"Next node pos: ({next_node.x}, {next_node.y})")
+            print(f"Next node pos: ({next_node.node.x}, {next_node.node.y})")
 
         # Tell the robot to drive towards the node
         # drive_to_coordinates(next_node)
-        await adjust_speed_using_pid(track, next_node, session)
+        await adjust_speed_using_pid(track, next_node.node, session)
     # if DEBUG:
     #     print("Done calculating path and adjusting speed")
 
@@ -218,8 +218,8 @@ async def adjust_speed_using_pid(track: Track, target_node: Node, session: aioht
     # Calculate wheel speeds based on PID output
     # speed_left = (2 * output * DIST_BETWEEN_WHEELS + error) / (2 * WHEEL_RADIUS)
     # speed_right = (2 * output * DIST_BETWEEN_WHEELS - error) / (2 * WHEEL_RADIUS)
-    speed_left = max(min(output + ROBOT_BASE_SPEED, 100), -100)
-    speed_right = max(min(-output + ROBOT_BASE_SPEED, 100), -100)
+    speed_left = max(min(-output + ROBOT_BASE_SPEED, 100), -100)
+    speed_right = max(min(output + ROBOT_BASE_SPEED, 100), -100)
 
     if DEBUG:
         print(f"Speed: L:{speed_left} R:{speed_right}")
@@ -227,8 +227,8 @@ async def adjust_speed_using_pid(track: Track, target_node: Node, session: aioht
     # Set motor speeds
     async with session.post(
             f"{ROBOT_API_ENDPOINT}/drive?speed_left={speed_left}&speed_right={speed_right}") as response:
-        if DEBUG:
-            print(response.status)
+        if response.status != 200:
+            print(f"Error on adjusting speed: {response.status}")
 
     # Update last target node
     last_target_node = target_node
@@ -362,36 +362,43 @@ def main_entrypoint(camera_queue: multiprocessing.JoinableQueue):
 
 
 if __name__ == '__main__':
-    print("Preparing the robot and AI... Please wait!")
+    try:
+        print("Preparing the robot and AI... Please wait!")
 
-    # Initialize joinable queue to share data between processes
-    # After many hours of troubleshooting, finally got help from https://stackoverflow.com/a/74190530/12418245
-    queue = multiprocessing.JoinableQueue(maxsize=1)
+        multiprocessing.set_start_method('spawn', force=True)
 
-    # Create a process for both the AI producer and the main consumer.
-    # Run the AI as the "main thread" and the consumer in the background.
-    ai_producer = multiprocessing.Process(target=run_ai, args=(queue,))
-    main_consumer = multiprocessing.Process(target=main_entrypoint, args=(queue,), daemon=True)
+        # Initialize joinable queue to share data between processes
+        # After many hours of troubleshooting, finally got help from https://stackoverflow.com/a/74190530/12418245
+        queue = multiprocessing.JoinableQueue(maxsize=1)
 
-    # First we start the consumer, since it needs to initialize the track
-    main_consumer.start()
+        # Create a process for both the AI producer and the main consumer.
+        # Run the AI as the "main thread" and the consumer in the background.
+        ai_producer = multiprocessing.Process(target=run_ai, args=(queue,))
+        main_consumer = multiprocessing.Process(target=main_entrypoint, args=(queue,), daemon=True)
 
-    # Wait for the track to be initialized before starting the AI
-    if DEBUG:
-        print("[main] Waiting for track to be initialized...")
-    queue.get()
-    queue.task_done()
-    if DEBUG:
-        print("[main] Track initialized! Starting AI producer...")
+        # First we start the consumer, since it needs to initialize the track
+        main_consumer.start()
 
-    # Now we start the AI
-    ai_producer.start()
+        # Wait for the track to be initialized before starting the AI
+        if DEBUG:
+            print("[main] Waiting for track to be initialized...")
+        queue.get()
+        queue.task_done()
+        if DEBUG:
+            print("[main] Track initialized! Starting AI producer...")
 
-    if DEBUG:
-        print("[main] AI producer started!")
+        # Now we start the AI
+        # run_ai(queue)
+        ai_producer.start()
 
-    # It shouldn't join, unless it ends somehow, but we put it here anyway
-    ai_producer.join()
+        if DEBUG:
+            print("[main] AI producer started!")
 
-    if DEBUG:
-        print("[main] AI producer joined!? Stopping race!")
+        # It shouldn't join, unless it ends somehow, but we put it here anyway
+        ai_producer.join()
+
+        if DEBUG:
+            print("[main] AI producer joined!? Stopping race!")
+    except KeyboardInterrupt:
+        pass
+    requests.post(f"{ROBOT_API_ENDPOINT}/stop")

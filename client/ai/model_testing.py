@@ -5,7 +5,7 @@ from ultralytics import YOLO
 from ultralytics.yolo.utils.plotting import Annotator
 
 VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 1))
-CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/20230601_2")
+CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/20230601_2q")
 
 # Set device for AI processing
 torchDevice = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
