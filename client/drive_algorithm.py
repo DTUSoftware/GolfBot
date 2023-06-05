@@ -532,18 +532,17 @@ TRACK_GLOBAL: Optional[Track] = None
 
 
 def setup_debug() -> None:
-    bounds = {"x": 15, "y": 18}
+    bounds = {"x": 15, "y": 20}
     track = setup(bounds)
 
-    track.set_robot_pos((8, 7))
-    track.add_ball(Ball((9, 11)))
+    track.set_robot_pos((9, 18))
+    track.add_ball(Ball((8, 0)))
 
-    obstacle_path = [(4, 3), (4, 4), (4, 5), (3, 4), (5, 4)]
+    obstacle_path = [(6, 10), (7, 11), (8, 10), (9, 9), (10, 10), (11, 11), (12, 10), (11, 9), (10, 8), (11, 7),
+                     (12, 6), (11, 5), (10, 6), (9, 7), (8, 6), (7, 5), (6, 6), (7, 7), (8, 8), (8, 9), (7, 6), (8, 7),
+                     (9, 8), (8, 9), (7, 10), (11, 10), (10, 9), (10, 7), (11, 6)]
     obstacle = Obstacle(track.graph.get_nodes_in_path(obstacle_path))
-    # track.add_obstacle(obstacle)
-    # obstacle_path = [(1, 5), (3, 5), (4, 5), (5, 5), (6, 5), (7, 5), (8, 5), (9, 5), (10, 5), (11, 5), (12, 5), (13, 5), (14, 5)]
-    # obstacle = Obstacle(track.graph.get_nodes_in_path(obstacle_path))
-    # track.add_obstacle(obstacle)
+    track.add_obstacle(obstacle)
 
     wall_path = []
     wall_path.extend([(x, y) for x in [0, bounds["x"] - 1]
