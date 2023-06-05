@@ -35,7 +35,7 @@ ROBOT_BASE_SPEED = float(os.environ.get('ROBOT_BASE_SPEED', 50.0))
 integral = 0
 previous_error = 0
 last_target_node = None
-
+last_target_path = None
 
 
 def test_robot_get_pos(old_pos: tuple = None) -> tuple:
@@ -149,6 +149,15 @@ async def calculate_and_adjust(track, session: aiohttp.ClientSession):
     track.calculate_path()
     # track.draw(True)
 
+    if not track.path:
+        if DEBUG:
+            print("No node to travel to, setting speed to 0!")
+        await set_speeds(session, 0, 0)
+        return
+
+    # await get_pid_target_and_adjust(track, session)
+    # return
+
     # Get the node to go to
     next_node = pick_target(track)
     if next_node:
@@ -160,8 +169,8 @@ async def calculate_and_adjust(track, session: aiohttp.ClientSession):
         await adjust_speed_using_pid(track, next_node.node, session)
     else:
         if DEBUG:
-            print("No node to travel to, setting speed to 0!")
-        await set_speeds(session, 0, 0)
+            print("No next node?")
+
     # if DEBUG:
     #     print("Done calculating path and adjusting speed")
 
@@ -171,6 +180,76 @@ async def set_speeds(session, speed_left, speed_right):
             f"{ROBOT_API_ENDPOINT}/drive?speed_left={speed_left}&speed_right={speed_right}") as response:
         if response.status != 200:
             print(f"Error on adjusting speed: {response.status}")
+
+
+async def get_pid_target_and_adjust(track: Track, session: aiohttp.ClientSession):
+    global last_target_path, integral, previous_error
+    # If not set already, set and reset
+    # Check if the new path target is different than before
+    if last_target_path and isinstance(last_target_path, list) and not is_target_different(track, last_target_path[-1].node, track.path[-1].node):
+        if DEBUG:
+            print("No change in target, keeping current path.")
+
+            # If robot is at target, pop
+            if not is_target_different(track, last_target_path[0].node, track.graph.get_node(track.robot_pos)):
+                if DEBUG:
+                    print("Robot reached target, popping")
+                last_target_path.pop(0)
+
+            if DEBUG:
+                print(f"Current optimized path: {last_target_path}")
+            # Call adjust to adjust for error, and to clear point from list if we reach the target
+            await adjust_speed_using_pid(track, last_target_path[0].node, session)
+    if DEBUG:
+        print("New target, making new path")
+    integral = 0
+    previous_error = 0
+    
+    # "Summarize" path into good points for targets
+    new_path = []
+    current_from_node = track.path[0]
+    
+    if len(track.path) <= 1:
+        # If under 1, do not make any path
+        new_path = []
+    elif len(track.path) == 2:
+        # Only given two points, make last point the target
+        new_path.append(track.path[-1])
+    else:
+        # Get the summarization
+        for i in range(2, len(track.path)):
+            current_check_node = track.path[i]
+            if current_check_node == current_from_node:
+                continue
+            
+            # If last node, add it
+            if i == len(track.path):
+                new_path.append(current_check_node)
+                break
+            
+            # Check if node is on same straight line
+            if current_check_node.node.x == current_from_node.node.x:
+                pass
+            if current_check_node.node.y == current_from_node.node.y:
+                pass
+            
+            # If heading is same as last node, skip
+            heading_diff_tolerance = 0.01
+            current_from_pos = (current_from_node.node.x, current_from_node.node.y)
+            if abs(current_check_node.node.get_heading(current_from_pos) - track.path[i-1].node.get_heading(current_from_pos)) <= heading_diff_tolerance:
+                pass
+            
+            # We have a new direction, add the LAST POINT (not current!) to the new path, as it's where the turn happens
+            new_path.append(current_check_node)
+            current_from_node = current_check_node
+    
+    last_target_path = new_path
+    if DEBUG:
+        print(f"Current target optimized path: {last_target_path}")
+
+    # Adjust and go to
+    if last_target_path:
+        await adjust_speed_using_pid(track, last_target_path[0].node, session)
 
 
 # Inspired by https://en.wikipedia.org/wiki/PID_controller and
@@ -252,7 +331,7 @@ async def adjust_speed_using_pid(track: Track, target_node: Node, session: aioht
 def is_target_different(track: Track, target_node: Node, other_node: Node) -> bool:
     # Define a threshold for difference based on your requirements
     # Assume a difference of 1.0 cm is significant, we use pixels though, so it depends on the distance and camera
-    position_threshold = 75.0
+    position_threshold = 50.0
 
     # Calculate the position difference
     position_diff = math.sqrt((target_node.x - other_node.x)**2 + (target_node.y - other_node.y)**2)
@@ -330,12 +409,23 @@ async def race(camera_queue: multiprocessing.JoinableQueue, track: Track, sessio
     start_time = time.time()
     time_taken = 0
 
+    print("Toggling fans!")
+    await toggle_fans(session)
+
+    print("Racing!")
     while time_taken <= 8 * 60:
         await do_race_iteration(track, camera_queue, session)
         time_taken = time.time() - start_time
         # Never remove this sleep
         await asyncio.sleep(0)
     print("Done with race!")
+
+
+async def toggle_fans(session):
+    async with session.post(
+            f"{ROBOT_API_ENDPOINT}/toggle_fans") as response:
+        if response.status != 200:
+            print(f"Error on toggling fans: {response.status}")
 
 
 async def main(camera_queue: multiprocessing.JoinableQueue, track):

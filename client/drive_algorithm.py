@@ -107,7 +107,7 @@ class Graph:
     def add_node(self, coordinates: tuple) -> None:
         self.nodes.append(Node(coordinates))
 
-    def get_node(self, pos: tuple) -> Any:
+    def get_node(self, pos: tuple) -> Optional[Node]:
         if 0 <= pos[0] < len(self.nodes[0]) and 0 <= pos[1] < len(self.nodes):
             return self.nodes[pos[1]][pos[0]]
         else:
