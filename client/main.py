@@ -135,7 +135,7 @@ def pick_target(track: Track) -> Optional[NodeData]:
         return track.path[-1]
 
     # If bigger path, get the path which is on 1/4 of the way
-    return track.path[math.ceil(len(track.path)/4)]
+    return track.path[math.ceil(len(track.path) / 4)]
 
     # If nothing else, get the first node on the path
     # return track.path[1]
@@ -186,7 +186,9 @@ async def get_pid_target_and_adjust(track: Track, session: aiohttp.ClientSession
     global last_target_path, integral, previous_error
     # If not set already, set and reset
     # Check if the new path target is different than before
-    if last_target_path and isinstance(last_target_path, list) and not is_target_different(track, last_target_path[-1].node, track.path[-1].node):
+    if last_target_path and isinstance(last_target_path, list) and not is_target_different(track,
+                                                                                           last_target_path[-1].node,
+                                                                                           track.path[-1].node):
         if DEBUG:
             print("No change in target, keeping current path.")
 
@@ -197,18 +199,19 @@ async def get_pid_target_and_adjust(track: Track, session: aiohttp.ClientSession
                 last_target_path.pop(0)
 
             if DEBUG:
-                print(f"Current optimized path: {[(nodedata.node.x, nodedata.node.y) for nodedata in last_target_path]}")
+                print(
+                    f"Current optimized path: {[(nodedata.node.x, nodedata.node.y) for nodedata in last_target_path]}")
             # Call adjust to adjust for error, and to clear point from list if we reach the target
             await adjust_speed_using_pid(track, last_target_path[0].node, session)
     if DEBUG:
         print("New target, making new path")
     integral = 0
     previous_error = 0
-    
+
     # "Summarize" path into good points for targets
     new_path = []
     current_from_node = track.path[0]
-    
+
     if len(track.path) <= 1:
         # If under 1, do not make any path
         new_path = []
@@ -221,28 +224,29 @@ async def get_pid_target_and_adjust(track: Track, session: aiohttp.ClientSession
             current_check_node = track.path[i]
             if current_check_node == current_from_node:
                 continue
-            
+
             # If last node, add it
             if i == len(track.path):
                 new_path.append(current_check_node)
                 break
-            
+
             # Check if node is on same straight line
             if current_check_node.node.x == current_from_node.node.x:
                 pass
             if current_check_node.node.y == current_from_node.node.y:
                 pass
-            
+
             # If heading is same as last node, skip
             heading_diff_tolerance = 0.01
             current_from_pos = (current_from_node.node.x, current_from_node.node.y)
-            if abs(current_check_node.node.get_heading(current_from_pos) - track.path[i-1].node.get_heading(current_from_pos)) <= heading_diff_tolerance:
+            if abs(current_check_node.node.get_heading(current_from_pos) - track.path[i - 1].node.get_heading(
+                    current_from_pos)) <= heading_diff_tolerance:
                 pass
-            
+
             # We have a new direction, add the LAST POINT (not current!) to the new path, as it's where the turn happens
             new_path.append(current_check_node)
             current_from_node = current_check_node
-    
+
     last_target_path = new_path
     if DEBUG:
         print(f"Current target optimized path: {[(nodedata.node.x, nodedata.node.y) for nodedata in last_target_path]}")
@@ -334,13 +338,13 @@ def is_target_different(track: Track, target_node: Node, other_node: Node) -> bo
     position_threshold = 50.0
 
     # Calculate the position difference
-    position_diff = math.sqrt((target_node.x - other_node.x)**2 + (target_node.y - other_node.y)**2)
+    position_diff = math.sqrt((target_node.x - other_node.x) ** 2 + (target_node.y - other_node.y) ** 2)
 
     # Calculate the direction difference
     direction_diff = abs(target_node.get_heading(track.robot_pos) - other_node.get_heading(track.robot_pos))
 
     # Check if target is significantly different from the last target
-    if position_diff > position_threshold or direction_diff > math.pi/4:
+    if position_diff > position_threshold or direction_diff > math.pi / 4:
         return True
 
     return False
