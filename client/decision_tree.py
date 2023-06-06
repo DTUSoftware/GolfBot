@@ -1,9 +1,11 @@
 import math
 
+from Utils.Math import calculate_new_direction, calculate_distance
+
 
 def drive_decision(robot_position: tuple[int, int], robot_direction: float, target_position: tuple[int, int]):
-    new_direction = calculate_new_direction(robot_position=robot_position, target_position=target_position)
-    distance = calculate_distance(robot_position=robot_position, target_position=target_position)
+    new_direction = calculate_new_direction(old_position=robot_position, new_position=target_position)
+    distance = calculate_distance(old_position=robot_position, new_position=target_position)
     # maybe make som kind of tolerance
     if abs(robot_direction - new_direction) > 0:
         # turn robot-
@@ -13,9 +15,4 @@ def drive_decision(robot_position: tuple[int, int], robot_direction: float, targ
         pass
 
 
-def calculate_new_direction(robot_position: tuple[int, int], target_position: tuple[int, int]) -> float:
-    return math.atan2(target_position[1] - robot_position[1], target_position[0] - robot_position[0])
 
-
-def calculate_distance(robot_position: tuple[int, int], target_position: tuple[int, int]) -> float:
-    return math.sqrt(pow(robot_position[0] + target_position[0], 2) + pow(robot_position[1] + target_position[1], 2))
