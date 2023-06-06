@@ -1,13 +1,11 @@
-import io
 import os
-import sys
 import cv2
 import logging
 from ultralytics import YOLO
 import torch
 
 VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 1))
-CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/20230601_2")
+CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/20230606")
 DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "True").lower()
 DEBUG = ("true" in os.environ.get('DEBUG', "True").lower()) and not DISABLE_LOGGING
 
