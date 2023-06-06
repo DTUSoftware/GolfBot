@@ -186,14 +186,19 @@ class Robot:
             reset_conn()
         return False
 
-    def stop(self) -> bool:
-        if not self.stopped:
-            self.stopped = True
-            self.motors.off()
-            self.busy = False
-            if self.fan_state:
-                self.toggle_fans()
-            return True
+    def stop(self, tries=0) -> bool:
+        if not self.stopped and tries <= 10:
+            try:
+                self.stopped = True
+                self.motors.off()
+                self.busy = False
+                if self.fan_state:
+                    self.toggle_fans()
+                return True
+            except (EOFError, ReferenceError):
+                reset_conn()
+                # keep trying pls, I don't care if it's recursive
+                self.stop(tries=tries+1)
         return False
 
     def start(self) -> bool:
@@ -238,18 +243,21 @@ def setup(tries=0) -> None:
 def reset_conn(tries=0):
     global conn, ev3_motor, ev3_button
     try:
+        print("Trying to reconnect to robot...")
         conn = rpyc.classic.connect(IP_ADDRESS)
         ev3_motor = conn.modules['ev3dev2.motor']
         ev3_button = conn.modules['ev3dev2.button']
+        print("Reconnected!")
     except Exception as e:
         print("Failed to connect to robot: " + str(e))
         conn = None
         ev3_motor = None
         ev3_button = None
 
-    # Keep trying 10 times
-    if tries < 10:
-        setup(tries + 1)
+    if not conn or not ev3_motor or not ev3_button:
+        # Keep trying 10 times
+        if tries < 10:
+            setup(tries + 1)
 
     return conn, ev3_motor, ev3_button
 

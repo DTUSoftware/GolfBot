@@ -1,3 +1,4 @@
+import io
 import os
 import sys
 import cv2
@@ -14,14 +15,8 @@ DEBUG = ("true" in os.environ.get('DEBUG', "True").lower()) and not DISABLE_LOGG
 # To be run as a thread
 def run_ai(camera_queue: torch.multiprocessing.JoinableQueue, path_queue: torch.multiprocessing.JoinableQueue):
     if DISABLE_LOGGING:
-        # THIS DISABLES LOGGING
-        if sys.platform == "win32":
-            sys.stdout = open('nul', 'w')
-            # sys.stderr = open('nul', 'w')
-        else:
-            sys.stdout = open('/dev/null', 'w')
-            # sys.stderr = open('/dev/null', 'w')
-        logging.getLogger("yolov5").setLevel(logging.WARNING)
+        # THIS DISABLES LOGGING FOR YOLO
+        logging.getLogger("ultralytics").setLevel(logging.WARNING)
 
     # Set device for AI processing
     torch_device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
@@ -85,7 +80,8 @@ def run_ai(camera_queue: torch.multiprocessing.JoinableQueue, path_queue: torch.
                     print("[AI] Queue full, cannot store image")
                     print(str(e))
         else:
-            print("Queue full, will not store elements.")
+            if DEBUG:
+                print("Queue full, will not store elements.")
 
         # Draw bounding boxes and labels on the image
         if DEBUG:
@@ -144,8 +140,9 @@ def run_ai(camera_queue: torch.multiprocessing.JoinableQueue, path_queue: torch.
 if __name__ == "__main__":
     torch.multiprocessing.set_start_method('spawn', force=True)
     # manager = torch.multiprocessing.Manager()
-    queue = torch.multiprocessing.JoinableQueue(maxsize=1)
-    process = torch.multiprocessing.Process(target=run_ai, args=(queue,))
+    queue_1 = torch.multiprocessing.JoinableQueue(maxsize=1)
+    queue_2 = torch.multiprocessing.JoinableQueue(maxsize=1)
+    process = torch.multiprocessing.Process(target=run_ai, args=(queue_1, queue_2))
     process.start()
     process.join()
     # run_ai(queue)

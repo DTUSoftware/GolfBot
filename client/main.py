@@ -140,17 +140,23 @@ def pick_target(track: Track) -> Optional[NodeData]:
 
 
 async def calculate_and_adjust(track, path_queue: multiprocessing.JoinableQueue, session: aiohttp.ClientSession):
-    # if DEBUG:
-    #     print("Calculating path and adjusting speed")
+    if DEBUG:
+        print("Calculating path and adjusting speed")
 
     # Get the path to closest ball
-    track.calculate_path()
+    await track.calculate_path()
     # track.draw(True)
 
     if not track.path:
         if DEBUG:
             print("No node to travel to, setting speed to 0!")
         await set_speeds(session, 0, 0)
+
+        # if not path_queue.full():
+        #     try:
+        #         path_queue.put([])
+        #     except:
+        #         pass
         return
 
     # Get the node to go to
@@ -213,12 +219,24 @@ def collapse_path(track: Track, path_queue: multiprocessing.JoinableQueue) -> bo
                     print("Robot went completely wrong way?!?? Removing path!")
                 last_target_node = None
                 last_target_path = None
+                # if not path_queue.full():
+                #     try:
+                #         path_queue.put([])
+                #     except:
+                #         pass
 
             if DEBUG:
                 print(f"Current optimized path: {[(nodedata.node.x, nodedata.node.y) for nodedata in last_target_path]}")
             if last_target_path:
                 # Call adjust to adjust for error, and to clear point from list if we reach the target
                 return True
+            else:
+                # if not path_queue.full():
+                #     try:
+                #         path_queue.put([])
+                #     except:
+                #         pass
+                pass
     if DEBUG:
         print("New target, making new path")
 
@@ -274,12 +292,17 @@ def collapse_path(track: Track, path_queue: multiprocessing.JoinableQueue) -> bo
             heading_diff_tolerance = 15  # degrees, not radians
             current_from_pos = (current_from_node.node.x, current_from_node.node.y)
             heading_of_check_node = current_check_node.node.get_heading((track.path[i-1].node.x, track.path[i-1].node.y))
+            # The line below 'should not' fuck up, but it can give a value of 0 if, somehow, the track path's last node
+            # is the same as the current from pos. But we, in the case of a new direction, assign the last variable,
+            # so the current from pos should always be different than the last node!
+            # We also start at index 2 (third value) to get around this, and for other reasons.
             heading_of_last_node = track.path[i-1].node.get_heading(current_from_pos)
             heading_diff = abs(heading_of_check_node - heading_of_last_node)
-            # print(f"current from: {current_from_pos}\n"
-            #       f"current check pos: {current_check_node.node.x}, {current_check_node.node.y}\n"
-            #       f"last check pos: {track.path[i-1].node.x}, {track.path[i-1].node.y}\n"
-            #       f"Heading diff: (check) {heading_of_check_node} - (last) {heading_of_last_node} = {heading_diff}")
+            # if DEBUG:
+            #     print(f"current from: {current_from_pos}\n"
+            #           f"current check pos: {current_check_node.node.x}, {current_check_node.node.y}\n"
+            #           f"last check pos: {track.path[i-1].node.x}, {track.path[i-1].node.y}\n"
+            #           f"Heading diff: (check) {heading_of_check_node} - (last) {heading_of_last_node} = {heading_diff}")
             if heading_diff <= math.radians(heading_diff_tolerance):
                 # if DEBUG:
                 #     print("Is same direction, skipping")
@@ -287,9 +310,9 @@ def collapse_path(track: Track, path_queue: multiprocessing.JoinableQueue) -> bo
             
             # We have a new direction, add the LAST POINT (not current!) to the new path, as it's where the turn happens
             if DEBUG:
-                print(f"{current_check_node.node.x}, {current_check_node.node.y} is on not on same path, appending")
-            new_path.append(current_check_node)
-            current_from_node = current_check_node
+                print(f"{track.path[i-1].node.x}, {track.path[i-1].node.y} is on not on same path, appending")
+            new_path.append(track.path[i-1])
+            current_from_node = track.path[i-1]
     
     last_target_path = new_path
     if DEBUG:
@@ -432,8 +455,8 @@ async def do_race_iteration(track: Track, ai_queue: multiprocessing.JoinableQueu
             return
 
         ai_results = ai_queue.get_nowait()
-        # if DEBUG:
-        #     print("Got results from AI!")
+        if DEBUG:
+            print("Got results from AI!")
 
         # if DEBUG:
         #     # Get robot status
@@ -551,7 +574,7 @@ if __name__ == '__main__':
         # Initialize joinable queue to share data between processes
         # After many hours of troubleshooting, finally got help from https://stackoverflow.com/a/74190530/12418245
         ai_queue = multiprocessing.JoinableQueue(maxsize=1)
-        path_queue = multiprocessing.JoinableQueue(maxsize=1)
+        path_queue = multiprocessing.JoinableQueue(maxsize=10)
 
         # Create a process for both the AI producer and the main consumer.
         # Run the AI as the "main thread" and the consumer in the background.

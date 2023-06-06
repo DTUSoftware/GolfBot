@@ -177,9 +177,9 @@ def setup_track() -> drivealg.Track:
     for obj in objects:
         object_type = obj["object_type"]
         if object_type == "obstacle":
-            print(f"Adding obstacle path {obj['path']} to track")
+            # print(f"Adding obstacle path {obj['path']} to track")
             nodes_in_path = track.graph.get_nodes_in_path(obj["path"])
-            print(f"Nodes in obstacle path: {[(node.x, node.y) for node in nodes_in_path]}")
+            # print(f"Nodes in obstacle path: {[(node.x, node.y) for node in nodes_in_path]}")
             obstacle = drivealg.Obstacle(nodes_in_path)
             track.add_obstacle(obstacle)
         elif object_type == "small_goal":

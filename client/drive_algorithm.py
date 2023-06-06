@@ -1,3 +1,4 @@
+import asyncio
 import os
 import math
 import heapq
@@ -117,12 +118,14 @@ class Graph:
             return None
 
     def get_nodes_in_path(self, path: list) -> list:
+        node_plusminus = 1
         nodes_in_path = []
         for i in range(len(path)):
             pos = path[i]
             node = self.get_node(pos)
             if node:
-                print(f"Adding {pos[0]}, {pos[1]}")
+                if DEBUG:
+                    print(f"Adding {pos[0]}, {pos[1]}")
                 nodes_in_path.append(node)
                 if i >= 1:
                     # Get all nodes between the current node and the previous node
@@ -140,26 +143,28 @@ class Graph:
                         x_max = max(x1, x2)
                         for x in range(int(x_min + 1), int(x_max)):
                             y = int(slope * float(x) + y_intercept)
-                            for j in range(-3, 3+1):
-                                pos = (x+j, y+j)
+                            if DEBUG:
+                                print(f"Adding {x}+-{node_plusminus}, {y}+-{node_plusminus}")
+                            for j in range(-node_plusminus, node_plusminus + 1):
+                                pos = (x + j, y + j)
                                 if pos not in path:
                                     node = self.get_node(pos)
                                     if node:
-                                        print(f"Adding {pos[0]}, {pos[1]}")
                                         nodes_in_path.append(node)
-                    elif abs(y1 - y2) > 1:
+                    if abs(y1 - y2) > 1:
                         slope = (x1 - x2) / (y1 - y2)
                         x_intercept = (y1 * x2 - y2 * x1) / (y1 - y2)
                         y_min = min(y1, y2)
                         y_max = max(y1, y2)
                         for y in range(int(y_min + 1), int(y_max)):
                             x = int(slope * float(y) + x_intercept)
-                            for j in range(-3, 3+1):
-                                pos = (x+j, y+j)
+                            if DEBUG:
+                                print(f"Adding {x}+-{node_plusminus}, {y}+-{node_plusminus}")
+                            for j in range(-node_plusminus, node_plusminus + 1):
+                                pos = (x + j, y + j)
                                 if pos not in path:
                                     node = self.get_node(pos)
                                     if node:
-                                        print(f"Adding {pos[0]}, {pos[1]}")
                                         nodes_in_path.append(node)
 
         return list(set(nodes_in_path))
@@ -183,9 +188,9 @@ class Graph:
         return abs(start_node.x - dst_node.x) + abs(start_node.y - dst_node.y)
 
     # Get path and cost using A*
-    def get_path(self, start_node: Node, dst_node: Node) -> list:
-        # if DEBUG:
-        #     print(f"Getting path between {start_node.x}, {start_node.y} and {dst_node.x}, {dst_node.y}")
+    async def get_path(self, start_node: Node, dst_node: Node) -> list:
+        if DEBUG:
+            print(f"Getting path between {start_node.x}, {start_node.y} and {dst_node.x}, {dst_node.y}")
         start_node_data = NodeData(
             start_node, 0, self.h(start_node, dst_node), None)
         open_list: List[Tuple[float, NodeData]] = [
@@ -199,11 +204,12 @@ class Graph:
         current_node = None
         while open_list:
             i += 1
-            # if DEBUG:
-            #     print(i)
-            if i > 2000:
+            if DEBUG and i != 0 and (i % 500) == 0:
+                print(f"OpenList: {i}")
+            if i > 5000:
                 if DEBUG:
                     print("While look fucky wucky")
+                closed_list = []
                 break
             current_node = heapq.heappop(open_list)
             if current_node[1].node is dst_node:
@@ -219,11 +225,13 @@ class Graph:
                 )
 
                 closed_list_check = False
-                for i in range(len(closed_list)):
-                    if closed_list[i][1].node == neighbour_data.node:
+                for j in range(len(closed_list)):
+                    # if DEBUG and j != 0 and (j % 500) == 0:
+                    #     print(f"ClosedListCheck: {j}")
+                    if closed_list[j][1].node == neighbour_data.node:
                         closed_list_check = True
-                        if neighbour_data.g < closed_list[i][1].g:
-                            closed_list[i] = (neighbour_data.f, neighbour_data)
+                        if neighbour_data.g < closed_list[j][1].g:
+                            closed_list[j] = (neighbour_data.f, neighbour_data)
                             found = False
                             for node_elem in list(open_list):
                                 if node_elem[1].node == neighbour_data.node:
@@ -233,40 +241,48 @@ class Graph:
                                 heapq.heappush(
                                     open_list, (neighbour_data.f, neighbour_data))
                         break
+                    await asyncio.sleep(0)
 
                 if not closed_list_check:
                     open_list_check = False
                     open_list_list = list(open_list)
-                    for i in range(len(open_list_list)):
-                        if open_list_list[i][1].node == neighbour_data.node:
+                    for j in range(len(open_list_list)):
+                        # if DEBUG and j != 0 and (j % 500) == 0:
+                        #     print(f"OpenListList: {j}")
+                        if open_list_list[j][1].node == neighbour_data.node:
                             open_list_check = True
-                            if neighbour_data.g < open_list_list[i][1].g:
-                                open_list_list[i] = (
+                            if neighbour_data.g < open_list_list[j][1].g:
+                                open_list_list[j] = (
                                     neighbour_data.f, neighbour_data)
                                 open_list = open_list_list
                                 heapq.heapify(open_list)
                             break
+                        await asyncio.sleep(0)
 
                     if not open_list_check:
                         heapq.heappush(
                             open_list, (neighbour_data.f, neighbour_data))
+                await asyncio.sleep(0)
 
             closed_list.append(current_node)
+            await asyncio.sleep(0)
 
         # print(closed_list)
         # for elem in closed_list:
         #     print(f"({elem[1].node.x}, {elem[1].node.y}) - f: {elem[1].f} g: {elem[1].g} h: {elem[1].h}")
 
         final_list: list = []
-        node = closed_list[-1][1]
-        # print(f"End walkthrough, f: {node.f} g: {node.g} h: {node.h}")
-        while node:
-            # if DEBUG:
-            #     print("NODE WHILE LOOP")
-            # print(f"({node.node.x}, {node.node.y})", end=" ")
-            final_list.insert(0, node)
-            node = node.parent
-        # print("")
+        if closed_list:
+            node = closed_list[-1][1]
+            # print(f"End walkthrough, f: {node.f} g: {node.g} h: {node.h}")
+            while node:
+                # if DEBUG:
+                #     print("NODE WHILE LOOP")
+                # print(f"({node.node.x}, {node.node.y})", end=" ")
+                final_list.insert(0, node)
+                node = node.parent
+                await asyncio.sleep(0)
+            # print("")
 
         return final_list
 
@@ -419,12 +435,12 @@ class Track:
         # Update position
         self.robot_pos = robot_pos
 
-    def calculate_path(self) -> None:
+    async def calculate_path(self) -> None:
         # if DEBUG:
         #     print("Calculating path")
         if not self.balls:
-            # if DEBUG:
-            #     print("No balls, returning empty path")
+            if DEBUG:
+                print("No balls, returning empty path")
             self.path = []
             return
 
@@ -438,18 +454,24 @@ class Track:
             balls_to_catch = self.balls
 
         # For every ball calculate the path, then choose the best path
-        # if DEBUG:
-        #     print("Calculating path for every ball")
-        paths: List[list] = []
-        for ball in balls_to_catch:
-            # if DEBUG:
-            #     print(f"Trying for ball: ({ball.x}, {ball.y})")
+        if DEBUG:
+            print("Calculating path for every ball")
+        paths = []
+        if balls_to_catch:
             robot_node = self.graph.get_node(self.robot_pos)
-            ball_node = self.graph.get_node((ball.x, ball.y))
-            paths.append(self.graph.get_path(
-                start_node=robot_node, dst_node=ball_node))
-            # if DEBUG:
-            #     print("Done finding path")
+            ball_nodes = [self.graph.get_node((ball.x, ball.y)) for ball in balls_to_catch]
+            tasks = [self.graph.get_path(start_node=robot_node, dst_node=ball_node) for ball_node in ball_nodes]
+            paths = await asyncio.gather(*tasks, return_exceptions=False)
+            if DEBUG:
+                print("Done calculating paths.")
+            # for ball in balls_to_catch:
+            #     if DEBUG:
+            #         print(f"Trying for ball: ({ball.x}, {ball.y})")
+            #     ball_node = self.graph.get_node((ball.x, ball.y))
+            #     path = await self.graph.get_path(start_node=robot_node, dst_node=ball_node)
+            #     paths.append(path)
+            #     if DEBUG:
+            #         print("Done finding path")
 
         if paths:
             # if DEBUG:
@@ -463,11 +485,12 @@ class Track:
             if min_path["path"] and len(min_path["path"]) > 1:
                 if DEBUG:
                     print(f"Best path found with weight {min_path['f']}")
-                for i in range(len(min_path["path"])):
-                    node = min_path["path"][i].node
-                    end = " -> " if i < len(min_path['path']) - 1 else "\n"
-                    if DEBUG:
-                        print(f"({node.x}, {node.y})", end=end)
+                    # Log the path found
+                    # for i in range(len(min_path["path"])):
+                    #     node = min_path["path"][i].node
+                    #     end = " -> " if i < len(min_path['path']) - 1 else "\n"
+                    #     if DEBUG:
+                    #         print(f"({node.x}, {node.y})", end=end)
                 self.path = min_path["path"]
             else:
                 if DEBUG:
@@ -511,8 +534,8 @@ class Track:
         else:
             self.graph.draw(robot_pos=self.robot_pos, balls=self.balls)
 
-    def plot(self):
-        self.calculate_path()
+    async def plot(self):
+        await self.calculate_path()
         points_in_path = [[], []]
         for nodeData in self.path:
             points_in_path[0].append(nodeData.node.x)
@@ -571,17 +594,17 @@ def setup(bounds: dict) -> Track:
     return track
 
 
-if __name__ == "__main__":
-    setup_debug()
-
-    if TRACK_GLOBAL:
-        track = TRACK_GLOBAL
-
-        print("=========================\nDrawing with obstacles!\n=========================")
-        track.draw(False)
-
-        track.calculate_path()
-
-        print("=========================\nDrawing driving path!\n=========================")
-        track.draw(True)
-        track.plot()
+# if __name__ == "__main__":
+#     setup_debug()
+#
+#     if TRACK_GLOBAL:
+#         track = TRACK_GLOBAL
+#
+#         print("=========================\nDrawing with obstacles!\n=========================")
+#         track.draw(False)
+#
+#         track.calculate_path()
+#
+#         print("=========================\nDrawing driving path!\n=========================")
+#         track.draw(True)
+#         # track.plot()
