@@ -73,11 +73,10 @@ async def parse_ai_results(ai_results) -> tuple:
             class_name = result.names[int(box.cls)]
             if "robot" in class_name:
                 robot_results.append(box)
-            elif "golf-balls" in class_name:
-                if any(x in class_name for x in ["golden", "yellow"]):
-                    golden_ball_results.append(box)
-                else:
-                    golf_ball_results.append(box)
+            elif "orange" in class_name:
+                golden_ball_results.append(box)
+            elif "white" in class_name:
+                golf_ball_results.append(box)
 
     robot_results.sort(key=box_confidence)
     golf_ball_results.sort(key=box_confidence)
@@ -155,21 +154,25 @@ async def calculate_and_adjust(track, session: aiohttp.ClientSession):
         await set_speeds(session, 0, 0)
         return
 
-    await get_pid_target_and_adjust(track, session)
-    return
-
     # Get the node to go to
-    next_node = pick_target(track)
-    if next_node:
-        if DEBUG:
-            print(f"Next node pos: ({next_node.node.x}, {next_node.node.y})")
-
+    if collapse_path(track) and last_target_path and isinstance(last_target_path, list):
         # Tell the robot to drive towards the node
         # await drive_to_coordinates(next_node.node, session)
-        await adjust_speed_using_pid(track, next_node.node, session)
+        await adjust_speed_using_pid(track, last_target_path[0].node, session)
     else:
-        if DEBUG:
-            print("No next node?")
+        print("No node")
+
+    # next_node = pick_target(track)
+    # if next_node:
+    #     if DEBUG:
+    #         print(f"Next node pos: ({next_node.node.x}, {next_node.node.y})")
+    #
+    #     # Tell the robot to drive towards the node
+    #     # await drive_to_coordinates(next_node.node, session)
+    #     await adjust_speed_using_pid(track, next_node.node, session)
+    # else:
+    #     if DEBUG:
+    #         print("No next node?")
 
     # if DEBUG:
     #     print("Done calculating path and adjusting speed")
@@ -182,8 +185,11 @@ async def set_speeds(session, speed_left, speed_right):
             print(f"Error on adjusting speed: {response.status}")
 
 
-async def get_pid_target_and_adjust(track: Track, session: aiohttp.ClientSession):
-    global last_target_path, integral, previous_error
+def collapse_path(track: Track) -> bool:
+    global last_target_path, integral, previous_error, last_target_node
+    if DEBUG:
+        print(f"current last target path: {[(nodedata.node.x, nodedata.node.y ) for nodedata in last_target_path] if last_target_path else []}\n"
+              f"new path target: {(track.path[-1].node.x, track.path[-1].node.y) if track.path else []}")
     # If not set already, set and reset
     # Check if the new path target is different than before
     if last_target_path and isinstance(last_target_path, list) and not is_target_different(track, last_target_path[-1].node, track.path[-1].node):
@@ -195,13 +201,33 @@ async def get_pid_target_and_adjust(track: Track, session: aiohttp.ClientSession
                 if DEBUG:
                     print("Robot reached target, popping")
                 last_target_path.pop(0)
+                last_target_node = track.graph.get_node(track.robot_pos)
+            # If we passed the target, pop
+            has_passed_result = has_passed_target(last_target_path[0].node, track.graph.get_node(track.robot_pos), last_target_node)
+            if has_passed_result:
+                if DEBUG:
+                    print("Robot passed target, popping")
+                last_target_path.pop(0)
+                last_target_node = track.graph.get_node(track.robot_pos)
+            elif has_passed_result is None:
+                if DEBUG:
+                    print("Robot went completely wrong way?!?? Removing path!")
+                last_target_node = None
+                last_target_path = None
 
             if DEBUG:
                 print(f"Current optimized path: {[(nodedata.node.x, nodedata.node.y) for nodedata in last_target_path]}")
-            # Call adjust to adjust for error, and to clear point from list if we reach the target
-            await adjust_speed_using_pid(track, last_target_path[0].node, session)
+            if last_target_path:
+                # Call adjust to adjust for error, and to clear point from list if we reach the target
+                return True
     if DEBUG:
         print("New target, making new path")
+
+    if track.path[0].node.x == 0 and track.path[0].node.y == 0:
+        if DEBUG:
+            print("Robot pos is 0,0, not making new path")
+            return False
+
     integral = 0
     previous_error = 0
     
@@ -211,35 +237,58 @@ async def get_pid_target_and_adjust(track: Track, session: aiohttp.ClientSession
     
     if len(track.path) <= 1:
         # If under 1, do not make any path
+        if DEBUG:
+            print("Under or equal to 1 (only robot), skips")
         new_path = []
     elif len(track.path) == 2:
         # Only given two points, make last point the target
+        if DEBUG:
+            print("Only two points, setting to last element")
         new_path.append(track.path[-1])
     else:
         # Get the summarization
         for i in range(2, len(track.path)):
             current_check_node = track.path[i]
             if current_check_node == current_from_node:
+                if DEBUG:
+                    print("Same as current from node, skipping")
                 continue
             
             # If last node, add it
-            if i == len(track.path):
+            if i == (len(track.path)-1):
+                if DEBUG:
+                    print("Last node appending")
                 new_path.append(current_check_node)
                 break
             
             # Check if node is on same straight line
             if current_check_node.node.x == current_from_node.node.x:
-                pass
+                # if DEBUG:
+                #     print("Same x")
+                continue
             if current_check_node.node.y == current_from_node.node.y:
-                pass
+                # if DEBUG:
+                #     print("Same y")
+                continue
             
             # If heading is same as last node, skip
-            heading_diff_tolerance = 0.01
+            heading_diff_tolerance = 15  # degrees, not radians
             current_from_pos = (current_from_node.node.x, current_from_node.node.y)
-            if abs(current_check_node.node.get_heading(current_from_pos) - track.path[i-1].node.get_heading(current_from_pos)) <= heading_diff_tolerance:
-                pass
+            heading_of_check_node = current_check_node.node.get_heading((track.path[i-1].node.x, track.path[i-1].node.y))
+            heading_of_last_node = track.path[i-1].node.get_heading(current_from_pos)
+            heading_diff = abs(heading_of_check_node - heading_of_last_node)
+            # print(f"current from: {current_from_pos}\n"
+            #       f"current check pos: {current_check_node.node.x}, {current_check_node.node.y}\n"
+            #       f"last check pos: {track.path[i-1].node.x}, {track.path[i-1].node.y}\n"
+            #       f"Heading diff: (check) {heading_of_check_node} - (last) {heading_of_last_node} = {heading_diff}")
+            if heading_diff <= math.radians(heading_diff_tolerance):
+                # if DEBUG:
+                #     print("Is same direction, skipping")
+                continue
             
             # We have a new direction, add the LAST POINT (not current!) to the new path, as it's where the turn happens
+            if DEBUG:
+                print(f"{current_check_node.node.x}, {current_check_node.node.y} is on not on same path, appending")
             new_path.append(current_check_node)
             current_from_node = current_check_node
     
@@ -249,7 +298,8 @@ async def get_pid_target_and_adjust(track: Track, session: aiohttp.ClientSession
 
     # Adjust and go to
     if last_target_path:
-        await adjust_speed_using_pid(track, last_target_path[0].node, session)
+        last_target_node = track.graph.get_node(track.robot_pos)
+        return True
 
 
 # Inspired by https://en.wikipedia.org/wiki/PID_controller and
@@ -279,7 +329,7 @@ async def adjust_speed_using_pid(track: Track, target_node: Node, session: aioht
         error += 2 * math.pi
 
     # Reset integral and previous error if target position is very different
-    global integral, previous_error, last_target_node, KI
+    global integral, previous_error, KI
     # if last_target_node and is_target_different(track, target_node, last_target_node):
     #     integral = 0
     #     previous_error = 0
@@ -325,7 +375,7 @@ async def adjust_speed_using_pid(track: Track, target_node: Node, session: aioht
     await set_speeds(session, speed_left, speed_right)
 
     # Update last target node
-    last_target_node = target_node
+    # last_target_node = target_node
 
 
 def is_target_different(track: Track, target_node: Node, other_node: Node) -> bool:
@@ -343,6 +393,16 @@ def is_target_different(track: Track, target_node: Node, other_node: Node) -> bo
     if position_diff > position_threshold or direction_diff > math.pi/4:
         return True
 
+    return False
+
+
+def has_passed_target(target_node: Node, current_node: Node, from_node: Node):
+    length_to_obtain = math.sqrt((target_node.x - from_node.x)**2 + (target_node.y - from_node.y)**2)
+    current_length = math.sqrt((target_node.x - current_node.x)**2 + (target_node.y - current_node.y)**2)
+
+    position_threshold = 10
+    if current_length - length_to_obtain >= position_threshold:
+        return True
     return False
 
 
