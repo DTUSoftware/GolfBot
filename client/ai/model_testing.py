@@ -6,29 +6,46 @@ from PIL import Image
 from ultralytics import YOLO
 from ultralytics.yolo.utils.plotting import Annotator
 
-VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 0))
+VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 1))
 CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/20230605_nico1")
 DATA = os.environ.get("DATA", "datasets/RoboFlow0506-1")
 
 
-def save_result(results):
+def save_result(results, frame=None, missing=False):
     print("Saving result...")
     if not os.path.exists(DATA + "/custom/images"):
         os.makedirs(DATA + "/custom/images", exist_ok=True)
     if not os.path.exists(DATA + "/custom/labels"):
         os.makedirs(DATA + "/custom/labels", exist_ok=True)
+    if missing and not os.path.exists(DATA + "/custom/missing_images"):
+        os.makedirs(DATA + "/custom/missing_images", exist_ok=True)
 
     for result in results:
         image_name: str = datetime.now().strftime("CustomImage-%Y-%m-%d_%H%M%S")
-        image = Image.fromarray(result.orig_img)
-        if not image:
-            continue
-        image.save(f"{DATA}/custom/images/{image_name}.jpg")
+
+        if frame is None:
+            image = Image.fromarray(result.orig_img)
+            if not image:
+                continue
+            if missing:
+                cv2.imwrite(f"{DATA}/custom/missing_images/{image_name}.jpg", frame)
+            else:
+                image.save(f"{DATA}/custom/images/{image_name}.jpg")
+        else:
+            if missing:
+                cv2.imwrite(f"{DATA}/custom/missing_images/{image_name}.jpg", frame)
+            else:
+                cv2.imwrite(f"{DATA}/custom/images/{image_name}.jpg", frame)
         print(f"Saved image as {image_name}.jpg!")
+
+        if missing:
+            continue
 
         labels = []
         for box in result.boxes:
-            labels.append(box.cls + " " + " ".join(box.xywhn) + "\n")
+            # 1D Tensor
+            arr = box.xywhn.cpu().numpy()
+            labels.append(str(int(box.cls)) + " " + ' '.join(map(str, arr[0])))
         if not labels:
             continue
         with open(f"{DATA}/custom/labels/{image_name}.txt", "w+") as file:
@@ -55,25 +72,29 @@ def test_model():
         # Send the frame to the model for prediction
         results = model.predict(frame, device=device)
 
-        # Draw bounding boxes and labels on the image
-        annotator = Annotator(frame)
-        for r in results:
-            boxes = r.boxes
-            for box in boxes:
-                b = box.xyxy[0]  # get box coordinates in (top, left, bottom, right) format
-                c = box.cls
-                conf = box.conf.item()
-                annotator.box_label(b, model.names[int(c)])
-                print(f"Class: {model.names[int(c)]}, Confidence: {conf:.2f}, x: {b[0]}, y: {b[1]}")
-            frame = annotator.result()
-
-        cv2.imshow('Camera Feed', frame)
-
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):
             break
         elif key == ord('s'):
-            save_result(results)
+            save_result(results, frame)
+        elif key == ord('m'):
+            save_result(results, frame, missing=True)
+
+        # Draw bounding boxes and labels on the image
+        # annotator = Annotator(frame)
+        # for r in results:
+        #     boxes = r.boxes
+        #     for box in boxes:
+        #         b = box.xyxy[0]  # get box coordinates in (top, left, bottom, right) format
+        #         c = box.cls
+        #         conf = box.conf.item()
+        #         annotator.box_label(b, model.names[int(c)])
+        #         print(f"Class: {model.names[int(c)]}, Confidence: {conf:.2f}, x: {b[0]}, y: {b[1]}")
+        #     frame = annotator.result()
+
+        frame = results[0].plot()
+
+        cv2.imshow('Camera Feed', frame)
 
     # Release the webcam when done
     cap.release()
