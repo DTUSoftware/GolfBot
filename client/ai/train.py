@@ -3,7 +3,7 @@ import torch
 import os
 
 PRETRAINED_MODEL = os.environ.get("PRETRAINED_MODEL", "yolov8n.pt")
-DATA = os.environ.get("DATA", "datasets/RoboFlow0506-1")
+DATA = os.environ.get("DATA", "datasets/RoboFlow0606")
 EPOCHS = int(os.environ.get("EPOCHS", 300))
 IMGSZ = int(os.environ.get("IMGSZ", 640))  # needs to be a multiple of 32
 
