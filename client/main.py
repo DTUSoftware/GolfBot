@@ -387,7 +387,7 @@ async def adjust_speed_using_pid(track: Track, target_node: Node, session: aioht
 def is_target_different(track: Track, target_node: Node, other_node: Node) -> bool:
     # Define a threshold for difference based on your requirements
     # Assume a difference of 1.0 cm is significant, we use pixels though, so it depends on the distance and camera
-    position_threshold = 50.0
+    position_threshold = 25.0
 
     # Calculate the position difference
     position_diff = math.sqrt((target_node.x - other_node.x)**2 + (target_node.y - other_node.y)**2)

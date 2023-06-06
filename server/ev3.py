@@ -45,7 +45,7 @@ class Robot:
                 self.motors.on(left_speed=SpeedPercent(DRIVE_SPEED),
                                right_speed=SpeedPercent(DRIVE_SPEED))
                 return True
-        except EOFError:
+        except (EOFError, ReferenceError):
             reset_conn()
         return False
 
@@ -56,7 +56,7 @@ class Robot:
                 self.motors.on(left_speed=SpeedPercent(-DRIVE_SPEED),
                                right_speed=SpeedPercent(-DRIVE_SPEED))
                 return True
-        except EOFError:
+        except (EOFError, ReferenceError):
             reset_conn()
         return False
 
@@ -73,7 +73,7 @@ class Robot:
                     self.motors.on(left_speed=SpeedPercent(-TURN_SPEED),
                                    right_speed=SpeedPercent(TURN_SPEED))
                 return True
-        except EOFError:
+        except (EOFError, ReferenceError):
             reset_conn()
         return False
 
@@ -93,7 +93,7 @@ class Robot:
                     self.motors.on(left_speed=SpeedPercent(TURN_SPEED),
                                    right_speed=SpeedPercent(-TURN_SPEED))
                 return True
-        except EOFError:
+        except (EOFError, ReferenceError):
             reset_conn()
         return False
 
@@ -105,7 +105,7 @@ class Robot:
                 self.fan_motor.on_for_degrees(speed=SpeedPercent(-FAN_TOGGLE_SPEED), degrees=FAN_MOTOR_DEGREES)
             self.fan_state = not self.fan_state
             return True
-        except EOFError:
+        except (EOFError, ReferenceError):
             reset_conn()
         return False
 
@@ -146,7 +146,7 @@ class Robot:
 
             self.busy = False
             return True
-        except EOFError:
+        except (EOFError, ReferenceError):
             reset_conn()
         return False
 
@@ -159,7 +159,7 @@ class Robot:
                 self.motors.left_motor.run_direct(duty_cycle_sp=left_speed)
                 self.motors.right_motor.run_direct(duty_cycle_sp=right_speed)
                 return True
-        except EOFError:
+        except (EOFError, ReferenceError):
             reset_conn()
         return False
 
@@ -182,7 +182,7 @@ class Robot:
 
                 self.forward()
                 return True
-        except EOFError:
+        except (EOFError, ReferenceError):
             reset_conn()
         return False
 
@@ -243,6 +243,9 @@ def reset_conn(tries=0):
         ev3_button = conn.modules['ev3dev2.button']
     except Exception as e:
         print("Failed to connect to robot: " + str(e))
+        conn = None
+        ev3_motor = None
+        ev3_button = None
 
     # Keep trying 10 times
     if tries < 10:

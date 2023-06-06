@@ -119,6 +119,7 @@ class Graph:
             pos = path[i]
             node = self.get_node(pos)
             if node:
+                print(f"Adding {pos[0]}, {pos[1]}")
                 nodes_in_path.append(node)
                 if i >= 1:
                     # Get all nodes between the current node and the previous node
@@ -136,11 +137,13 @@ class Graph:
                         x_max = max(x1, x2)
                         for x in range(int(x_min + 1), int(x_max)):
                             y = int(slope * float(x) + y_intercept)
-                            pos = (x, y)
-                            if pos not in path:
-                                node = self.get_node(pos)
-                                if node:
-                                    nodes_in_path.append(node)
+                            for j in range(-3, 3+1):
+                                pos = (x+j, y+j)
+                                if pos not in path:
+                                    node = self.get_node(pos)
+                                    if node:
+                                        print(f"Adding {pos[0]}, {pos[1]}")
+                                        nodes_in_path.append(node)
                     elif abs(y1 - y2) > 1:
                         slope = (x1 - x2) / (y1 - y2)
                         x_intercept = (y1 * x2 - y2 * x1) / (y1 - y2)
@@ -148,13 +151,15 @@ class Graph:
                         y_max = max(y1, y2)
                         for y in range(int(y_min + 1), int(y_max)):
                             x = int(slope * float(y) + x_intercept)
-                            pos = (x, y)
-                            if pos not in path:
-                                node = self.get_node(pos)
-                                if node:
-                                    nodes_in_path.append(node)
+                            for j in range(-3, 3+1):
+                                pos = (x+j, y+j)
+                                if pos not in path:
+                                    node = self.get_node(pos)
+                                    if node:
+                                        print(f"Adding {pos[0]}, {pos[1]}")
+                                        nodes_in_path.append(node)
 
-        return nodes_in_path
+        return list(set(nodes_in_path))
 
     def add_edge(self, node_1: Node, node_2: Node) -> None:
         if node_1 is not node_2 and node_1 and node_2:
