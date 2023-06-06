@@ -10,7 +10,6 @@ import random
 import asyncio
 import aiohttp
 from torch import multiprocessing
-import queue
 from ai.main import run_ai
 from drive_algorithm import Ball, Track, Node, NodeData
 from track_setup import setup_track
@@ -140,7 +139,7 @@ def pick_target(track: Track) -> Optional[NodeData]:
     # return track.path[1]
 
 
-async def calculate_and_adjust(track, session: aiohttp.ClientSession):
+async def calculate_and_adjust(track, path_queue: multiprocessing.JoinableQueue, session: aiohttp.ClientSession):
     # if DEBUG:
     #     print("Calculating path and adjusting speed")
 
@@ -155,7 +154,7 @@ async def calculate_and_adjust(track, session: aiohttp.ClientSession):
         return
 
     # Get the node to go to
-    if collapse_path(track) and last_target_path and isinstance(last_target_path, list):
+    if collapse_path(track, path_queue) and last_target_path and isinstance(last_target_path, list):
         # Tell the robot to drive towards the node
         # await drive_to_coordinates(next_node.node, session)
         await adjust_speed_using_pid(track, last_target_path[0].node, session)
@@ -185,7 +184,7 @@ async def set_speeds(session, speed_left, speed_right):
             print(f"Error on adjusting speed: {response.status}")
 
 
-def collapse_path(track: Track) -> bool:
+def collapse_path(track: Track, path_queue: multiprocessing.JoinableQueue) -> bool:
     global last_target_path, integral, previous_error, last_target_node
     if DEBUG:
         print(f"current last target path: {[(nodedata.node.x, nodedata.node.y ) for nodedata in last_target_path] if last_target_path else []}\n"
@@ -298,6 +297,13 @@ def collapse_path(track: Track) -> bool:
 
     # Adjust and go to
     if last_target_path:
+        full_path = [track.robot_pos] + [(nodedata.node.x, nodedata.node.y) for nodedata in last_target_path]
+
+        if not path_queue.full():
+            try:
+                path_queue.put(full_path)
+            except:
+                pass
         last_target_node = track.graph.get_node(track.robot_pos)
         return True
 
@@ -415,12 +421,17 @@ async def drive_to_coordinates(node: Node, session: aiohttp.ClientSession):
             await asyncio.sleep(1)
 
 
-async def do_race_iteration(track: Track, camera_queue: multiprocessing.JoinableQueue, session: aiohttp.ClientSession):
+async def do_race_iteration(track: Track, ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue, session: aiohttp.ClientSession):
     try:
         # Get results from AI
         # if DEBUG:
         #     print("Trying to get results from queue")
-        ai_results = camera_queue.get_nowait()
+        if ai_queue.empty():
+            # if DEBUG:
+            #     print("AI queue empty")
+            return
+
+        ai_results = ai_queue.get_nowait()
         # if DEBUG:
         #     print("Got results from AI!")
 
@@ -436,31 +447,33 @@ async def do_race_iteration(track: Track, camera_queue: multiprocessing.Joinable
         await update_balls_from_ai_result(track, golf_ball_results, golden_ball_results)
 
         # Calculate track path and give the robot directions
-        await calculate_and_adjust(track, session)
+        await calculate_and_adjust(track, path_queue, session)
 
         # Let AI know we are done with the data
         # if DEBUG:
         #     print("Marked as done with event")
-        camera_queue.task_done()
-    except queue.Empty:
-        pass
+        ai_queue.task_done()
     except Exception as e:
         print("uh oh... - " + str(e))
         traceback.print_exc()
+    except:
+        pass
 
 
-async def race(camera_queue: multiprocessing.JoinableQueue, track: Track, session: aiohttp.ClientSession) -> None:
+async def race(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue, track: Track, session: aiohttp.ClientSession) -> None:
     if DEBUG:
         print("Getting initial AI result.")
     while True:
-        try:
-            camera_queue.get_nowait()
-            break
-        except queue.Empty:
-            await asyncio.sleep(0)
+        if not ai_queue.empty():
+            try:
+                ai_queue.get_nowait()
+                break
+            except:
+                pass
+        await asyncio.sleep(0)
     if DEBUG:
         print("Got result, marking as ready.")
-    camera_queue.task_done()
+    ai_queue.task_done()
     if DEBUG:
         print("AI thread ready.")
 
@@ -474,7 +487,7 @@ async def race(camera_queue: multiprocessing.JoinableQueue, track: Track, sessio
 
     print("Racing!")
     while time_taken <= 8 * 60:
-        await do_race_iteration(track, camera_queue, session)
+        await do_race_iteration(track, ai_queue, path_queue, session)
         time_taken = time.time() - start_time
         # Never remove this sleep
         await asyncio.sleep(0)
@@ -488,7 +501,7 @@ async def toggle_fans(session):
             print(f"Error on toggling fans: {response.status}")
 
 
-async def main(camera_queue: multiprocessing.JoinableQueue, track):
+async def main(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue, track):
     print("Running main...")
     try:
         async with aiohttp.ClientSession() as session:
@@ -506,7 +519,7 @@ async def main(camera_queue: multiprocessing.JoinableQueue, track):
                     pass
 
             # Do the race
-            await race(camera_queue, track, session)
+            await race(ai_queue, path_queue, track, session)
     except KeyboardInterrupt:
         requests.post(f"{ROBOT_API_ENDPOINT}/stop")
         raise KeyboardInterrupt()
@@ -514,19 +527,19 @@ async def main(camera_queue: multiprocessing.JoinableQueue, track):
         print("Failed to connect to robot. Is the API on?")
 
 
-def main_entrypoint(camera_queue: multiprocessing.JoinableQueue):
+def main_entrypoint(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue):
     print("Running main entrypoint")
 
     # Setup the track
     print("Setting up track...")
     track = setup_track()
-    camera_queue.put("Done!")
+    ai_queue.put("Done!")
 
     # Run main task in async
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-    asyncio.run(main(camera_queue, track))
+    asyncio.run(main(ai_queue, path_queue, track))
 
 
 if __name__ == '__main__':
@@ -537,12 +550,13 @@ if __name__ == '__main__':
 
         # Initialize joinable queue to share data between processes
         # After many hours of troubleshooting, finally got help from https://stackoverflow.com/a/74190530/12418245
-        queue = multiprocessing.JoinableQueue(maxsize=1)
+        ai_queue = multiprocessing.JoinableQueue(maxsize=1)
+        path_queue = multiprocessing.JoinableQueue(maxsize=1)
 
         # Create a process for both the AI producer and the main consumer.
         # Run the AI as the "main thread" and the consumer in the background.
-        ai_producer = multiprocessing.Process(target=run_ai, args=(queue,))
-        main_consumer = multiprocessing.Process(target=main_entrypoint, args=(queue,), daemon=True)
+        ai_producer = multiprocessing.Process(target=run_ai, args=(ai_queue, path_queue))
+        main_consumer = multiprocessing.Process(target=main_entrypoint, args=(ai_queue, path_queue), daemon=True)
 
         # First we start the consumer, since it needs to initialize the track
         main_consumer.start()
@@ -550,8 +564,8 @@ if __name__ == '__main__':
         # Wait for the track to be initialized before starting the AI
         if DEBUG:
             print("[main] Waiting for track to be initialized...")
-        queue.get()
-        queue.task_done()
+        ai_queue.get()
+        ai_queue.task_done()
         if DEBUG:
             print("[main] Track initialized! Starting AI producer...")
 

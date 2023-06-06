@@ -12,7 +12,7 @@ DEBUG = ("true" in os.environ.get('DEBUG', "True").lower()) and not DISABLE_LOGG
 
 
 # To be run as a thread
-def run_ai(camera_queue: torch.multiprocessing.JoinableQueue):
+def run_ai(camera_queue: torch.multiprocessing.JoinableQueue, path_queue: torch.multiprocessing.JoinableQueue):
     if DISABLE_LOGGING:
         # THIS DISABLES LOGGING
         if sys.platform == "win32":
@@ -46,6 +46,9 @@ def run_ai(camera_queue: torch.multiprocessing.JoinableQueue):
     if DEBUG and not DISABLE_LOGGING:
         print("[AI] Opening video capture...")
     cap = cv2.VideoCapture(VIDEO_INPUT)
+
+    # Store current path for drawing
+    current_path = []
 
     while cap.isOpened():
         # Capture a frame from the webcam
@@ -98,6 +101,28 @@ def run_ai(camera_queue: torch.multiprocessing.JoinableQueue):
         #         print(f"Class: {model.names[int(c)]}, Confidence: {conf:.2f}, x: {b[0]}, y: {b[1]}")
         #     frame = annotator.result()
         frame = results[0].plot()
+
+        if DEBUG:
+            print("[AI] Getting result from path queue")
+        if not path_queue.empty():
+            try:
+                current_path = path_queue.get_nowait()
+                path_queue.task_done()
+            except:
+                pass
+
+        if current_path:
+            for i in range(len(current_path)):
+                point = current_path[i]
+
+                color = (0, 0, 255)
+
+                # Add a dot at the point
+                cv2.circle(frame, point, 3, color)
+
+                # Add a line
+                if i >= 1:
+                    cv2.line(frame, current_path[i - 1], point, color)
 
         cv2.imshow('Camera Feed', frame)
 
