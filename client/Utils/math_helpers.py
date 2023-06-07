@@ -18,6 +18,24 @@ def calculate_direction(position1: Tuple[int, int], position2: Tuple[int, int]) 
     return math.atan2(dy, dx)
 
 
+def calculate_direction_difference(from_position: Tuple[int, int], middle_position: Tuple[int, int], to_position: Tuple[int, int]) -> float:
+    """
+    Calculates the direction difference between three positions.
+
+    Args:
+        from_position: The starting position.
+        middle_position: The middle position.
+        to_position: The ending position.
+
+    Returns:
+        float: The direction difference in radians.
+    """
+    direction1 = calculate_direction(from_position, middle_position)
+    direction2 = calculate_direction(middle_position, to_position)
+    direction_diff = abs(direction2 - direction1)
+    return direction_diff
+
+
 def calculate_distance(position1: Tuple[int, int], position2: Tuple[int, int]) -> float:
     """
     Calculates the distance between two points.

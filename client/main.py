@@ -206,24 +206,26 @@ async def summarize_path(path: List[NodeData]) -> List[NodeData]:
 
     # Check if the path is empty or contains only one point
     if len(path) <= 1:
-        return new_path
+        return path
 
     new_path.append(path[0])  # Add the first point as the initial target
     current_from_node = path[0]
-    previous_direction = math_helpers.calculate_direction(current_from_node.node.get_position(), path[1].node.get_position())
 
-    for i in range(1, len(path)):
-        current_check_node = path[i]
-        current_direction = math_helpers.calculate_direction(current_from_node.node.get_position(), current_check_node.node.get_position())
-        direction_diff = abs(current_direction - previous_direction)
+    for i in range(1, len(path)-1):
+        previous_node = path[i-1]
+        current_node = path[i]
+        next_node = path[i+1]
+
+        direction_diff = math_helpers.calculate_direction_difference(
+            current_from_node.node.get_position(), previous_node.node.get_position(), next_node.node.get_position()
+        )
 
         # Check if the direction difference is within the tolerance
         if direction_diff <= math.radians(15):  # 15 degrees tolerance
             continue
 
-        new_path.append(current_check_node)
-        current_from_node = current_check_node
-        previous_direction = current_direction
+        new_path.append(current_node)  # Add the current point to the new path
+        current_from_node = current_node
 
     new_path.append(path[-1])  # Add the last point to the new path
     return new_path
