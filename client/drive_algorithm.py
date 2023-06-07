@@ -23,7 +23,7 @@ class Node:
         self.y = coordinates[1]
         self.neighbours = []
 
-    def get_post(self) -> tuple[int, int]:
+    def get_position(self) -> tuple[int, int]:
         return self.x, self.y
 
     def add_neighbour(self, node: 'Node', weight: float = None) -> None:
@@ -31,7 +31,7 @@ class Node:
             if self.x == node.x or self.y == node.y:
                 weight = max(abs(self.x - node.x), abs(self.y - node.y))
             else:
-                weight = calculate_distance(self.get_post(), node.get_post())
+                weight = calculate_distance(self.get_position(), node.get_position())
         self.neighbours.append({"node": node, "weight": weight})
 
     def remove_neighbour(self, node: 'Node') -> None:
@@ -44,7 +44,7 @@ class Node:
         return [neighbour["node"] for neighbour in self.neighbours]
 
     def get_heading(self, from_position: tuple) -> float:
-        return calculate_new_direction(from_position, self.get_post())
+        return calculate_new_direction(from_position, self.get_position())
 
 
 class Ball:

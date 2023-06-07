@@ -13,6 +13,8 @@ from torch import multiprocessing
 from ai.main import run_ai
 from drive_algorithm import Ball, Track, Node, NodeData
 from track_setup import setup_track
+from Utils.math_helpers import calculate_new_direction, calculate_distance
+
 
 ROBOT_API_ENDPOINT = os.environ.get('API_ENDPOINT', "http://localhost:8069/api/v1")
 GOLF_BALL_CONFIDENCE_GATE = float(os.environ.get('GOLF_BALL_CONFIDENCE_GATE', 0.45))
@@ -415,8 +417,7 @@ def is_target_different(track: Track, target_node: Node, other_node: Node) -> bo
     position_threshold = 25.0
 
     # Calculate the position difference
-    position_diff = math.sqrt((target_node.x - other_node.x) ** 2 + (target_node.y - other_node.y) ** 2)
-
+    position_diff = calculate_distance(target_node.get_position(), other_node.get_position())
     # Calculate the direction difference
     direction_diff = abs(target_node.get_heading(track.robot_pos) - other_node.get_heading(track.robot_pos))
 
@@ -428,9 +429,8 @@ def is_target_different(track: Track, target_node: Node, other_node: Node) -> bo
 
 
 def has_passed_target(target_node: Node, current_node: Node, from_node: Node):
-    length_to_obtain = math.sqrt((target_node.x - from_node.x)**2 + (target_node.y - from_node.y)**2)
-    current_length = math.sqrt((target_node.x - current_node.x)**2 + (target_node.y - current_node.y)**2)
-
+    length_to_obtain = calculate_distance(target_node.get_position(), from_node.get_position())
+    current_length = calculate_distance(target_node.get_position(), current_node.get_position())
     position_threshold = 10
     if current_length - length_to_obtain >= position_threshold:
         return True
