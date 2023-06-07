@@ -10,7 +10,7 @@ from colorama import Fore
 from colorama import Style
 from colorama import init as colorama_init
 
-from Utils.math_helpers import calculate_new_direction, calculate_distance
+from Utils.math_helpers import calculate_direction, calculate_distance
 
 DEBUG = "true" in os.environ.get('DEBUG', "True").lower()
 TIMEOUT_GET_PATH = 5  # in seconds
@@ -31,7 +31,7 @@ class Node:
     def __le__(self, other: Any) -> bool:
         return True
 
-    def get_position(self) -> tuple[int, int]:
+    def get_position(self) -> Tuple[int, int]:
         return self.x, self.y
 
     def add_neighbour(self, node: 'Node', weight: float = None) -> None:
@@ -52,7 +52,7 @@ class Node:
         return [neighbour["node"] for neighbour in self.neighbours]
 
     def get_heading(self, from_position: tuple) -> float:
-        return calculate_new_direction(from_position, self.get_position())
+        return calculate_direction(from_position, self.get_position())
 
 
 class Ball:
@@ -456,7 +456,7 @@ class Track:
 
     def set_robot_pos(self, robot_pos: tuple) -> None:
         # Recalibrate the direction / angle
-        self.robot_direction = calculate_new_direction(robot_pos, self.robot_pos)
+        self.robot_direction = calculate_direction(robot_pos, self.robot_pos)
         # Update position
         self.robot_pos = robot_pos
 

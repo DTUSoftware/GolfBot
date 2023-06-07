@@ -5,13 +5,13 @@ import os
 import random
 import time
 import traceback
-from typing import Optional
+from typing import Optional, List
 
 import aiohttp
 import requests
 from torch import multiprocessing
 
-from Utils.math_helpers import calculate_distance
+from Utils import math_helpers
 from ai.main import run_ai
 from drive_algorithm import Ball, Track, Node, NodeData
 from track_setup import setup_track
@@ -162,7 +162,7 @@ async def calculate_and_adjust(track, path_queue: multiprocessing.JoinableQueue,
         return
 
     # Get the node to go to
-    if collapse_path(track, path_queue) and last_target_path and isinstance(last_target_path, list):
+    if await collapse_path(track, path_queue) and last_target_path and isinstance(last_target_path, list):
         # Tell the robot to drive towards the node
         # await drive_to_coordinates(next_node.node, session)
         await adjust_speed_using_pid(track, last_target_path[0].node, session)
@@ -192,7 +192,44 @@ async def set_speeds(session, speed_left, speed_right):
             print(f"Error on adjusting speed: {response.status}")
 
 
-def collapse_path(track: Track, path_queue: multiprocessing.JoinableQueue) -> bool:
+async def summarize_path(path: List[NodeData]) -> List[NodeData]:
+    """
+    Summarizes a path of points/nodes into the least amount of points/nodes needed for a robot to traverse the path.
+    
+    Args:
+        path (List[NodeData]): The path object containing the path to be summarized.
+    
+    Returns:
+        list: The summarized path as a list of NodeData objects.
+    """
+    new_path: List[NodeData] = []
+
+    # Check if the path is empty or contains only one point
+    if len(path) <= 1:
+        return new_path
+
+    new_path.append(path[0])  # Add the first point as the initial target
+    current_from_node = path[0]
+    previous_direction = math_helpers.calculate_direction(current_from_node.node.get_position(), path[1].node.get_position())
+
+    for i in range(1, len(path)):
+        current_check_node = path[i]
+        current_direction = math_helpers.calculate_direction(current_from_node.node.get_position(), current_check_node.node.get_position())
+        direction_diff = abs(current_direction - previous_direction)
+
+        # Check if the direction difference is within the tolerance
+        if direction_diff <= math.radians(15):  # 15 degrees tolerance
+            continue
+
+        new_path.append(current_check_node)
+        current_from_node = current_check_node
+        previous_direction = current_direction
+
+    new_path.append(path[-1])  # Add the last point to the new path
+    return new_path
+
+
+async def collapse_path(track: Track, path_queue: multiprocessing.JoinableQueue) -> bool:
     global last_target_path, integral, previous_error, last_target_node
     if DEBUG:
         print(
@@ -256,73 +293,7 @@ def collapse_path(track: Track, path_queue: multiprocessing.JoinableQueue) -> bo
     previous_error = 0
 
     # "Summarize" path into good points for targets
-    new_path = []
-    current_from_node = track.path[0]
-
-    if len(track.path) <= 1:
-        # If under 1, do not make any path
-        if DEBUG:
-            print("Under or equal to 1 (only robot), skips")
-        new_path = []
-    elif len(track.path) == 2:
-        # Only given two points, make last point the target
-        if DEBUG:
-            print("Only two points, setting to last element")
-        new_path.append(track.path[-1])
-    else:
-        # Get the summarization
-        for i in range(2, len(track.path)):
-            current_check_node = track.path[i]
-            if current_check_node == current_from_node:
-                if DEBUG:
-                    print("Same as current from node, skipping")
-                continue
-
-            # If last node, add it
-            if i == (len(track.path) - 1):
-                if DEBUG:
-                    print("Last node appending")
-                new_path.append(current_check_node)
-                break
-
-            # Check if node is on same straight line
-            if current_check_node.node.x == current_from_node.node.x:
-                # if DEBUG:
-                #     print("Same x")
-                continue
-            if current_check_node.node.y == current_from_node.node.y:
-                # if DEBUG:
-                #     print("Same y")
-                continue
-
-            # If heading is same as last node, skip
-            heading_diff_tolerance = 15  # degrees, not radians
-            current_from_pos = (current_from_node.node.x, current_from_node.node.y)
-            heading_of_check_node = current_check_node.node.get_heading(
-                (track.path[i - 1].node.x, track.path[i - 1].node.y))
-            # The line below 'should not' fuck up, but it can give a value of 0 if, somehow, the track path's last node
-            # is the same as the current from pos. But we, in the case of a new direction, assign the last variable,
-            # so the current from pos should always be different than the last node!
-            # We also start at index 2 (third value) to get around this, and for other reasons.
-            heading_of_last_node = track.path[i - 1].node.get_heading(current_from_pos)
-            heading_diff = abs(heading_of_check_node - heading_of_last_node)
-            if DEBUG:
-                print(f"current from: {current_from_pos}\n"
-                      f"current check pos: {current_check_node.node.x}, {current_check_node.node.y}\n"
-                      f"last check pos: {track.path[i-1].node.x}, {track.path[i-1].node.y}\n"
-                      f"Heading diff: (check) {heading_of_check_node} - (last) {heading_of_last_node} = {heading_diff}")
-            if heading_diff <= math.radians(heading_diff_tolerance):
-                if DEBUG:
-                    print("Is same direction, skipping")
-                continue
-
-            # We have a new direction, add the LAST POINT (not current!) to the new path, as it's where the turn happens
-            if DEBUG:
-                print(f"{track.path[i - 1].node.x}, {track.path[i - 1].node.y} is on not on same path, appending")
-            new_path.append(track.path[i - 1])
-            current_from_node = track.path[i - 1]
-
-    last_target_path = new_path
+    last_target_path = await summarize_path(track.path)
     if DEBUG:
         print(f"Current target optimized path: {[(nodedata.node.x, nodedata.node.y) for nodedata in last_target_path]}")
 
@@ -422,7 +393,7 @@ def is_target_different(track: Track, target_node: Node, other_node: Node) -> bo
     position_threshold = 30.0
 
     # Calculate the position difference
-    position_diff = calculate_distance(target_node.get_position(), other_node.get_position())
+    position_diff = math_helpers.calculate_distance(target_node.get_position(), other_node.get_position())
     # Calculate the direction difference
     direction_diff = abs(target_node.get_heading(track.robot_pos) - other_node.get_heading(track.robot_pos))
 
@@ -436,8 +407,8 @@ def is_target_different(track: Track, target_node: Node, other_node: Node) -> bo
 
 
 def has_passed_target(target_node: Node, current_node: Node, from_node: Node):
-    length_to_obtain = calculate_distance(target_node.get_position(), from_node.get_position())
-    current_length = calculate_distance(target_node.get_position(), current_node.get_position())
+    length_to_obtain = math_helpers.calculate_distance(target_node.get_position(), from_node.get_position())
+    current_length = math_helpers.calculate_distance(target_node.get_position(), current_node.get_position())
     position_threshold = 10
     if current_length - length_to_obtain >= position_threshold:
         return True
