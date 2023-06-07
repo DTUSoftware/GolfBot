@@ -186,37 +186,55 @@ class Graph:
 
     # Manhattan Distance heuristic for A*
     def h(self, start_node: Node, dst_node: Node) -> float:
-        return abs(start_node.x - dst_node.x) + abs(start_node.y - dst_node.y)
+        dx = abs(start_node.x - dst_node.x)
+        dy = abs(start_node.y - dst_node.y)
+        return dx + dy
 
     # Get path and cost using A*
     async def get_path(self, start_node: Node, dst_node: Node) -> list:
         if DEBUG:
             print(f"Getting path between {start_node.x}, {start_node.y} and {dst_node.x}, {dst_node.y}")
-        start_node_data = NodeData(
-            start_node, 0, self.h(start_node, dst_node), None)
-        open_list: List[Tuple[float, NodeData]] = [
-            (start_node_data.f, start_node_data)]
-        closed_list: List[Tuple[float, NodeData]] = []
 
+        # Initialize the start node data
+        start_node_data = NodeData(start_node, 0, self.h(start_node, dst_node), None)
+
+        # Create open and closed lists
+        open_list = [(start_node_data.f, start_node_data)]
+        closed_list = []
+
+        # Heapify the open list
         heapq.heapify(open_list)
 
-        # TODO: fix this hack with i, shouldn't be needed
+        # Initialize iteration counter and current node
         i = 0
         current_node = None
+
+        # A* algorithm main loop
         while open_list:
             i += 1
-            if DEBUG and i != 0 and (i % 500) == 0:
-                print(f"OpenList: {i}")
+            if i != 0 and (i % 500) == 0:
+                if DEBUG:
+                    print(f"OpenList: {i}")
+                    await asyncio.sleep(0)
             if i > 5000:
                 if DEBUG:
-                    print("While look fucky wucky")
+                    print("While loop exceeded maximum iterations")
                 closed_list = []
                 break
+
+            # Pop the node with the smallest priority (lowest f value) from the open list
             current_node = heapq.heappop(open_list)
+
+            # Check if the destination node has been reached
             if current_node[1].node is dst_node:
                 closed_list.append(current_node)
                 break
 
+            # Skip processing if the current node is already in the closed list
+            if current_node[1] in closed_list:
+                continue
+
+            # Process the neighbors of the current node
             for neighbour in current_node[1].node.neighbours:
                 neighbour_data = NodeData(
                     node=neighbour["node"],
@@ -225,65 +243,33 @@ class Graph:
                     parent=current_node[1]
                 )
 
-                closed_list_check = False
-                for j in range(len(closed_list)):
-                    # if DEBUG and j != 0 and (j % 500) == 0:
-                    #     print(f"ClosedListCheck: {j}")
-                    if closed_list[j][1].node == neighbour_data.node:
-                        closed_list_check = True
-                        if neighbour_data.g < closed_list[j][1].g:
-                            closed_list[j] = (neighbour_data.f, neighbour_data)
-                            found = False
-                            for node_elem in list(open_list):
-                                if node_elem[1].node == neighbour_data.node:
-                                    found = True
-                                    break
-                            if not found:
-                                heapq.heappush(
-                                    open_list, (neighbour_data.f, neighbour_data))
-                        break
-                    await asyncio.sleep(0)
+                # Skip processing if the neighbor is already in the closed list
+                if neighbour_data in closed_list:
+                    continue
 
-                if not closed_list_check:
-                    open_list_check = False
-                    open_list_list = list(open_list)
-                    for j in range(len(open_list_list)):
-                        # if DEBUG and j != 0 and (j % 500) == 0:
-                        #     print(f"OpenListList: {j}")
-                        if open_list_list[j][1].node == neighbour_data.node:
-                            open_list_check = True
-                            if neighbour_data.g < open_list_list[j][1].g:
-                                open_list_list[j] = (
-                                    neighbour_data.f, neighbour_data)
-                                open_list = open_list_list
-                                heapq.heapify(open_list)
-                            break
-                        await asyncio.sleep(0)
+                # Check if the neighbor is already in the open list
+                if neighbour_data in open_list:
+                    open_list_node = open_list[open_list.index(neighbour_data)]
+                    if neighbour_data.g < open_list_node[1].g:
+                        # Update the neighbor's data in the open list
+                        open_list.remove(open_list_node)
+                        heapq.heapify(open_list)
+                    else:
+                        continue
 
-                    if not open_list_check:
-                        heapq.heappush(
-                            open_list, (neighbour_data.f, neighbour_data))
-                await asyncio.sleep(0)
+                # Add the neighbor to the open list
+                heapq.heappush(open_list, (neighbour_data.f, neighbour_data))
 
+            # Add the current node to the closed list
             closed_list.append(current_node)
-            await asyncio.sleep(0)
 
-        # print(closed_list)
-        # for elem in closed_list:
-        #     print(f"({elem[1].node.x}, {elem[1].node.y}) - f: {elem[1].f} g: {elem[1].g} h: {elem[1].h}")
-
-        final_list: list = []
+        # Construct the final path from the closed list
+        final_list = []
         if closed_list:
             node = closed_list[-1][1]
-            # print(f"End walkthrough, f: {node.f} g: {node.g} h: {node.h}")
             while node:
-                # if DEBUG:
-                #     print("NODE WHILE LOOP")
-                # print(f"({node.node.x}, {node.node.y})", end=" ")
                 final_list.insert(0, node)
                 node = node.parent
-                await asyncio.sleep(0)
-            # print("")
 
         return final_list
 
@@ -462,17 +448,15 @@ class Track:
             robot_node = self.graph.get_node(self.robot_pos)
             ball_nodes = [self.graph.get_node((ball.x, ball.y)) for ball in balls_to_catch]
             tasks = [self.graph.get_path(start_node=robot_node, dst_node=ball_node) for ball_node in ball_nodes]
-            paths, pending = await asyncio.wait(*tasks, timeout=TIMEOUT_GET_PATH, return_when=asyncio.ALL_COMPLETED)
+            done, pending = await asyncio.wait(tasks, timeout=TIMEOUT_GET_PATH, return_when=asyncio.FIRST_COMPLETED)
             if DEBUG:
-                print("Done calculating paths.")
-            # for ball in balls_to_catch:
-            #     if DEBUG:
-            #         print(f"Trying for ball: ({ball.x}, {ball.y})")
-            #     ball_node = self.graph.get_node((ball.x, ball.y))
-            #     path = await self.graph.get_path(start_node=robot_node, dst_node=ball_node)
-            #     paths.append(path)
-            #     if DEBUG:
-            #         print("Done finding path")
+                print(f"Done calculating paths: {len(done)} done, {len(pending)} timed out")
+            [task.cancel() for task in pending]
+            for task in done:
+                try:
+                    paths.append(await task)
+                except TimeoutError:
+                    pass
 
         if paths:
             # if DEBUG:
