@@ -1,6 +1,7 @@
-from ultralytics import YOLO
-import torch
 import os
+
+import torch
+from ultralytics import YOLO
 
 PRETRAINED_MODEL = os.environ.get("PRETRAINED_MODEL", "yolov8n.pt")
 DATA = os.environ.get("DATA", "datasets/RoboFlow0606")

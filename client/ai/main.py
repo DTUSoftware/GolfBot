@@ -1,8 +1,8 @@
+import logging
 import os
 import cv2
-import logging
-from ultralytics import YOLO
 import torch
+from ultralytics import YOLO
 from ..track_setup import draw_object
 
 VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 1))
