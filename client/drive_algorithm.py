@@ -2,7 +2,7 @@ import asyncio
 import os
 import math
 import heapq
-from typing import Any, Optional, List, Tuple
+from typing import Any, Optional, List, Tuple, Set, Dict, Union
 
 import numpy as np
 from colorama import init as colorama_init
@@ -21,7 +21,13 @@ class Node:
     def __init__(self, coordinates: tuple) -> None:
         self.x = coordinates[0]
         self.y = coordinates[1]
-        self.neighbours = []
+        self.neighbours: List[Dict[str, Union['Node', float]]] = []
+
+    def __lt__(self, other: Any) -> bool:
+        return True
+
+    def __le__(self, other: Any) -> bool:
+        return True
 
     def add_neighbour(self, node: 'Node', weight: float = None) -> None:
         if not weight:
@@ -63,7 +69,7 @@ class Goal:
 
 
 class NodeData:
-    def __init__(self, node: Node, g: float, h: float, parent: Any) -> None:
+    def __init__(self, node: Node, g: float, h: float, parent: Optional[Node]) -> None:
         self.node = node
         self.g = g
         self.h = h
@@ -191,87 +197,88 @@ class Graph:
         return dx + dy
 
     # Get path and cost using A*
-    async def get_path(self, start_node: Node, dst_node: Node) -> list:
+    async def get_path(self, start_node: Node, dst_node: Node) -> List[NodeData]:
         if DEBUG:
             print(f"Getting path between {start_node.x}, {start_node.y} and {dst_node.x}, {dst_node.y}")
 
         # Initialize the start node data
         start_node_data = NodeData(start_node, 0, self.h(start_node, dst_node), None)
 
-        # Create open and closed lists
-        open_list = [(start_node_data.f, start_node_data)]
-        closed_list = []
+        # Create open and closed sets
+        open_set: Set[Node] = {start_node}
+        closed_set: Dict[Node, NodeData] = {}
 
-        # Heapify the open list
-        heapq.heapify(open_list)
+        # A dictionary to store the best known cost from start to each node
+        g_scores: Dict[Node, float] = {start_node: 0}
 
-        # Initialize iteration counter and current node
-        i = 0
-        current_node = None
+        # A dictionary to store the estimated total cost from start to each node
+        f_scores: Dict[Node, float] = {start_node: start_node_data.f}
 
-        # A* algorithm main loop
-        while open_list:
-            i += 1
-            if i != 0 and (i % 500) == 0:
+        # A priority queue to efficiently extract the node with the lowest f-score
+        open_queue: List[Tuple[float, Node]] = [(f_scores[start_node], start_node)]
+
+        # A counter to track the number of iterations
+        iteration = 0
+
+        # The current node
+        current_node: Node
+        while open_queue:
+            iteration += 1
+            if iteration % 500 == 0:
                 if DEBUG:
-                    print(f"OpenList: {i}")
-                    await asyncio.sleep(0)
-            if i > 5000:
-                if DEBUG:
-                    print("While loop exceeded maximum iterations")
-                closed_list = []
-                break
+                    print(f"Iteration: {iteration}")
+                await asyncio.sleep(0)
 
-            # Pop the node with the smallest priority (lowest f value) from the open list
-            current_node = heapq.heappop(open_list)
+            _, current_node = heapq.heappop(open_queue)
 
-            # Check if the destination node has been reached
-            if current_node[1].node is dst_node:
-                closed_list.append(current_node)
-                break
+            closed_set[current_node] = NodeData(
+                node=current_node,
+                g=g_scores[current_node],
+                h=self.h(current_node, dst_node),
+                parent=closed_set.get(current_node, None).parent if closed_set.get(current_node, None) else None
+            )
 
-            # Skip processing if the current node is already in the closed list
-            if current_node[1] in closed_list:
-                continue
+            if current_node is dst_node:
+                # Destination reached, construct and return the final path
+                final_path: List[NodeData] = []
+                while current_node:
+                    final_path.insert(0, closed_set[current_node])
+                    current_node = closed_set[current_node].parent
+                return final_path
 
-            # Process the neighbors of the current node
-            for neighbour in current_node[1].node.neighbours:
-                neighbour_data = NodeData(
-                    node=neighbour["node"],
-                    g=current_node[1].g + neighbour["weight"],
-                    h=self.h(neighbour["node"], dst_node),
-                    parent=current_node[1]
-                )
+            for neighbour in current_node.neighbours:
+                neighbour_node: Node = neighbour["node"]
+                neighbour_weight: float = neighbour["weight"]
 
-                # Skip processing if the neighbor is already in the closed list
-                if neighbour_data in closed_list:
+                if neighbour_node in closed_set:
                     continue
 
-                # Check if the neighbor is already in the open list
-                if neighbour_data in open_list:
-                    open_list_node = open_list[open_list.index(neighbour_data)]
-                    if neighbour_data.g < open_list_node[1].g:
-                        # Update the neighbor's data in the open list
-                        open_list.remove(open_list_node)
-                        heapq.heapify(open_list)
-                    else:
-                        continue
+                neighbour_g_score = g_scores[current_node] + neighbour_weight
 
-                # Add the neighbor to the open list
-                heapq.heappush(open_list, (neighbour_data.f, neighbour_data))
+                if neighbour_node not in open_set:
+                    # Add the neighbour to the open set
+                    neighbour_data = NodeData(
+                        node=neighbour_node,
+                        g=neighbour_g_score,
+                        h=self.h(neighbour_node, dst_node),
+                        parent=current_node
+                    )
+                    open_set.add(neighbour_node)
+                    closed_set[neighbour_node] = neighbour_data
+                    g_scores[neighbour_node] = neighbour_g_score
+                    f_scores[neighbour_node] = neighbour_data.f
+                    heapq.heappush(open_queue, (f_scores[neighbour_node], neighbour_node))
+                elif neighbour_g_score < g_scores[neighbour_node]:
+                    # Update the neighbour's scores and parent if a better path is found
+                    neighbour_data = closed_set[neighbour_node]
+                    neighbour_data.g = neighbour_g_score
+                    neighbour_data.parent = current_node
+                    g_scores[neighbour_node] = neighbour_g_score
+                    f_scores[neighbour_node] = neighbour_data.f
+                    heapq.heapify(open_queue)
 
-            # Add the current node to the closed list
-            closed_list.append(current_node)
-
-        # Construct the final path from the closed list
-        final_list = []
-        if closed_list:
-            node = closed_list[-1][1]
-            while node:
-                final_list.insert(0, node)
-                node = node.parent
-
-        return final_list
+        # No path found
+        return []
 
     def draw(self, robot_pos: tuple = None, balls: list = None, path: list = None) -> None:
         if balls is None:
@@ -448,7 +455,7 @@ class Track:
             robot_node = self.graph.get_node(self.robot_pos)
             ball_nodes = [self.graph.get_node((ball.x, ball.y)) for ball in balls_to_catch]
             tasks = [self.graph.get_path(start_node=robot_node, dst_node=ball_node) for ball_node in ball_nodes]
-            done, pending = await asyncio.wait(tasks, timeout=TIMEOUT_GET_PATH, return_when=asyncio.FIRST_COMPLETED)
+            done, pending = await asyncio.wait(tasks, timeout=TIMEOUT_GET_PATH, return_when=asyncio.ALL_COMPLETED)
             if DEBUG:
                 print(f"Done calculating paths: {len(done)} done, {len(pending)} timed out")
             [task.cancel() for task in pending]
