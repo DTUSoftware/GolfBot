@@ -11,6 +11,7 @@ from colorama import Style
 import matplotlib.pyplot as plt
 
 DEBUG = "true" in os.environ.get('DEBUG', "True").lower()
+TIMEOUT_GET_PATH = 5  # in seconds
 
 colorama_init()
 distance_across = math.sqrt(1 ** 2 + 1 ** 2)
@@ -461,7 +462,7 @@ class Track:
             robot_node = self.graph.get_node(self.robot_pos)
             ball_nodes = [self.graph.get_node((ball.x, ball.y)) for ball in balls_to_catch]
             tasks = [self.graph.get_path(start_node=robot_node, dst_node=ball_node) for ball_node in ball_nodes]
-            paths = await asyncio.gather(*tasks, return_exceptions=False)
+            paths, pending = await asyncio.wait(*tasks, timeout=TIMEOUT_GET_PATH, return_when=asyncio.ALL_COMPLETED)
             if DEBUG:
                 print("Done calculating paths.")
             # for ball in balls_to_catch:
