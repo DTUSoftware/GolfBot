@@ -4,10 +4,9 @@ import torch
 from datetime import datetime
 from PIL import Image
 from ultralytics import YOLO
-from ultralytics.yolo.utils.plotting import Annotator
 
 VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 1))
-CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/20230605_nico1")
+CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/20230606")
 DATA = os.environ.get("DATA", "datasets/RoboFlow0506-1")
 
 

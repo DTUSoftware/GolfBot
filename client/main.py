@@ -10,7 +10,6 @@ import random
 import asyncio
 import aiohttp
 from torch import multiprocessing
-import queue
 from ai.main import run_ai
 from drive_algorithm import Ball, Track, Node, NodeData
 from track_setup import setup_track
@@ -73,11 +72,10 @@ async def parse_ai_results(ai_results) -> tuple:
             class_name = result.names[int(box.cls)]
             if "robot" in class_name:
                 robot_results.append(box)
-            elif "golf-balls" in class_name:
-                if any(x in class_name for x in ["golden", "yellow"]):
-                    golden_ball_results.append(box)
-                else:
-                    golf_ball_results.append(box)
+            elif "orange" in class_name:
+                golden_ball_results.append(box)
+            elif "white" in class_name:
+                golf_ball_results.append(box)
 
     robot_results.sort(key=box_confidence)
     golf_ball_results.sort(key=box_confidence)
@@ -141,35 +139,45 @@ def pick_target(track: Track) -> Optional[NodeData]:
     # return track.path[1]
 
 
-async def calculate_and_adjust(track, session: aiohttp.ClientSession):
-    # if DEBUG:
-    #     print("Calculating path and adjusting speed")
+async def calculate_and_adjust(track, path_queue: multiprocessing.JoinableQueue, session: aiohttp.ClientSession):
+    if DEBUG:
+        print("Calculating path and adjusting speed")
 
     # Get the path to closest ball
-    track.calculate_path()
+    await track.calculate_path()
     # track.draw(True)
 
     if not track.path:
         if DEBUG:
             print("No node to travel to, setting speed to 0!")
         await set_speeds(session, 0, 0)
+
+        # if not path_queue.full():
+        #     try:
+        #         path_queue.put([])
+        #     except:
+        #         pass
         return
 
-    await get_pid_target_and_adjust(track, session)
-    return
-
     # Get the node to go to
-    next_node = pick_target(track)
-    if next_node:
-        if DEBUG:
-            print(f"Next node pos: ({next_node.node.x}, {next_node.node.y})")
-
+    if collapse_path(track, path_queue) and last_target_path and isinstance(last_target_path, list):
         # Tell the robot to drive towards the node
         # await drive_to_coordinates(next_node.node, session)
-        await adjust_speed_using_pid(track, next_node.node, session)
+        await adjust_speed_using_pid(track, last_target_path[0].node, session)
     else:
-        if DEBUG:
-            print("No next node?")
+        print("No node")
+
+    # next_node = pick_target(track)
+    # if next_node:
+    #     if DEBUG:
+    #         print(f"Next node pos: ({next_node.node.x}, {next_node.node.y})")
+    #
+    #     # Tell the robot to drive towards the node
+    #     # await drive_to_coordinates(next_node.node, session)
+    #     await adjust_speed_using_pid(track, next_node.node, session)
+    # else:
+    #     if DEBUG:
+    #         print("No next node?")
 
     # if DEBUG:
     #     print("Done calculating path and adjusting speed")
@@ -182,8 +190,11 @@ async def set_speeds(session, speed_left, speed_right):
             print(f"Error on adjusting speed: {response.status}")
 
 
-async def get_pid_target_and_adjust(track: Track, session: aiohttp.ClientSession):
-    global last_target_path, integral, previous_error
+def collapse_path(track: Track, path_queue: multiprocessing.JoinableQueue) -> bool:
+    global last_target_path, integral, previous_error, last_target_node
+    if DEBUG:
+        print(f"current last target path: {[(nodedata.node.x, nodedata.node.y ) for nodedata in last_target_path] if last_target_path else []}\n"
+              f"new path target: {(track.path[-1].node.x, track.path[-1].node.y) if track.path else []}")
     # If not set already, set and reset
     # Check if the new path target is different than before
     if last_target_path and isinstance(last_target_path, list) and not is_target_different(track,
@@ -197,14 +208,45 @@ async def get_pid_target_and_adjust(track: Track, session: aiohttp.ClientSession
                 if DEBUG:
                     print("Robot reached target, popping")
                 last_target_path.pop(0)
+                last_target_node = track.graph.get_node(track.robot_pos)
+            # If we passed the target, pop
+            has_passed_result = has_passed_target(last_target_path[0].node, track.graph.get_node(track.robot_pos), last_target_node)
+            if has_passed_result:
+                if DEBUG:
+                    print("Robot passed target, popping")
+                last_target_path.pop(0)
+                last_target_node = track.graph.get_node(track.robot_pos)
+            elif has_passed_result is None:
+                if DEBUG:
+                    print("Robot went completely wrong way?!?? Removing path!")
+                last_target_node = None
+                last_target_path = None
+                # if not path_queue.full():
+                #     try:
+                #         path_queue.put([])
+                #     except:
+                #         pass
 
             if DEBUG:
-                print(
-                    f"Current optimized path: {[(nodedata.node.x, nodedata.node.y) for nodedata in last_target_path]}")
-            # Call adjust to adjust for error, and to clear point from list if we reach the target
-            await adjust_speed_using_pid(track, last_target_path[0].node, session)
+                print(f"Current optimized path: {[(nodedata.node.x, nodedata.node.y) for nodedata in last_target_path]}")
+            if last_target_path:
+                # Call adjust to adjust for error, and to clear point from list if we reach the target
+                return True
+            else:
+                # if not path_queue.full():
+                #     try:
+                #         path_queue.put([])
+                #     except:
+                #         pass
+                pass
     if DEBUG:
         print("New target, making new path")
+
+    if track.path[0].node.x == 0 and track.path[0].node.y == 0:
+        if DEBUG:
+            print("Robot pos is 0,0, not making new path")
+            return False
+
     integral = 0
     previous_error = 0
 
@@ -214,46 +256,81 @@ async def get_pid_target_and_adjust(track: Track, session: aiohttp.ClientSession
 
     if len(track.path) <= 1:
         # If under 1, do not make any path
+        if DEBUG:
+            print("Under or equal to 1 (only robot), skips")
         new_path = []
     elif len(track.path) == 2:
         # Only given two points, make last point the target
+        if DEBUG:
+            print("Only two points, setting to last element")
         new_path.append(track.path[-1])
     else:
         # Get the summarization
         for i in range(2, len(track.path)):
             current_check_node = track.path[i]
             if current_check_node == current_from_node:
+                if DEBUG:
+                    print("Same as current from node, skipping")
                 continue
 
             # If last node, add it
-            if i == len(track.path):
+            if i == (len(track.path)-1):
+                if DEBUG:
+                    print("Last node appending")
                 new_path.append(current_check_node)
                 break
 
             # Check if node is on same straight line
             if current_check_node.node.x == current_from_node.node.x:
-                pass
+                # if DEBUG:
+                #     print("Same x")
+                continue
             if current_check_node.node.y == current_from_node.node.y:
-                pass
-
+                # if DEBUG:
+                #     print("Same y")
+                continue
+            
             # If heading is same as last node, skip
-            heading_diff_tolerance = 0.01
+            heading_diff_tolerance = 15  # degrees, not radians
             current_from_pos = (current_from_node.node.x, current_from_node.node.y)
-            if abs(current_check_node.node.get_heading(current_from_pos) - track.path[i - 1].node.get_heading(
-                    current_from_pos)) <= heading_diff_tolerance:
-                pass
-
+            heading_of_check_node = current_check_node.node.get_heading((track.path[i-1].node.x, track.path[i-1].node.y))
+            # The line below 'should not' fuck up, but it can give a value of 0 if, somehow, the track path's last node
+            # is the same as the current from pos. But we, in the case of a new direction, assign the last variable,
+            # so the current from pos should always be different than the last node!
+            # We also start at index 2 (third value) to get around this, and for other reasons.
+            heading_of_last_node = track.path[i-1].node.get_heading(current_from_pos)
+            heading_diff = abs(heading_of_check_node - heading_of_last_node)
+            # if DEBUG:
+            #     print(f"current from: {current_from_pos}\n"
+            #           f"current check pos: {current_check_node.node.x}, {current_check_node.node.y}\n"
+            #           f"last check pos: {track.path[i-1].node.x}, {track.path[i-1].node.y}\n"
+            #           f"Heading diff: (check) {heading_of_check_node} - (last) {heading_of_last_node} = {heading_diff}")
+            if heading_diff <= math.radians(heading_diff_tolerance):
+                # if DEBUG:
+                #     print("Is same direction, skipping")
+                continue
+            
             # We have a new direction, add the LAST POINT (not current!) to the new path, as it's where the turn happens
-            new_path.append(current_check_node)
-            current_from_node = current_check_node
-
+            if DEBUG:
+                print(f"{track.path[i-1].node.x}, {track.path[i-1].node.y} is on not on same path, appending")
+            new_path.append(track.path[i-1])
+            current_from_node = track.path[i-1]
+    
     last_target_path = new_path
     if DEBUG:
         print(f"Current target optimized path: {[(nodedata.node.x, nodedata.node.y) for nodedata in last_target_path]}")
 
     # Adjust and go to
     if last_target_path:
-        await adjust_speed_using_pid(track, last_target_path[0].node, session)
+        full_path = [track.robot_pos] + [(nodedata.node.x, nodedata.node.y) for nodedata in last_target_path]
+
+        if not path_queue.full():
+            try:
+                path_queue.put(full_path)
+            except:
+                pass
+        last_target_node = track.graph.get_node(track.robot_pos)
+        return True
 
 
 # Inspired by https://en.wikipedia.org/wiki/PID_controller and
@@ -283,7 +360,7 @@ async def adjust_speed_using_pid(track: Track, target_node: Node, session: aioht
         error += 2 * math.pi
 
     # Reset integral and previous error if target position is very different
-    global integral, previous_error, last_target_node, KI
+    global integral, previous_error, KI
     # if last_target_node and is_target_different(track, target_node, last_target_node):
     #     integral = 0
     #     previous_error = 0
@@ -329,13 +406,13 @@ async def adjust_speed_using_pid(track: Track, target_node: Node, session: aioht
     await set_speeds(session, speed_left, speed_right)
 
     # Update last target node
-    last_target_node = target_node
+    # last_target_node = target_node
 
 
 def is_target_different(track: Track, target_node: Node, other_node: Node) -> bool:
     # Define a threshold for difference based on your requirements
     # Assume a difference of 1.0 cm is significant, we use pixels though, so it depends on the distance and camera
-    position_threshold = 50.0
+    position_threshold = 25.0
 
     # Calculate the position difference
     position_diff = math.sqrt((target_node.x - other_node.x) ** 2 + (target_node.y - other_node.y) ** 2)
@@ -350,6 +427,16 @@ def is_target_different(track: Track, target_node: Node, other_node: Node) -> bo
     return False
 
 
+def has_passed_target(target_node: Node, current_node: Node, from_node: Node):
+    length_to_obtain = math.sqrt((target_node.x - from_node.x)**2 + (target_node.y - from_node.y)**2)
+    current_length = math.sqrt((target_node.x - current_node.x)**2 + (target_node.y - current_node.y)**2)
+
+    position_threshold = 10
+    if current_length - length_to_obtain >= position_threshold:
+        return True
+    return False
+
+
 async def drive_to_coordinates(node: Node, session: aiohttp.ClientSession):
     async with session.post(f"{ROBOT_API_ENDPOINT}/drive?x={node.x}&y={node.y}") as response:
         if response.status != 200:
@@ -359,14 +446,19 @@ async def drive_to_coordinates(node: Node, session: aiohttp.ClientSession):
             await asyncio.sleep(1)
 
 
-async def do_race_iteration(track: Track, camera_queue: multiprocessing.JoinableQueue, session: aiohttp.ClientSession):
+async def do_race_iteration(track: Track, ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue, session: aiohttp.ClientSession):
     try:
         # Get results from AI
         # if DEBUG:
         #     print("Trying to get results from queue")
-        ai_results = camera_queue.get_nowait()
-        # if DEBUG:
-        #     print("Got results from AI!")
+        if ai_queue.empty():
+            # if DEBUG:
+            #     print("AI queue empty")
+            return
+
+        ai_results = ai_queue.get_nowait()
+        if DEBUG:
+            print("Got results from AI!")
 
         # if DEBUG:
         #     # Get robot status
@@ -380,31 +472,33 @@ async def do_race_iteration(track: Track, camera_queue: multiprocessing.Joinable
         await update_balls_from_ai_result(track, golf_ball_results, golden_ball_results)
 
         # Calculate track path and give the robot directions
-        await calculate_and_adjust(track, session)
+        await calculate_and_adjust(track, path_queue, session)
 
         # Let AI know we are done with the data
         # if DEBUG:
         #     print("Marked as done with event")
-        camera_queue.task_done()
-    except queue.Empty:
-        pass
+        ai_queue.task_done()
     except Exception as e:
         print("uh oh... - " + str(e))
         traceback.print_exc()
+    except:
+        pass
 
 
-async def race(camera_queue: multiprocessing.JoinableQueue, track: Track, session: aiohttp.ClientSession) -> None:
+async def race(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue, track: Track, session: aiohttp.ClientSession) -> None:
     if DEBUG:
         print("Getting initial AI result.")
     while True:
-        try:
-            camera_queue.get_nowait()
-            break
-        except queue.Empty:
-            await asyncio.sleep(0)
+        if not ai_queue.empty():
+            try:
+                ai_queue.get_nowait()
+                break
+            except:
+                pass
+        await asyncio.sleep(0)
     if DEBUG:
         print("Got result, marking as ready.")
-    camera_queue.task_done()
+    ai_queue.task_done()
     if DEBUG:
         print("AI thread ready.")
 
@@ -418,7 +512,7 @@ async def race(camera_queue: multiprocessing.JoinableQueue, track: Track, sessio
 
     print("Racing!")
     while time_taken <= 8 * 60:
-        await do_race_iteration(track, camera_queue, session)
+        await do_race_iteration(track, ai_queue, path_queue, session)
         time_taken = time.time() - start_time
         # Never remove this sleep
         await asyncio.sleep(0)
@@ -432,7 +526,7 @@ async def toggle_fans(session):
             print(f"Error on toggling fans: {response.status}")
 
 
-async def main(camera_queue: multiprocessing.JoinableQueue, track):
+async def main(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue, track):
     print("Running main...")
     try:
         async with aiohttp.ClientSession() as session:
@@ -450,7 +544,7 @@ async def main(camera_queue: multiprocessing.JoinableQueue, track):
                     pass
 
             # Do the race
-            await race(camera_queue, track, session)
+            await race(ai_queue, path_queue, track, session)
     except KeyboardInterrupt:
         requests.post(f"{ROBOT_API_ENDPOINT}/stop")
         raise KeyboardInterrupt()
@@ -458,19 +552,19 @@ async def main(camera_queue: multiprocessing.JoinableQueue, track):
         print("Failed to connect to robot. Is the API on?")
 
 
-def main_entrypoint(camera_queue: multiprocessing.JoinableQueue):
+def main_entrypoint(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue):
     print("Running main entrypoint")
 
     # Setup the track
     print("Setting up track...")
     track = setup_track()
-    camera_queue.put("Done!")
+    ai_queue.put("Done!")
 
     # Run main task in async
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-    asyncio.run(main(camera_queue, track))
+    asyncio.run(main(ai_queue, path_queue, track))
 
 
 if __name__ == '__main__':
@@ -481,12 +575,13 @@ if __name__ == '__main__':
 
         # Initialize joinable queue to share data between processes
         # After many hours of troubleshooting, finally got help from https://stackoverflow.com/a/74190530/12418245
-        queue = multiprocessing.JoinableQueue(maxsize=1)
+        ai_queue = multiprocessing.JoinableQueue(maxsize=1)
+        path_queue = multiprocessing.JoinableQueue(maxsize=10)
 
         # Create a process for both the AI producer and the main consumer.
         # Run the AI as the "main thread" and the consumer in the background.
-        ai_producer = multiprocessing.Process(target=run_ai, args=(queue,))
-        main_consumer = multiprocessing.Process(target=main_entrypoint, args=(queue,), daemon=True)
+        ai_producer = multiprocessing.Process(target=run_ai, args=(ai_queue, path_queue))
+        main_consumer = multiprocessing.Process(target=main_entrypoint, args=(ai_queue, path_queue), daemon=True)
 
         # First we start the consumer, since it needs to initialize the track
         main_consumer.start()
@@ -494,8 +589,8 @@ if __name__ == '__main__':
         # Wait for the track to be initialized before starting the AI
         if DEBUG:
             print("[main] Waiting for track to be initialized...")
-        queue.get()
-        queue.task_done()
+        ai_queue.get()
+        ai_queue.task_done()
         if DEBUG:
             print("[main] Track initialized! Starting AI producer...")
 
