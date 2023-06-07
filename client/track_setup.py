@@ -1,10 +1,9 @@
 import datetime
 import json
 import os
-
 import cv2
-
 import drive_algorithm as drivealg
+from Utils.opencv_helpers import draw_object
 
 VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 1))
 TRACK_PRESET = os.environ.get('TRACK_PRESET', "track.json")
@@ -46,26 +45,6 @@ def setup_track_mouse_input(event, x, y, flags, param):
     if event == cv2.EVENT_LBUTTONDBLCLK and track_setup_mode:
         global draw_path
         draw_path.append((x, y))
-
-
-def draw_object(img, object_type, path):
-    color = (0, 0, 0)
-    if object_type == "obstacle":
-        color = (0, 0, 255)
-    elif object_type == "small_goal":
-        color = (255, 0, 0)
-    elif object_type == "big_goal":
-        color = (0, 255, 0)
-
-    for i in range(len(path)):
-        point = path[i]
-
-        # Add a dot at the point
-        cv2.circle(img, point, 3, color)
-
-        # Add a line
-        if i >= 1:
-            cv2.line(img, path[i - 1], point, color)
 
 
 def setup_track() -> drivealg.Track:

@@ -3,7 +3,7 @@ import os
 import cv2
 import torch
 from ultralytics import YOLO
-from ..track_setup import draw_object
+from client.Utils.opencv_helpers import draw_object
 
 VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 1))
 CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/20230601_2")
