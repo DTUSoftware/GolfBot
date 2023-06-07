@@ -1,6 +1,6 @@
 import math
 
-from Utils.Math import calculate_new_direction, calculate_distance
+from Utils.math_helpers import calculate_new_direction, calculate_distance
 
 
 def drive_decision(robot_position: tuple[int, int], robot_direction: float, target_position: tuple[int, int]):

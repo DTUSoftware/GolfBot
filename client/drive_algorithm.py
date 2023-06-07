@@ -9,6 +9,7 @@ from colorama import init as colorama_init
 from colorama import Fore
 from colorama import Style
 import matplotlib.pyplot as plt
+from Utils.math_helpers import calculate_new_direction, calculate_distance
 
 DEBUG = "true" in os.environ.get('DEBUG', "True").lower()
 
@@ -22,12 +23,15 @@ class Node:
         self.y = coordinates[1]
         self.neighbours = []
 
+    def get_post(self) -> tuple[int, int]:
+        return self.x, self.y
+
     def add_neighbour(self, node: 'Node', weight: float = None) -> None:
         if not weight:
             if self.x == node.x or self.y == node.y:
                 weight = max(abs(self.x - node.x), abs(self.y - node.y))
             else:
-                weight = math.sqrt(abs(self.x - node.x) ** 2 + abs(self.y - node.y) ** 2)
+                weight = calculate_distance(self.get_post(), node.get_post())
         self.neighbours.append({"node": node, "weight": weight})
 
     def remove_neighbour(self, node: 'Node') -> None:
@@ -40,7 +44,7 @@ class Node:
         return [neighbour["node"] for neighbour in self.neighbours]
 
     def get_heading(self, from_position: tuple) -> float:
-        return math.atan2(self.y - from_position[1], self.x - from_position[0])
+        return calculate_new_direction(from_position, self.get_post())
 
 
 class Ball:
@@ -431,7 +435,7 @@ class Track:
 
     def set_robot_pos(self, robot_pos: tuple) -> None:
         # Recalibrate the direction / angle
-        self.robot_direction = math.atan2(self.robot_pos[1] - robot_pos[1], self.robot_pos[0] - robot_pos[0])
+        self.robot_direction = calculate_new_direction(robot_pos, self.robot_pos)
         # Update position
         self.robot_pos = robot_pos
 
@@ -592,7 +596,6 @@ def setup(bounds: dict) -> Track:
     global TRACK_GLOBAL
     TRACK_GLOBAL = track
     return track
-
 
 # if __name__ == "__main__":
 #     setup_debug()
