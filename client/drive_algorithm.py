@@ -58,14 +58,16 @@ class Ball:
 
 
 class Obstacle:
-    def __init__(self, path: list) -> None:
+    def __init__(self, path: list, points: list = None) -> None:
         self.path = path
+        self.points = points
 
 
 class Goal:
-    def __init__(self, path: list, small=False) -> None:
+    def __init__(self, path: list, points: list = None, small=False) -> None:
         self.path = path
         self.small = small
+        self.points = points
 
 
 class NodeData:

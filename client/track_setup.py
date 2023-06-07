@@ -180,13 +180,13 @@ def setup_track() -> drivealg.Track:
             # print(f"Adding obstacle path {obj['path']} to track")
             nodes_in_path = track.graph.get_nodes_in_path(obj["path"])
             # print(f"Nodes in obstacle path: {[(node.x, node.y) for node in nodes_in_path]}")
-            obstacle = drivealg.Obstacle(nodes_in_path)
+            obstacle = drivealg.Obstacle(nodes_in_path, obj["path"])
             track.add_obstacle(obstacle)
         elif object_type == "small_goal":
-            goal = drivealg.Goal(track.graph.get_nodes_in_path(obj["path"]), small=True)
+            goal = drivealg.Goal(track.graph.get_nodes_in_path(obj["path"]), obj["path"], small=True)
             track.add_goal(goal)
         elif object_type == "big_goal":
-            goal = drivealg.Goal(track.graph.get_nodes_in_path(obj["path"]), small=False)
+            goal = drivealg.Goal(track.graph.get_nodes_in_path(obj["path"]), obj["path"], small=False)
             track.add_goal(goal)
 
     return track

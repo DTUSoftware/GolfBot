@@ -324,7 +324,8 @@ def collapse_path(track: Track, path_queue: multiprocessing.JoinableQueue) -> bo
 
         if not path_queue.full():
             try:
-                path_queue.put(full_path)
+                path_queue.put({"path": full_path if full_path else [], "obstacles": [obstacle.points for obstacle in track.obstacles] if track.obstacles else [],
+                                "small_goal": track.small_goal.points if track.small_goal else [], "big_goal": track.big_goal.points if track.big_goal else []})
             except:
                 pass
         last_target_node = track.graph.get_node(track.robot_pos)
