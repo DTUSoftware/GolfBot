@@ -93,37 +93,61 @@ class NodeData:
 
 class Graph:
     def __init__(self, size_x: int = 500, size_y: int = 200) -> None:
-        self.nodes: List[Node] = []
-
         if size_x and size_y:
-            self.nodes = [[Node((x, y)) for x in range(size_x)]
-                          for y in range(size_y)]
+            range_x = range(size_x)
+            range_y = range(size_y)
+            self.nodes: np.ndarray[Node] = np.empty((size_y, size_x), dtype=Node)
 
-            for y, row in enumerate(self.nodes):
-                for x, node in enumerate(row):
+            # Create nodes
+            for y in range_y:
+                for x in range_x:
+                    pos = (x, y)
+                    node = Node(pos)
+                    self.nodes[y, x] = node
+
+            # Connect neighbors
+            rows, cols = self.nodes.shape
+
+            for y in range(rows):
+                for x in range(cols):
+                    node = self.nodes[y, x]
+
+                    # Check left and right neighbors
                     if x - 1 >= 0:
-                        node.add_neighbour(row[x - 1], 1)
+                        left = self.nodes[y, x - 1]
+                        node.add_neighbour(left, 1)
+
                         if y - 1 >= 0:
-                            node.add_neighbour(
-                                self.nodes[y - 1][x - 1], distance_across)
-                        if y + 1 < len(self.nodes):
-                            node.add_neighbour(
-                                self.nodes[y + 1][x - 1], distance_across)
-                    if x + 1 < len(row):
-                        node.add_neighbour(row[x + 1], 1)
+                            left_up = self.nodes[y - 1, x - 1]
+                            node.add_neighbour(left_up, distance_across)
+
+                        if y + 1 < rows:
+                            left_down = self.nodes[y + 1, x - 1]
+                            node.add_neighbour(left_down, distance_across)
+
+                    if x + 1 < cols:
+                        right = self.nodes[y, x + 1]
+                        node.add_neighbour(right, 1)
+
                         if y - 1 >= 0:
-                            node.add_neighbour(
-                                self.nodes[y - 1][x + 1], distance_across)
-                        if y + 1 < len(self.nodes):
-                            node.add_neighbour(
-                                self.nodes[y + 1][x + 1], distance_across)
+                            right_up = self.nodes[y - 1, x + 1]
+                            node.add_neighbour(right_up, distance_across)
+
+                        if y + 1 < rows:
+                            right_down = self.nodes[y + 1, x + 1]
+                            node.add_neighbour(right_down, distance_across)
+
+                    # Check top and bottom neighbors
                     if y - 1 >= 0:
-                        node.add_neighbour(self.nodes[y - 1][x], 1)
-                    if y + 1 < len(self.nodes):
-                        node.add_neighbour(self.nodes[y + 1][x], 1)
+                        top = self.nodes[y - 1, x]
+                        node.add_neighbour(top, 1)
+
+                    if y + 1 < rows:
+                        bottom = self.nodes[y + 1, x]
+                        node.add_neighbour(bottom, 1)
 
     def add_node(self, coordinates: tuple) -> None:
-        self.nodes.append(Node(coordinates))
+        np.append(self.nodes, Node(coordinates))
 
     def get_node(self, pos: tuple) -> Optional[Node]:
         if 0 <= pos[0] < len(self.nodes[0]) and 0 <= pos[1] < len(self.nodes):

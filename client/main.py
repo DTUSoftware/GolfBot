@@ -306,14 +306,14 @@ def collapse_path(track: Track, path_queue: multiprocessing.JoinableQueue) -> bo
             # We also start at index 2 (third value) to get around this, and for other reasons.
             heading_of_last_node = track.path[i - 1].node.get_heading(current_from_pos)
             heading_diff = abs(heading_of_check_node - heading_of_last_node)
-            # if DEBUG:
-            #     print(f"current from: {current_from_pos}\n"
-            #           f"current check pos: {current_check_node.node.x}, {current_check_node.node.y}\n"
-            #           f"last check pos: {track.path[i-1].node.x}, {track.path[i-1].node.y}\n"
-            #           f"Heading diff: (check) {heading_of_check_node} - (last) {heading_of_last_node} = {heading_diff}")
+            if DEBUG:
+                print(f"current from: {current_from_pos}\n"
+                      f"current check pos: {current_check_node.node.x}, {current_check_node.node.y}\n"
+                      f"last check pos: {track.path[i-1].node.x}, {track.path[i-1].node.y}\n"
+                      f"Heading diff: (check) {heading_of_check_node} - (last) {heading_of_last_node} = {heading_diff}")
             if heading_diff <= math.radians(heading_diff_tolerance):
-                # if DEBUG:
-                #     print("Is same direction, skipping")
+                if DEBUG:
+                    print("Is same direction, skipping")
                 continue
 
             # We have a new direction, add the LAST POINT (not current!) to the new path, as it's where the turn happens
@@ -419,7 +419,7 @@ async def adjust_speed_using_pid(track: Track, target_node: Node, session: aioht
 def is_target_different(track: Track, target_node: Node, other_node: Node) -> bool:
     # Define a threshold for difference based on your requirements
     # Assume a difference of 1.0 cm is significant, we use pixels though, so it depends on the distance and camera
-    position_threshold = 25.0
+    position_threshold = 30.0
 
     # Calculate the position difference
     position_diff = calculate_distance(target_node.get_position(), other_node.get_position())
@@ -428,6 +428,8 @@ def is_target_different(track: Track, target_node: Node, other_node: Node) -> bo
 
     # Check if target is significantly different from the last target
     if position_diff > position_threshold or direction_diff > math.pi / 4:
+        if DEBUG:
+            print(f"Different target: posdiff = {position_diff} > {position_threshold} | headdiff = {direction_diff} > {math.pi / 4}")
         return True
 
     return False
