@@ -1,5 +1,3 @@
-import math
-
 from Utils.math_helpers import calculate_new_direction, calculate_distance
 
 
@@ -13,6 +11,3 @@ def drive_decision(robot_position: tuple[int, int], robot_direction: float, targ
     if distance > 0:
         # robot, drive distance
         pass
-
-
-

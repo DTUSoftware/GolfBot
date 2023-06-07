@@ -1,14 +1,15 @@
 import asyncio
-import os
-import math
 import heapq
+import math
+import os
 from typing import Any, Optional, List, Tuple
 
+import matplotlib.pyplot as plt
 import numpy as np
-from colorama import init as colorama_init
 from colorama import Fore
 from colorama import Style
-import matplotlib.pyplot as plt
+from colorama import init as colorama_init
+
 from Utils.math_helpers import calculate_new_direction, calculate_distance
 
 DEBUG = "true" in os.environ.get('DEBUG', "True").lower()

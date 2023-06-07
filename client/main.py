@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-import os
-import time
+import asyncio
 import math
+import os
+import random
+import time
 import traceback
 from typing import Optional
 
-import requests
-import random
-import asyncio
 import aiohttp
+import requests
 from torch import multiprocessing
+
+from Utils.math_helpers import calculate_distance
 from ai.main import run_ai
 from drive_algorithm import Ball, Track, Node, NodeData
 from track_setup import setup_track
-from Utils.math_helpers import calculate_new_direction, calculate_distance
-
 
 ROBOT_API_ENDPOINT = os.environ.get('API_ENDPOINT', "http://localhost:8069/api/v1")
 GOLF_BALL_CONFIDENCE_GATE = float(os.environ.get('GOLF_BALL_CONFIDENCE_GATE', 0.45))
@@ -195,8 +195,9 @@ async def set_speeds(session, speed_left, speed_right):
 def collapse_path(track: Track, path_queue: multiprocessing.JoinableQueue) -> bool:
     global last_target_path, integral, previous_error, last_target_node
     if DEBUG:
-        print(f"current last target path: {[(nodedata.node.x, nodedata.node.y ) for nodedata in last_target_path] if last_target_path else []}\n"
-              f"new path target: {(track.path[-1].node.x, track.path[-1].node.y) if track.path else []}")
+        print(
+            f"current last target path: {[(nodedata.node.x, nodedata.node.y) for nodedata in last_target_path] if last_target_path else []}\n"
+            f"new path target: {(track.path[-1].node.x, track.path[-1].node.y) if track.path else []}")
     # If not set already, set and reset
     # Check if the new path target is different than before
     if last_target_path and isinstance(last_target_path, list) and not is_target_different(track,
@@ -212,7 +213,8 @@ def collapse_path(track: Track, path_queue: multiprocessing.JoinableQueue) -> bo
                 last_target_path.pop(0)
                 last_target_node = track.graph.get_node(track.robot_pos)
             # If we passed the target, pop
-            has_passed_result = has_passed_target(last_target_path[0].node, track.graph.get_node(track.robot_pos), last_target_node)
+            has_passed_result = has_passed_target(last_target_path[0].node, track.graph.get_node(track.robot_pos),
+                                                  last_target_node)
             if has_passed_result:
                 if DEBUG:
                     print("Robot passed target, popping")
@@ -230,7 +232,8 @@ def collapse_path(track: Track, path_queue: multiprocessing.JoinableQueue) -> bo
                 #         pass
 
             if DEBUG:
-                print(f"Current optimized path: {[(nodedata.node.x, nodedata.node.y) for nodedata in last_target_path]}")
+                print(
+                    f"Current optimized path: {[(nodedata.node.x, nodedata.node.y) for nodedata in last_target_path]}")
             if last_target_path:
                 # Call adjust to adjust for error, and to clear point from list if we reach the target
                 return True
@@ -276,7 +279,7 @@ def collapse_path(track: Track, path_queue: multiprocessing.JoinableQueue) -> bo
                 continue
 
             # If last node, add it
-            if i == (len(track.path)-1):
+            if i == (len(track.path) - 1):
                 if DEBUG:
                     print("Last node appending")
                 new_path.append(current_check_node)
@@ -291,16 +294,17 @@ def collapse_path(track: Track, path_queue: multiprocessing.JoinableQueue) -> bo
                 # if DEBUG:
                 #     print("Same y")
                 continue
-            
+
             # If heading is same as last node, skip
             heading_diff_tolerance = 15  # degrees, not radians
             current_from_pos = (current_from_node.node.x, current_from_node.node.y)
-            heading_of_check_node = current_check_node.node.get_heading((track.path[i-1].node.x, track.path[i-1].node.y))
+            heading_of_check_node = current_check_node.node.get_heading(
+                (track.path[i - 1].node.x, track.path[i - 1].node.y))
             # The line below 'should not' fuck up, but it can give a value of 0 if, somehow, the track path's last node
             # is the same as the current from pos. But we, in the case of a new direction, assign the last variable,
             # so the current from pos should always be different than the last node!
             # We also start at index 2 (third value) to get around this, and for other reasons.
-            heading_of_last_node = track.path[i-1].node.get_heading(current_from_pos)
+            heading_of_last_node = track.path[i - 1].node.get_heading(current_from_pos)
             heading_diff = abs(heading_of_check_node - heading_of_last_node)
             # if DEBUG:
             #     print(f"current from: {current_from_pos}\n"
@@ -311,13 +315,13 @@ def collapse_path(track: Track, path_queue: multiprocessing.JoinableQueue) -> bo
                 # if DEBUG:
                 #     print("Is same direction, skipping")
                 continue
-            
+
             # We have a new direction, add the LAST POINT (not current!) to the new path, as it's where the turn happens
             if DEBUG:
-                print(f"{track.path[i-1].node.x}, {track.path[i-1].node.y} is on not on same path, appending")
-            new_path.append(track.path[i-1])
-            current_from_node = track.path[i-1]
-    
+                print(f"{track.path[i - 1].node.x}, {track.path[i - 1].node.y} is on not on same path, appending")
+            new_path.append(track.path[i - 1])
+            current_from_node = track.path[i - 1]
+
     last_target_path = new_path
     if DEBUG:
         print(f"Current target optimized path: {[(nodedata.node.x, nodedata.node.y) for nodedata in last_target_path]}")
@@ -446,7 +450,8 @@ async def drive_to_coordinates(node: Node, session: aiohttp.ClientSession):
             await asyncio.sleep(1)
 
 
-async def do_race_iteration(track: Track, ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue, session: aiohttp.ClientSession):
+async def do_race_iteration(track: Track, ai_queue: multiprocessing.JoinableQueue,
+                            path_queue: multiprocessing.JoinableQueue, session: aiohttp.ClientSession):
     try:
         # Get results from AI
         # if DEBUG:
@@ -485,7 +490,8 @@ async def do_race_iteration(track: Track, ai_queue: multiprocessing.JoinableQueu
         pass
 
 
-async def race(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue, track: Track, session: aiohttp.ClientSession) -> None:
+async def race(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue, track: Track,
+               session: aiohttp.ClientSession) -> None:
     if DEBUG:
         print("Getting initial AI result.")
     while True:

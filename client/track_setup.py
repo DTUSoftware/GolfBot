@@ -1,7 +1,9 @@
-import os
-import cv2
-import json
 import datetime
+import json
+import os
+
+import cv2
+
 import drive_algorithm as drivealg
 
 VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 1))

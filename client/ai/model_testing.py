@@ -1,7 +1,8 @@
-import cv2
 import os
-import torch
 from datetime import datetime
+
+import cv2
+import torch
 from PIL import Image
 from ultralytics import YOLO
 

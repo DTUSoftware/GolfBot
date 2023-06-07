@@ -1,8 +1,9 @@
-import os
-import cv2
 import logging
-from ultralytics import YOLO
+import os
+
+import cv2
 import torch
+from ultralytics import YOLO
 
 VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 1))
 CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/20230606")
