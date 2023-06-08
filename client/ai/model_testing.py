@@ -7,7 +7,7 @@ from PIL import Image
 from ultralytics import YOLO
 
 VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 1))
-CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/20230607-last")
+CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/20230608-best")
 DATA = os.environ.get("DATA", "datasets/RoboFlow0506-1")
 
 

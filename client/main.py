@@ -194,7 +194,7 @@ async def simplify_path(path: List[NodeData]) -> List[NodeData]:
         same_path = True
         for j in range(i+1, i+4):
             # If last node stop
-            if j == len(path)-2:
+            if j >= len(path):
                 break
 
             # Get j'th next node
@@ -210,8 +210,8 @@ async def simplify_path(path: List[NodeData]) -> List[NodeData]:
                 same_path = True
                 continue
 
-            if DEBUG:
-                print(f"Checking {current_node.node.get_position()}")
+            # if DEBUG:
+            #     print(f"Checking {current_node.node.get_position()}")
 
             # If same direction
             direction_diff = math_helpers.calculate_direction_difference(
@@ -246,8 +246,8 @@ async def check_new_path(track: Track, path_queue: multiprocessing.JoinableQueue
     global last_target_path, integral, previous_error, last_target_node
     if DEBUG:
         print(
-            f"current last target path: {[(nodedata.node.x, nodedata.node.y) for nodedata in last_target_path] if last_target_path else []}\n"
-            f"new path target: {(track.path[-1].node.x, track.path[-1].node.y) if track.path else []}")
+            f"current last target path: {[nodedata.node.get_position() for nodedata in last_target_path] if last_target_path else []}\n"
+            f"new path target: {track.path[-1].node.get_position() if track.path else []}")
     # If not set already, set and reset
     # Check if the new path target is different than before
     if last_target_path and isinstance(last_target_path, list) and not is_target_different(track,
@@ -406,6 +406,9 @@ def is_target_different(track: Track, target_node: Node, other_node: Node) -> bo
     # Define a threshold for difference based on your requirements
     # Assume a difference of 1.0 cm is significant, we use pixels though, so it depends on the distance and camera
     position_threshold = 30.0
+
+    if DEBUG:
+        print(f"Checking if target is different between {target_node.get_position()} and {other_node.get_position()}")
 
     # Calculate the position difference
     position_diff = math_helpers.calculate_distance(target_node.get_position(), other_node.get_position())
