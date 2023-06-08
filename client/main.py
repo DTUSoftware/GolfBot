@@ -122,7 +122,12 @@ async def calculate_and_adjust(track, path_queue: multiprocessing.JoinableQueue,
         print("Calculating path and adjusting speed")
 
     # Get the path to closest ball
+    start_time = 0.0
+    if DEBUG:
+        start_time = time.time()
     await track.calculate_path()
+    if DEBUG:
+        print(f"Got all paths in {time.time()-start_time} seconds!")
     # track.draw(True)
 
     if not track.path:
@@ -244,63 +249,64 @@ async def simplify_path(path: List[NodeData]) -> List[NodeData]:
 
 async def check_new_path(track: Track, path_queue: multiprocessing.JoinableQueue) -> bool:
     global last_target_path, integral, previous_error, last_target_node
-    if DEBUG:
-        print(
-            f"current last target path: {[nodedata.node.get_position() for nodedata in last_target_path] if last_target_path else []}\n"
-            f"new path target: {track.path[-1].node.get_position() if track.path else []}")
+    # if DEBUG:
+    #     print(
+    #         f"current last target path: {[nodedata.node.get_position() for nodedata in last_target_path] if last_target_path else []}\n"
+    #         f"new path target: {track.path[-1].node.get_position() if track.path else []}")
     # If not set already, set and reset
     # Check if the new path target is different than before
-    if last_target_path and isinstance(last_target_path, list) and not is_target_different(track,
-                                                                                           last_target_path[-1].node,
-                                                                                           track.path[-1].node):
-        if DEBUG:
-            print("No change in target, keeping current path.")
+    if last_target_path and isinstance(last_target_path, list) and \
+            not is_target_different(track, last_target_path[-1].node, track.path[-1].node):
+        # if DEBUG:
+        #     print("No change in target, keeping current path.")
 
-            # If robot is at target, pop
-            if not is_target_different(track, last_target_path[0].node, track.graph.get_node(track.robot_pos)):
-                if DEBUG:
-                    print("Robot reached target, popping")
-                last_target_path.pop(0)
-                last_target_node = track.graph.get_node(track.robot_pos)
-            # If we passed the target, pop
-            has_passed_result = has_passed_target(last_target_path[0].node, track.graph.get_node(track.robot_pos),
-                                                  last_target_node)
-            if has_passed_result:
-                if DEBUG:
-                    print("Robot passed target, popping")
-                last_target_path.pop(0)
-                last_target_node = track.graph.get_node(track.robot_pos)
-            elif has_passed_result is None:
-                if DEBUG:
-                    print("Robot went completely wrong way?!?? Removing path!")
-                last_target_node = None
-                last_target_path = None
-                # if not path_queue.full():
-                #     try:
-                #         path_queue.put([])
-                #     except:
-                #         pass
-
+        # If robot is at target, pop
+        # if DEBUG:
+        #     print("Checking if robot has reached target")
+        if not is_target_different(track, last_target_path[0].node, track.graph.get_node(track.robot_pos)):
             if DEBUG:
-                print(
-                    f"Current optimized path: {[(nodedata.node.x, nodedata.node.y) for nodedata in last_target_path]}")
-            if last_target_path:
-                # Call adjust to adjust for error, and to clear point from list if we reach the target
-                return True
-            else:
-                # if not path_queue.full():
-                #     try:
-                #         path_queue.put([])
-                #     except:
-                #         pass
-                pass
+                print("Robot reached target, popping")
+            last_target_path.pop(0)
+            last_target_node = track.graph.get_node(track.robot_pos)
+        # If we passed the target, pop
+        has_passed_result = has_passed_target(last_target_path[0].node, track.graph.get_node(track.robot_pos),
+                                              last_target_node)
+        if has_passed_result:
+            if DEBUG:
+                print("Robot passed target, popping")
+            last_target_path.pop(0)
+            last_target_node = track.graph.get_node(track.robot_pos)
+        elif has_passed_result is None:
+            if DEBUG:
+                print("Robot went completely wrong way?!?? Removing path!")
+            last_target_node = None
+            last_target_path = None
+            # if not path_queue.full():
+            #     try:
+            #         path_queue.put([])
+            #     except:
+            #         pass
+
+        if DEBUG:
+            print(
+                f"Current optimized path: {[(nodedata.node.x, nodedata.node.y) for nodedata in last_target_path]}")
+        if last_target_path:
+            # Call adjust to adjust for error, and to clear point from list if we reach the target
+            return True
+        else:
+            # if not path_queue.full():
+            #     try:
+            #         path_queue.put([])
+            #     except:
+            #         pass
+            pass
     if DEBUG:
         print("New target, making new path")
 
     if track.path[0].node.x == 0 and track.path[0].node.y == 0:
-        if DEBUG:
-            print("Robot pos is 0,0, not making new path")
-            return False
+        # if DEBUG:
+        #     print("Robot pos is 0,0, not making new path")
+        return False
 
     integral = 0
     previous_error = 0
@@ -407,8 +413,8 @@ def is_target_different(track: Track, target_node: Node, other_node: Node) -> bo
     # Assume a difference of 1.0 cm is significant, we use pixels though, so it depends on the distance and camera
     position_threshold = 30.0
 
-    if DEBUG:
-        print(f"Checking if target is different between {target_node.get_position()} and {other_node.get_position()}")
+    # if DEBUG:
+    #     print(f"Checking if target is different between {target_node.get_position()} and {other_node.get_position()}")
 
     # Calculate the position difference
     position_diff = math_helpers.calculate_distance(target_node.get_position(), other_node.get_position())
@@ -417,9 +423,9 @@ def is_target_different(track: Track, target_node: Node, other_node: Node) -> bo
 
     # Check if target is significantly different from the last target
     if position_diff > position_threshold or direction_diff > math.pi / 4:
-        if DEBUG:
-            print(
-                f"Different target: posdiff = {position_diff} > {position_threshold} | headdiff = {direction_diff} > {math.pi / 4}")
+        # if DEBUG:
+        #     print(
+        #         f"Different target: posdiff = {position_diff} > {position_threshold} | headdiff = {direction_diff} > {math.pi / 4}")
         return True
 
     return False
@@ -446,8 +452,8 @@ async def do_race_iteration(track: Track, ai_queue: multiprocessing.JoinableQueu
             return
 
         ai_results = ai_queue.get_nowait()
-        if DEBUG:
-            print("Got results from AI!")
+        # if DEBUG:
+        #     print("Got results from AI!")
 
         # if DEBUG:
         #     # Get robot status

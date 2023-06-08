@@ -38,6 +38,12 @@ class Robot:
         self.stopped = False
         self.busy = False
 
+    def refresh_conn(self):
+        reset_conn()
+        self.motors = get_motors()
+        self.fan_motor = get_fan_motor()
+        self.buttons = get_button()
+
     def forward(self) -> bool:
         try:
             if not self.stopped and not self.busy:
@@ -241,7 +247,7 @@ def setup(tries=0) -> None:
 
 
 def reset_conn(tries=0):
-    global conn, ev3_motor, ev3_button
+    global conn, ev3_motor, ev3_button, ROBOT_GLOBAL
     try:
         print("Trying to reconnect to robot...")
         conn = rpyc.classic.connect(IP_ADDRESS)
@@ -262,6 +268,25 @@ def reset_conn(tries=0):
     return conn, ev3_motor, ev3_button
 
 
+def get_button() -> Optional[Button]:
+    if not conn or not ev3_button:
+        return None
+    return ev3_button.Button()  # Any buton on the robot
+
+
+def get_motors() -> Optional[MoveTank]:
+    if not conn or not ev3_motor:
+        return None
+    return ev3_motor.MoveTank(left_motor_port=ev3_motor.OUTPUT_A,
+                              right_motor_port=ev3_motor.OUTPUT_D)  # Motor on output port A and D
+
+
+def get_fan_motor() -> Optional[Motor]:
+    if not conn or not ev3_motor:
+        return None
+    return ev3_motor.Motor(ev3_motor.OUTPUT_C)
+
+
 def get_robot(current_pos: tuple = (0, 0), tries=0) -> Optional[Robot]:
     global conn, ev3_motor, ev3_button
     if not conn:
@@ -270,9 +295,8 @@ def get_robot(current_pos: tuple = (0, 0), tries=0) -> Optional[Robot]:
         return None
 
     # The motors and other things on the robot
-    buttons = ev3_button.Button()  # Any buton on the robot
-    motors = ev3_motor.MoveTank(left_motor_port=ev3_motor.OUTPUT_A,
-                                right_motor_port=ev3_motor.OUTPUT_D)  # Motor on output port A and D
-    fan_motor = ev3_motor.Motor(ev3_motor.OUTPUT_C)
+    buttons = get_button()
+    motors = get_motors()
+    fan_motor = get_fan_motor()
 
     return Robot(buttons, motors, fan_motor, current_pos)
