@@ -204,18 +204,33 @@ async def summarize_path(path: List[NodeData]) -> List[NodeData]:
     """
     new_path: List[NodeData] = []
 
-    # Check if the path is empty or contains only one point
-    if len(path) <= 1:
+    # Check if the path is empty or contains only two points
+    if len(path) <= 2:
         return path
 
-    new_path.append(path[0])  # Add the first point as the initial target
+    # Add the first point as the initial target
+    new_path.append(path[0])
     current_from_node = path[0]
 
+    # Current heading diff
+    last_direction_diff = 0.0
     for i in range(1, len(path)-1):
         previous_node = path[i-1]
         current_node = path[i]
         next_node = path[i+1]
 
+        # If previous node is current from node, skip
+        if previous_node == current_from_node:
+            continue
+
+        # If on same line, ie. x and y
+        if math_helpers.is_on_same_line(current_from_node.node.get_position(), current_node.node.get_position()):
+            continue
+
+        if DEBUG:
+            print(f"Checking {current_node.node.get_position()}")
+
+        # If same direction
         direction_diff = math_helpers.calculate_direction_difference(
             current_from_node.node.get_position(), previous_node.node.get_position(), next_node.node.get_position()
         )
@@ -224,10 +239,18 @@ async def summarize_path(path: List[NodeData]) -> List[NodeData]:
         if direction_diff <= math.radians(15):  # 15 degrees tolerance
             continue
 
-        new_path.append(current_node)  # Add the current point to the new path
+        # Check if direction diff is same as last
+        if abs(direction_diff - last_direction_diff) <= math.radians(2):
+            last_direction_diff = direction_diff
+            continue
+        last_direction_diff = direction_diff
+
+        # Add the current point to the new path
+        new_path.append(current_node)
         current_from_node = current_node
 
-    new_path.append(path[-1])  # Add the last point to the new path
+    # Add the last point to the new path
+    new_path.append(path[-1])
     return new_path
 
 
@@ -301,7 +324,7 @@ async def collapse_path(track: Track, path_queue: multiprocessing.JoinableQueue)
 
     # Adjust and go to
     if last_target_path:
-        full_path = [track.robot_pos] + [(nodedata.node.x, nodedata.node.y) for nodedata in last_target_path]
+        full_path = [nodedata.node.get_position() for nodedata in last_target_path]
 
         if not path_queue.full():
             try:
@@ -309,7 +332,8 @@ async def collapse_path(track: Track, path_queue: multiprocessing.JoinableQueue)
                                 "small_goal": track.small_goal.points if track.small_goal else [], "big_goal": track.big_goal.points if track.big_goal else []})
             except:
                 pass
-        last_target_node = track.graph.get_node(track.robot_pos)
+        # TODO: Add back
+        # last_target_node = last_target_path[-1].node
         return True
 
 

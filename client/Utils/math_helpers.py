@@ -33,6 +33,9 @@ def calculate_direction_difference(from_position: Tuple[int, int], middle_positi
     direction1 = calculate_direction(from_position, middle_position)
     direction2 = calculate_direction(middle_position, to_position)
     direction_diff = abs(direction2 - direction1)
+    print(f"direction1: {direction1} (from {from_position} to {middle_position}\n"
+          f"direction2: {direction2} (from {middle_position} to {to_position}\n"
+          f"diff: {direction_diff}")
     return direction_diff
 
 
