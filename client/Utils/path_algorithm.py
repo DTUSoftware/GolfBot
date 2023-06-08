@@ -9,8 +9,9 @@ import numpy as np
 from colorama import Fore
 from colorama import Style
 from colorama import init as colorama_init
+from torch import multiprocessing
 
-from Utils.math_helpers import calculate_direction, calculate_distance
+import math_helpers
 
 DEBUG = "true" in os.environ.get('DEBUG', "True").lower()
 TIMEOUT_GET_PATH = 5  # in seconds
@@ -39,7 +40,7 @@ class Node:
             if self.x == node.x or self.y == node.y:
                 weight = max(abs(self.x - node.x), abs(self.y - node.y))
             else:
-                weight = calculate_distance(self.get_position(), node.get_position())
+                weight = math_helpers.calculate_distance(self.get_position(), node.get_position())
         self.neighbours.append({"node": node, "weight": weight})
 
     def remove_neighbour(self, node: 'Node') -> None:
@@ -52,7 +53,7 @@ class Node:
         return [neighbour["node"] for neighbour in self.neighbours]
 
     def get_heading(self, from_position: tuple) -> float:
-        return calculate_direction(from_position, self.get_position())
+        return math_helpers.calculate_direction(from_position, self.get_position())
 
 
 class Ball:
@@ -446,6 +447,11 @@ class Track:
         self.robot_direction = 0.0
         self.path: list = []
 
+        self.last_target_path: List[NodeData] = []
+        self.last_target_node: Optional[Node] = None
+        self.integral = 0.0
+        self.previous_error = 0.0
+
         self.graph = Graph(bounds["x"], bounds["y"])
 
     def add_ball(self, ball: Ball) -> None:
@@ -456,7 +462,7 @@ class Track:
 
     def set_robot_pos(self, robot_pos: tuple) -> None:
         # Recalibrate the direction / angle
-        self.robot_direction = calculate_direction(robot_pos, self.robot_pos)
+        self.robot_direction = math_helpers.calculate_direction(robot_pos, self.robot_pos)
         # Update position
         self.robot_pos = robot_pos
 
@@ -580,6 +586,203 @@ class Track:
 
 
 TRACK_GLOBAL: Optional[Track] = None
+
+
+async def simplify_path(path: List[NodeData]) -> List[NodeData]:
+    """
+    Summarizes/simplifies a path of points/nodes into the least amount of points/nodes needed for a robot to traverse
+    the path.
+
+    Args:
+        path (List[NodeData]): The path object containing the path to be summarized.
+
+    Returns:
+        list: The summarized path as a list of NodeData objects.
+    """
+    new_path: List[NodeData] = []
+
+    # Check if the path is empty or contains only two points
+    if len(path) <= 1:
+        return []
+    elif len(path) == 2:
+        return path
+
+    # Add the first point as the initial target
+    new_path.append(path[0])
+    current_from_node = path[0]
+
+    # Current heading diff
+    last_direction_diff = 0.0
+    for i in range(1, len(path) - 1):
+        previous_node = path[i - 1]
+        current_node = path[i]
+
+        # Check forward a bit to see if it's the same line
+        same_path = True
+        for j in range(i + 1, i + 4):
+            # If last node stop
+            if j >= len(path):
+                break
+
+            # Get j'th next node
+            next_node = path[j]
+
+            # If previous node is current from node, skip
+            if previous_node == current_from_node:
+                same_path = True
+                continue
+
+            # If on same line, ie. x and y
+            if math_helpers.is_on_same_line(current_from_node.node.get_position(), current_node.node.get_position()):
+                same_path = True
+                continue
+
+            # if DEBUG:
+            #     print(f"Checking {current_node.node.get_position()}")
+
+            # If same direction
+            direction_diff = math_helpers.calculate_direction_difference(
+                current_from_node.node.get_position(), previous_node.node.get_position(), next_node.node.get_position()
+            )
+
+            # Check if the direction difference is within the tolerance
+            if direction_diff <= math.radians(15):  # 15 degrees tolerance
+                same_path = True
+                continue
+
+            # Check if direction diff is same as last
+            if abs(direction_diff - last_direction_diff) <= math.radians(2):
+                last_direction_diff = direction_diff
+                same_path = True
+                continue
+            last_direction_diff = direction_diff
+
+            same_path = False
+
+        if not same_path:
+            # Add the current point to the new path
+            new_path.append(current_node)
+            current_from_node = current_node
+
+    # Add the last point to the new path
+    new_path.append(path[-1])
+    return new_path
+
+
+async def check_new_path(path_queue: multiprocessing.JoinableQueue) -> bool:
+    """
+    Checks if the path in the track is the same as last, and if it is, updates the current path. Also updates if it isn't.
+
+    :param path_queue: The queue to send the current path to the AI.
+    :return: True if we should drive, else False.
+    """
+    track = TRACK_GLOBAL
+    # if DEBUG:
+    #     print(
+    #         f"current last target path: {[nodedata.node.get_position() for nodedata in last_target_path] if last_target_path else []}\n"
+    #         f"new path target: {track.path[-1].node.get_position() if track.path else []}")
+    # If not set already, set and reset
+    # Check if the new path target is different than before
+    if track.last_target_path and isinstance(track.last_target_path, list) and \
+            not is_target_different(track, track.last_target_path[-1].node, track.path[-1].node):
+        # if DEBUG:
+        #     print("No change in target, keeping current path.")
+
+        # If robot is at target, pop
+        # if DEBUG:
+        #     print("Checking if robot has reached target")
+        if not is_target_different(track, track.last_target_path[0].node, track.graph.get_node(track.robot_pos)):
+            if DEBUG:
+                print("Robot reached target, popping")
+            track.last_target_path.pop(0)
+            track.last_target_node = track.graph.get_node(track.robot_pos)
+        # If we passed the target, pop
+        has_passed_result = math_helpers.has_passed_target(track.last_target_path[0].node.get_position(),
+                                                           track.graph.get_node(track.robot_pos).get_position(),
+                                                           track.last_target_node.get_position())
+        if has_passed_result:
+            if DEBUG:
+                print("Robot passed target, popping")
+            track.last_target_path.pop(0)
+            track.last_target_node = track.graph.get_node(track.robot_pos)
+        elif has_passed_result is None:
+            if DEBUG:
+                print("Robot went completely wrong way?!?? Removing path!")
+            track.last_target_node = None
+            track.last_target_path = None
+            # if not path_queue.full():
+            #     try:
+            #         path_queue.put([])
+            #     except:
+            #         pass
+
+        if DEBUG:
+            print(
+                f"Current optimized path: {[(nodedata.node.x, nodedata.node.y) for nodedata in track.last_target_path]}")
+        if track.last_target_path:
+            # Call adjust to adjust for error, and to clear point from list if we reach the target
+            return True
+        else:
+            # if not path_queue.full():
+            #     try:
+            #         path_queue.put([])
+            #     except:
+            #         pass
+            pass
+    if DEBUG:
+        print("New target, making new path")
+
+    if track.path[0].node.x == 0 and track.path[0].node.y == 0:
+        # if DEBUG:
+        #     print("Robot pos is 0,0, not making new path")
+        return False
+
+    track.integral = 0.0
+    track.previous_error = 0.0
+
+    # "Summarize" path into good points for targets
+    track.last_target_path = await simplify_path(track.path)
+    if DEBUG:
+        print(
+            f"Current target optimized path: {[(nodedata.node.x, nodedata.node.y) for nodedata in track.last_target_path]}")
+
+    # Adjust and go to
+    if track.last_target_path:
+        full_path = [nodedata.node.get_position() for nodedata in track.last_target_path]
+
+        if not path_queue.full():
+            try:
+                path_queue.put({"path": full_path if full_path else [], "obstacles": [obstacle.points for obstacle in
+                                                                                      track.obstacles] if track.obstacles else [],
+                                "small_goal": track.small_goal.points if track.small_goal else [],
+                                "big_goal": track.big_goal.points if track.big_goal else []})
+            except:
+                pass
+        track.last_target_node = track.last_target_path[-1].node
+        return True
+
+
+def is_target_different(track: Track, target_node: Node, other_node: Node) -> bool:
+    # Define a threshold for difference based on your requirements
+    # Assume a difference of 1.0 cm is significant, we use pixels though, so it depends on the distance and camera
+    position_threshold = 30.0
+
+    # if DEBUG:
+    #     print(f"Checking if target is different between {target_node.get_position()} and {other_node.get_position()}")
+
+    # Calculate the position difference
+    position_diff = math_helpers.calculate_distance(target_node.get_position(), other_node.get_position())
+    # Calculate the direction difference
+    direction_diff = abs(target_node.get_heading(track.robot_pos) - other_node.get_heading(track.robot_pos))
+
+    # Check if target is significantly different from the last target
+    if position_diff > position_threshold or direction_diff > math.pi / 4:
+        # if DEBUG:
+        #     print(
+        #         f"Different target: posdiff = {position_diff} > {position_threshold} | headdiff = {direction_diff} > {math.pi / 4}")
+        return True
+
+    return False
 
 
 def setup_debug() -> None:

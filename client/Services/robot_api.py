@@ -3,8 +3,8 @@ import os
 import aiohttp
 import requests
 
-
 ROBOT_API_ENDPOINT = os.environ.get('API_ENDPOINT', "http://localhost:8069/api/v1")
+
 
 async def set_robot_start(session: aiohttp.ClientSession):
     print("Setting robot start")
@@ -13,11 +13,14 @@ async def set_robot_start(session: aiohttp.ClientSession):
         if response.status != 200:
             print(response.status)
 
+
 def set_robot_stop():
     response = requests.post(f"{ROBOT_API_ENDPOINT}/stop")
     print(response.text)
     if response.status_code != 200:
         print(response.status_code)
+
+
 async def get_robot_status(session: aiohttp.ClientSession):
     print("Getting robot status")
     async with session.get(f"{ROBOT_API_ENDPOINT}/status") as response:
@@ -40,6 +43,7 @@ async def set_speeds(session: aiohttp.ClientSession, speed_left, speed_right):
             f"{ROBOT_API_ENDPOINT}/drive?speed_left={speed_left}&speed_right={speed_right}") as response:
         if response.status != 200:
             print(f"Error on adjusting speed: {response.status}")
+
 
 async def toggle_fans(session: aiohttp.ClientSession):
     async with session.post(

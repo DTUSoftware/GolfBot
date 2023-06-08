@@ -18,7 +18,8 @@ def calculate_direction(position1: Tuple[int, int], position2: Tuple[int, int]) 
     return math.atan2(dy, dx)
 
 
-def calculate_direction_difference(from_position: Tuple[int, int], middle_position: Tuple[int, int], to_position: Tuple[int, int]) -> float:
+def calculate_direction_difference(from_position: Tuple[int, int], middle_position: Tuple[int, int],
+                                   to_position: Tuple[int, int]) -> float:
     """
     Calculates the direction difference between three positions.
 
@@ -65,3 +66,19 @@ def is_on_same_line(position1: Tuple[int, int], position2: Tuple[int, int]) -> b
         bool: True if the points are on the same line, False otherwise.
     """
     return position1[0] == position2[0] or position1[1] == position2[1]
+
+
+def has_passed_target(frompos: Tuple[int, int], target: Tuple[int, int], currentpos: Tuple[int, int]) -> bool:
+    """
+    Checks if you pass a target.
+    :param frompos: the original from position
+    :param target: the target position
+    :param currentpos: your new position
+    :return: True if passed, else False
+    """
+    length_to_obtain = calculate_distance(target, frompos)
+    current_length = calculate_distance(target, currentpos)
+    position_threshold = 10
+    if current_length - length_to_obtain >= position_threshold:
+        return True
+    return False
