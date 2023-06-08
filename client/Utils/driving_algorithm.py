@@ -53,11 +53,13 @@ async def drive_decision(robot_position: Tuple[int, int], robot_direction: float
     # If the distance is above distance tolerance
     if distance >= DISTANCE_TOLERANCE:
         # Get difference in direction, if any
-        new_direction = math_helpers.calculate_direction(position1=robot_position, position2=target_position)
+        new_direction = math_helpers.calculate_direction(position1=target_position, position2=robot_position)
 
         if DEBUG:
-            print(f"The distance between the robot and the target is {distance} units, and the adjustment in direction "
-                  f"needed is {math.degrees(new_direction)} deg ({new_direction} rad)")
+            print(f"The distance between the robot and the target is {distance} units, and the angle from robot to "
+                  f"target is {math.degrees(new_direction)} deg ({new_direction} rad)\n"
+                  f"The adjustment in direction needed is {math.degrees(new_direction-robot_direction)} deg "
+                  f"({new_direction-robot_direction} rad)")
 
         # Turn if needed
         if abs(robot_direction - new_direction) >= math.radians(DIRECTION_TOLERANCE):

@@ -8,7 +8,7 @@ from ultralytics import YOLO
 from client.Utils.opencv_helpers import draw_object
 
 VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 1))
-CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/20230601_2")
+CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/20230608-kindaworks")
 DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "True").lower()
 DEBUG = ("true" in os.environ.get('DEBUG', "True").lower()) and not DISABLE_LOGGING
 
