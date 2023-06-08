@@ -8,15 +8,14 @@ import traceback
 from typing import Optional, List
 
 import aiohttp
-import requests
 from torch import multiprocessing
 
+from Services.robot_api import set_robot_position, set_speeds, toggle_fans, set_robot_start, set_robot_stop
 from Utils import math_helpers
 from ai.main import run_ai
 from drive_algorithm import Ball, Track, Node, NodeData
 from track_setup import setup_track
 
-ROBOT_API_ENDPOINT = os.environ.get('API_ENDPOINT', "http://localhost:8069/api/v1")
 GOLF_BALL_CONFIDENCE_GATE = float(os.environ.get('GOLF_BALL_CONFIDENCE_GATE', 0.45))
 DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "False").lower()
 DEBUG = ("true" in os.environ.get('DEBUG', "True").lower()) and not DISABLE_LOGGING
@@ -44,12 +43,6 @@ def test_robot_get_pos(old_pos: tuple = None) -> tuple:
         return old_pos[0] + 1, old_pos[1] + 1
     else:
         return random.randrange(5, 10), random.randrange(5, 10)
-
-
-async def get_robot_status(session: aiohttp.ClientSession):
-    print("Getting robot status")
-    async with session.get(f"{ROBOT_API_ENDPOINT}/status") as response:
-        print(await response.text())
 
 
 def box_confidence(box):
@@ -99,9 +92,7 @@ async def update_robot_from_ai_result(track, robot_results, session: aiohttp.Cli
             print(
                 f"Using robot with confidence {box_confidence(robot_box):.2f} at position ({current_pos[0]}, {current_pos[1]})")
         track.set_robot_pos(current_pos)
-        async with session.post(f"{ROBOT_API_ENDPOINT}/position?x={current_pos[0]}&y={current_pos[1]}") as response:
-            if response.status != 200:
-                print(response.status)
+        await set_robot_position(session, x=current_pos[0], y=current_pos[1])
     else:
         if DEBUG:
             print("No robot on track!")
@@ -185,13 +176,6 @@ async def calculate_and_adjust(track, path_queue: multiprocessing.JoinableQueue,
     #     print("Done calculating path and adjusting speed")
 
 
-async def set_speeds(session, speed_left, speed_right):
-    async with session.post(
-            f"{ROBOT_API_ENDPOINT}/drive?speed_left={speed_left}&speed_right={speed_right}") as response:
-        if response.status != 200:
-            print(f"Error on adjusting speed: {response.status}")
-
-
 async def summarize_path(path: List[NodeData]) -> List[NodeData]:
     """
     Summarizes a path of points/nodes into the least amount of points/nodes needed for a robot to traverse the path.
@@ -211,10 +195,10 @@ async def summarize_path(path: List[NodeData]) -> List[NodeData]:
     new_path.append(path[0])  # Add the first point as the initial target
     current_from_node = path[0]
 
-    for i in range(1, len(path)-1):
-        previous_node = path[i-1]
+    for i in range(1, len(path) - 1):
+        previous_node = path[i - 1]
         current_node = path[i]
-        next_node = path[i+1]
+        next_node = path[i + 1]
 
         direction_diff = math_helpers.calculate_direction_difference(
             current_from_node.node.get_position(), previous_node.node.get_position(), next_node.node.get_position()
@@ -305,8 +289,10 @@ async def collapse_path(track: Track, path_queue: multiprocessing.JoinableQueue)
 
         if not path_queue.full():
             try:
-                path_queue.put({"path": full_path if full_path else [], "obstacles": [obstacle.points for obstacle in track.obstacles] if track.obstacles else [],
-                                "small_goal": track.small_goal.points if track.small_goal else [], "big_goal": track.big_goal.points if track.big_goal else []})
+                path_queue.put({"path": full_path if full_path else [], "obstacles": [obstacle.points for obstacle in
+                                                                                      track.obstacles] if track.obstacles else [],
+                                "small_goal": track.small_goal.points if track.small_goal else [],
+                                "big_goal": track.big_goal.points if track.big_goal else []})
             except:
                 pass
         last_target_node = track.graph.get_node(track.robot_pos)
@@ -402,7 +388,8 @@ def is_target_different(track: Track, target_node: Node, other_node: Node) -> bo
     # Check if target is significantly different from the last target
     if position_diff > position_threshold or direction_diff > math.pi / 4:
         if DEBUG:
-            print(f"Different target: posdiff = {position_diff} > {position_threshold} | headdiff = {direction_diff} > {math.pi / 4}")
+            print(
+                f"Different target: posdiff = {position_diff} > {position_threshold} | headdiff = {direction_diff} > {math.pi / 4}")
         return True
 
     return False
@@ -415,15 +402,6 @@ def has_passed_target(target_node: Node, current_node: Node, from_node: Node):
     if current_length - length_to_obtain >= position_threshold:
         return True
     return False
-
-
-async def drive_to_coordinates(node: Node, session: aiohttp.ClientSession):
-    async with session.post(f"{ROBOT_API_ENDPOINT}/drive?x={node.x}&y={node.y}") as response:
-        if response.status != 200:
-            print(response.status)
-        else:
-            # Let the robot drive a lil' bit
-            await asyncio.sleep(1)
 
 
 async def do_race_iteration(track: Track, ai_queue: multiprocessing.JoinableQueue,
@@ -501,13 +479,6 @@ async def race(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocess
     print("Done with race!")
 
 
-async def toggle_fans(session):
-    async with session.post(
-            f"{ROBOT_API_ENDPOINT}/toggle_fans") as response:
-        if response.status != 200:
-            print(f"Error on toggling fans: {response.status}")
-
-
 async def main(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue, track):
     print("Running main...")
     try:
@@ -517,18 +488,16 @@ async def main(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocess
             while True:
                 try:
                     # Start robot
-                    async with session.post(f"{ROBOT_API_ENDPOINT}/start") as response:
-                        if DEBUG:
-                            print(response.status)
-                            print(await response.text())
-                        break
-                except ConnectionError as e:
-                    pass
+                    await set_robot_start(session)
+                    break
+                except Exception as e:
+                    print(f"Failed to start robot with exception {e}.\nRetrying in 5 seconds...")
+                    await asyncio.sleep(5)
 
             # Do the race
             await race(ai_queue, path_queue, track, session)
     except KeyboardInterrupt:
-        requests.post(f"{ROBOT_API_ENDPOINT}/stop")
+        set_robot_stop()
         raise KeyboardInterrupt()
     except ConnectionError:
         print("Failed to connect to robot. Is the API on?")
@@ -590,4 +559,4 @@ if __name__ == '__main__':
             print("[main] AI producer joined!? Stopping race!")
     except KeyboardInterrupt:
         pass
-    requests.post(f"{ROBOT_API_ENDPOINT}/stop")
+    set_robot_stop()
