@@ -37,6 +37,14 @@ async def set_robot_position(session: aiohttp.ClientSession, x: int, y: int):
             # Let the robot drive a lil' bit
             await asyncio.sleep(1)
 
+async def set_robot_direction(session: aiohttp.ClientSession, direction: float):
+    async with session.post(f"{ROBOT_API_ENDPOINT}/turn?radians={direction}") as response:
+        print(await response.text())
+        if response.status != 200:
+            print(response.status)
+        else:
+            # Let the robot drive a lil' bit
+            await asyncio.sleep(1)
 
 async def set_speeds(session: aiohttp.ClientSession, speed_left, speed_right):
     async with session.post(
