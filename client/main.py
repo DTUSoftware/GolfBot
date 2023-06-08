@@ -1,120 +1,16 @@
 #!/usr/bin/env python3
 import asyncio
-import math
 import os
-import random
 import time
 import traceback
-from typing import Optional, List
-
 import aiohttp
 from torch import multiprocessing
 
-from Services.robot_api import set_robot_position, set_speeds, toggle_fans, set_robot_start, set_robot_stop
-from Utils import math_helpers
-from ai.main import run_ai
-from drive_algorithm import Ball, Track, Node, NodeData
-from track_setup import setup_track
+from Services import robot_api, robot_ai
+from Utils import driving_algorithm, path_algorithm, track_setup
 
-GOLF_BALL_CONFIDENCE_GATE = float(os.environ.get('GOLF_BALL_CONFIDENCE_GATE', 0.45))
 DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "False").lower()
 DEBUG = ("true" in os.environ.get('DEBUG', "True").lower()) and not DISABLE_LOGGING
-
-# PID constants
-KP = float(os.environ.get('PID_KP', 5))  # Proportional gain  3.04
-KI = float(os.environ.get('PID_KI', 0.1))  # Integral gain - 0.1
-KD = float(os.environ.get('PID_KD', 0.05))  # Derivative gain - 0.05
-
-# Robot parameters
-WHEEL_RADIUS = (float(os.environ.get('WHEEL_DIAMETER', 68.8)) / 2) / 10  # Radius of the robot's wheels in cm
-DIST_BETWEEN_WHEELS = float(
-    os.environ.get('DIST_BETWEEN_WHEELS', 83.0 * 2)) / 10  # Distance between the robot's wheels in cm
-ROBOT_BASE_SPEED = float(os.environ.get('ROBOT_BASE_SPEED', 50.0))
-
-# PID variables
-integral = 0
-previous_error = 0
-last_target_node = None
-last_target_path = None
-
-
-def test_robot_get_pos(old_pos: tuple = None) -> tuple:
-    if old_pos:
-        return old_pos[0] + 1, old_pos[1] + 1
-    else:
-        return random.randrange(5, 10), random.randrange(5, 10)
-
-
-def box_confidence(box):
-    return box.conf.item()
-
-
-def box_to_pos(box) -> tuple:
-    x1, y1, x2, y2 = box.xyxy[0]  # get box coordinates in (top, left, bottom, right) format
-    return int((x1 + x2) / 2), int((y1 + y2) / 2)
-
-
-async def parse_ai_results(ai_results) -> tuple:
-    # if DEBUG:
-    #     print("Parsing AI results")
-    robot_results = []
-    golf_ball_results = []
-    golden_ball_results = []
-    # https://docs.ultralytics.com/modes/predict/#working-with-results
-    for result in ai_results:
-        boxes = result.boxes
-        for box in boxes:
-            class_name = result.names[int(box.cls)]
-            if "robot" in class_name:
-                robot_results.append(box)
-            elif "orange" in class_name:
-                golden_ball_results.append(box)
-            elif "white" in class_name:
-                golf_ball_results.append(box)
-
-    robot_results.sort(key=box_confidence)
-    golf_ball_results.sort(key=box_confidence)
-    golden_ball_results.sort(key=box_confidence)
-
-    # if DEBUG:
-    #     print("Done parsing AI results.")
-    return robot_results, golf_ball_results, golden_ball_results
-
-
-async def update_robot_from_ai_result(track, robot_results, session: aiohttp.ClientSession):
-    # if DEBUG:
-    #     print("Updating robot from AI results")
-    # Get current robot position and update track robot position
-    if robot_results:
-        robot_box = robot_results[0]
-        current_pos = box_to_pos(robot_box)
-        if DEBUG:
-            print(
-                f"Using robot with confidence {box_confidence(robot_box):.2f} at position ({current_pos[0]}, {current_pos[1]})")
-        track.set_robot_pos(current_pos)
-        await set_robot_position(session, x=current_pos[0], y=current_pos[1])
-    else:
-        if DEBUG:
-            print("No robot on track!")
-
-
-async def update_balls_from_ai_result(track, golf_ball_results, golden_ball_results):
-    # if DEBUG:
-    #     print("Update balls from AI result")
-    # Add balls to track
-    track.clear_balls()
-    for ball_box in golf_ball_results:
-        confidence = box_confidence(ball_box)
-        if confidence > GOLF_BALL_CONFIDENCE_GATE:
-            ball = Ball(box_to_pos(ball_box))
-            track.add_ball(ball)
-    # Add golden balls to track
-    for ball_box in golden_ball_results:
-        confidence = box_confidence(ball_box)
-        if confidence > GOLF_BALL_CONFIDENCE_GATE:
-            ball = Ball(box_to_pos(ball_box), golden=True)
-            track.add_ball(ball)
-
 
 
 async def calculate_and_adjust(track, path_queue: multiprocessing.JoinableQueue, session: aiohttp.ClientSession):
@@ -122,13 +18,18 @@ async def calculate_and_adjust(track, path_queue: multiprocessing.JoinableQueue,
         print("Calculating path and adjusting speed")
 
     # Get the path to closest ball
+    start_time = 0.0
+    if DEBUG:
+        start_time = time.time()
     await track.calculate_path()
+    if DEBUG:
+        print(f"Got all paths in {time.time() - start_time} seconds!")
     # track.draw(True)
 
     if not track.path:
         if DEBUG:
             print("No node to travel to, setting speed to 0!")
-        await set_speeds(session, 0, 0)
+        await robot_api.set_speeds(session, 0, 0)
 
         # if not path_queue.full():
         #     try:
@@ -138,10 +39,11 @@ async def calculate_and_adjust(track, path_queue: multiprocessing.JoinableQueue,
         return
 
     # Get the node to go to
-    if await check_new_path(track, path_queue) and last_target_path and isinstance(last_target_path, list):
+    if await path_algorithm.check_new_path(path_queue) and track.last_target_path and \
+            isinstance(track.last_target_path, list):
         # Tell the robot to drive towards the node
         # await drive_to_coordinates(next_node.node, session)
-        await adjust_speed_using_pid(track, last_target_path[0].node, session)
+        await driving_algorithm.adjust_speed_using_pid(track, track.last_target_path[0].node, session)
     else:
         print("No node")
 
@@ -161,277 +63,7 @@ async def calculate_and_adjust(track, path_queue: multiprocessing.JoinableQueue,
     #     print("Done calculating path and adjusting speed")
 
 
-async def simplify_path(path: List[NodeData]) -> List[NodeData]:
-    """
-    Summarizes/simplifies a path of points/nodes into the least amount of points/nodes needed for a robot to traverse
-    the path.
-    
-    Args:
-        path (List[NodeData]): The path object containing the path to be summarized.
-    
-    Returns:
-        list: The summarized path as a list of NodeData objects.
-    """
-    new_path: List[NodeData] = []
-
-    # Check if the path is empty or contains only two points
-    if len(path) <= 1:
-        return []
-    elif len(path) == 2:
-        return path
-
-    # Add the first point as the initial target
-    new_path.append(path[0])
-    current_from_node = path[0]
-
-    # Current heading diff
-    last_direction_diff = 0.0
-    for i in range(1, len(path)-1):
-        previous_node = path[i-1]
-        current_node = path[i]
-
-        # Check forward a bit to see if it's the same line
-        same_path = True
-        for j in range(i+1, i+4):
-            # If last node stop
-            if j == len(path)-2:
-                break
-
-            # Get j'th next node
-            next_node = path[j]
-
-            # If previous node is current from node, skip
-            if previous_node == current_from_node:
-                same_path = True
-                continue
-
-            # If on same line, ie. x and y
-            if math_helpers.is_on_same_line(current_from_node.node.get_position(), current_node.node.get_position()):
-                same_path = True
-                continue
-
-            if DEBUG:
-                print(f"Checking {current_node.node.get_position()}")
-
-            # If same direction
-            direction_diff = math_helpers.calculate_direction_difference(
-                current_from_node.node.get_position(), previous_node.node.get_position(), next_node.node.get_position()
-            )
-
-            # Check if the direction difference is within the tolerance
-            if direction_diff <= math.radians(15):  # 15 degrees tolerance
-                same_path = True
-                continue
-
-            # Check if direction diff is same as last
-            if abs(direction_diff - last_direction_diff) <= math.radians(2):
-                last_direction_diff = direction_diff
-                same_path = True
-                continue
-            last_direction_diff = direction_diff
-
-            same_path = False
-
-        if not same_path:
-            # Add the current point to the new path
-            new_path.append(current_node)
-            current_from_node = current_node
-
-    # Add the last point to the new path
-    new_path.append(path[-1])
-    return new_path
-
-
-async def check_new_path(track: Track, path_queue: multiprocessing.JoinableQueue) -> bool:
-    global last_target_path, integral, previous_error, last_target_node
-    if DEBUG:
-        print(
-            f"current last target path: {[(nodedata.node.x, nodedata.node.y) for nodedata in last_target_path] if last_target_path else []}\n"
-            f"new path target: {(track.path[-1].node.x, track.path[-1].node.y) if track.path else []}")
-    # If not set already, set and reset
-    # Check if the new path target is different than before
-    if last_target_path and isinstance(last_target_path, list) and not is_target_different(track,
-                                                                                           last_target_path[-1].node,
-                                                                                           track.path[-1].node):
-        if DEBUG:
-            print("No change in target, keeping current path.")
-
-            # If robot is at target, pop
-            if not is_target_different(track, last_target_path[0].node, track.graph.get_node(track.robot_pos)):
-                if DEBUG:
-                    print("Robot reached target, popping")
-                last_target_path.pop(0)
-                last_target_node = track.graph.get_node(track.robot_pos)
-            # If we passed the target, pop
-            has_passed_result = has_passed_target(last_target_path[0].node, track.graph.get_node(track.robot_pos),
-                                                  last_target_node)
-            if has_passed_result:
-                if DEBUG:
-                    print("Robot passed target, popping")
-                last_target_path.pop(0)
-                last_target_node = track.graph.get_node(track.robot_pos)
-            elif has_passed_result is None:
-                if DEBUG:
-                    print("Robot went completely wrong way?!?? Removing path!")
-                last_target_node = None
-                last_target_path = None
-                # if not path_queue.full():
-                #     try:
-                #         path_queue.put([])
-                #     except:
-                #         pass
-
-            if DEBUG:
-                print(
-                    f"Current optimized path: {[(nodedata.node.x, nodedata.node.y) for nodedata in last_target_path]}")
-            if last_target_path:
-                # Call adjust to adjust for error, and to clear point from list if we reach the target
-                return True
-            else:
-                # if not path_queue.full():
-                #     try:
-                #         path_queue.put([])
-                #     except:
-                #         pass
-                pass
-    if DEBUG:
-        print("New target, making new path")
-
-    if track.path[0].node.x == 0 and track.path[0].node.y == 0:
-        if DEBUG:
-            print("Robot pos is 0,0, not making new path")
-            return False
-
-    integral = 0
-    previous_error = 0
-
-    # "Summarize" path into good points for targets
-    last_target_path = await simplify_path(track.path)
-    if DEBUG:
-        print(f"Current target optimized path: {[(nodedata.node.x, nodedata.node.y) for nodedata in last_target_path]}")
-
-    # Adjust and go to
-    if last_target_path:
-        full_path = [nodedata.node.get_position() for nodedata in last_target_path]
-
-        if not path_queue.full():
-            try:
-                path_queue.put({"path": full_path if full_path else [], "obstacles": [obstacle.points for obstacle in
-                                                                                      track.obstacles] if track.obstacles else [],
-                                "small_goal": track.small_goal.points if track.small_goal else [],
-                                "big_goal": track.big_goal.points if track.big_goal else []})
-            except:
-                pass
-        last_target_node = last_target_path[-1].node
-        return True
-
-
-# Inspired by https://en.wikipedia.org/wiki/PID_controller and
-# https://www.sciencedirect.com/science/article/pii/S0967066101000661
-async def adjust_speed_using_pid(track: Track, target_node: Node, session: aiohttp.ClientSession):
-    # Get current robot position
-    current_position = track.robot_pos
-
-    if (current_position[0] == 0 and current_position[1] == 0) or not target_node:
-        if DEBUG:
-            print("Current position is (0,0), stopping speed adjustment")
-        return
-
-    # Calculate target heading to the next path point
-    target_heading = target_node.get_heading(current_position)
-
-    # Get the current heading
-    current_heading = track.robot_direction
-
-    # Calculate heading error
-    error = target_heading - current_heading
-
-    # Adjust error to be within -pi to pi range
-    if error > math.pi:
-        error -= 2 * math.pi
-    elif error < -math.pi:
-        error += 2 * math.pi
-
-    # Reset integral and previous error if target position is very different
-    global integral, previous_error, KI
-    # if last_target_node and is_target_different(track, target_node, last_target_node):
-    #     integral = 0
-    #     previous_error = 0
-
-    # Update integral term
-    integral += error
-
-    # Anti-windup - Limit the integral term
-    integral = max(min(integral, 100), -100)
-
-    # Update derivative term
-    derivative = error - previous_error
-
-    # DEBUG Testing of finding good variables
-    KI += 0.0001
-    print(f"=============================================================\n"
-          f"USING A KI VALUE OF {KI}\n"
-          f"=============================================================")
-
-    # Calculate PID output
-    output = KP * error + KI * integral + KD * derivative
-
-    if DEBUG:
-        print(f"PID Output:\n"
-              f"- Output: {output}\n"
-              f"- Error: {error} (previous error {previous_error}) - Pi: {KP}\n"
-              f"- Integral: {integral} - KI: {KI}\n"
-              f"- Derivative: {derivative} - KD: {KD}")
-
-    # Update previous error
-    previous_error = error
-
-    # Calculate wheel speeds based on PID output
-    # speed_left = (2 * output * DIST_BETWEEN_WHEELS + error) / (2 * WHEEL_RADIUS)
-    # speed_right = (2 * output * DIST_BETWEEN_WHEELS - error) / (2 * WHEEL_RADIUS)
-    speed_left = max(min(-output + ROBOT_BASE_SPEED, 100), -100)
-    speed_right = max(min(output + ROBOT_BASE_SPEED, 100), -100)
-
-    if DEBUG:
-        print(f"Speed: L:{speed_left} R:{speed_right}")
-
-    # Set motor speeds
-    await set_speeds(session, speed_left, speed_right)
-
-    # Update last target node
-    # last_target_node = target_node
-
-
-def is_target_different(track: Track, target_node: Node, other_node: Node) -> bool:
-    # Define a threshold for difference based on your requirements
-    # Assume a difference of 1.0 cm is significant, we use pixels though, so it depends on the distance and camera
-    position_threshold = 30.0
-
-    # Calculate the position difference
-    position_diff = math_helpers.calculate_distance(target_node.get_position(), other_node.get_position())
-    # Calculate the direction difference
-    direction_diff = abs(target_node.get_heading(track.robot_pos) - other_node.get_heading(track.robot_pos))
-
-    # Check if target is significantly different from the last target
-    if position_diff > position_threshold or direction_diff > math.pi / 4:
-        if DEBUG:
-            print(
-                f"Different target: posdiff = {position_diff} > {position_threshold} | headdiff = {direction_diff} > {math.pi / 4}")
-        return True
-
-    return False
-
-
-def has_passed_target(target_node: Node, current_node: Node, from_node: Node):
-    length_to_obtain = math_helpers.calculate_distance(target_node.get_position(), from_node.get_position())
-    current_length = math_helpers.calculate_distance(target_node.get_position(), current_node.get_position())
-    position_threshold = 10
-    if current_length - length_to_obtain >= position_threshold:
-        return True
-    return False
-
-
-async def do_race_iteration(track: Track, ai_queue: multiprocessing.JoinableQueue,
+async def do_race_iteration(track: path_algorithm.Track, ai_queue: multiprocessing.JoinableQueue,
                             path_queue: multiprocessing.JoinableQueue, session: aiohttp.ClientSession):
     try:
         # Get results from AI
@@ -443,19 +75,19 @@ async def do_race_iteration(track: Track, ai_queue: multiprocessing.JoinableQueu
             return
 
         ai_results = ai_queue.get_nowait()
-        if DEBUG:
-            print("Got results from AI!")
+        # if DEBUG:
+        #     print("Got results from AI!")
 
         # if DEBUG:
         #     # Get robot status
         #     get_robot_status()
 
         # Parse the results
-        robot_results, golf_ball_results, golden_ball_results = await parse_ai_results(ai_results)
+        robot_results, golf_ball_results, golden_ball_results = await robot_ai.parse_ai_results(ai_results)
 
         # Update robot and balls
-        await update_robot_from_ai_result(track, robot_results, session)
-        await update_balls_from_ai_result(track, golf_ball_results, golden_ball_results)
+        await robot_ai.update_robot_from_ai_result(track, robot_results, session)
+        await robot_ai.update_balls_from_ai_result(track, golf_ball_results, golden_ball_results)
 
         # Calculate track path and give the robot directions
         await calculate_and_adjust(track, path_queue, session)
@@ -471,8 +103,8 @@ async def do_race_iteration(track: Track, ai_queue: multiprocessing.JoinableQueu
         pass
 
 
-async def race(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue, track: Track,
-               session: aiohttp.ClientSession) -> None:
+async def race(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue,
+               track: path_algorithm.Track, session: aiohttp.ClientSession) -> None:
     if DEBUG:
         print("Getting initial AI result.")
     while True:
@@ -495,7 +127,7 @@ async def race(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocess
     time_taken = 0
 
     print("Toggling fans!")
-    await toggle_fans(session)
+    await robot_api.toggle_fans(session)
 
     print("Racing!")
     while time_taken <= 8 * 60:
@@ -507,6 +139,8 @@ async def race(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocess
 
 
 async def main(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue, track):
+    # Update TRACK_GLOBAL in path algorithm since we just joined an async loop
+    path_algorithm.TRACK_GLOBAL = track
     print("Running main...")
     try:
         async with aiohttp.ClientSession() as session:
@@ -515,7 +149,7 @@ async def main(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocess
             while True:
                 try:
                     # Start robot
-                    await set_robot_start(session)
+                    await robot_api.set_robot_start(session)
                     break
                 except Exception as e:
                     print(f"Failed to start robot with exception {e}.\nRetrying in 5 seconds...")
@@ -524,7 +158,7 @@ async def main(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocess
             # Do the race
             await race(ai_queue, path_queue, track, session)
     except KeyboardInterrupt:
-        set_robot_stop()
+        robot_api.set_robot_stop()
         raise KeyboardInterrupt()
     except ConnectionError:
         print("Failed to connect to robot. Is the API on?")
@@ -535,7 +169,7 @@ def main_entrypoint(ai_queue: multiprocessing.JoinableQueue, path_queue: multipr
 
     # Setup the track
     print("Setting up track...")
-    track = setup_track()
+    track = track_setup.setup_track()
     ai_queue.put("Done!")
 
     # Run main task in async
@@ -558,7 +192,7 @@ if __name__ == '__main__':
 
         # Create a process for both the AI producer and the main consumer.
         # Run the AI as the "main thread" and the consumer in the background.
-        ai_producer = multiprocessing.Process(target=run_ai, args=(ai_queue, path_queue))
+        ai_producer = multiprocessing.Process(target=robot_ai.start_ai, args=(ai_queue, path_queue))
         main_consumer = multiprocessing.Process(target=main_entrypoint, args=(ai_queue, path_queue), daemon=True)
 
         # First we start the consumer, since it needs to initialize the track
@@ -586,4 +220,4 @@ if __name__ == '__main__':
             print("[main] AI producer joined!? Stopping race!")
     except KeyboardInterrupt:
         pass
-    set_robot_stop()
+    robot_api.set_robot_stop()

@@ -38,6 +38,12 @@ class Robot:
         self.stopped = False
         self.busy = False
 
+    def refresh_conn(self):
+        reset_conn()
+        self.motors = get_motors()
+        self.fan_motor = get_fan_motor()
+        self.buttons = get_button()
+
     def forward(self) -> bool:
         try:
             if not self.stopped and not self.busy:
@@ -46,7 +52,7 @@ class Robot:
                                right_speed=SpeedPercent(DRIVE_SPEED))
                 return True
         except (EOFError, ReferenceError):
-            reset_conn()
+            self.refresh_conn()
         return False
 
     def backwards(self) -> bool:
@@ -57,7 +63,7 @@ class Robot:
                                right_speed=SpeedPercent(-DRIVE_SPEED))
                 return True
         except (EOFError, ReferenceError):
-            reset_conn()
+            self.refresh_conn()
         return False
 
     def turn_left(self, radians=None, busy_override=False) -> bool:
@@ -74,7 +80,7 @@ class Robot:
                                    right_speed=SpeedPercent(TURN_SPEED))
                 return True
         except (EOFError, ReferenceError):
-            reset_conn()
+            self.refresh_conn()
         return False
 
     def turn_right(self, radians=None, busy_override=False) -> bool:
@@ -94,7 +100,7 @@ class Robot:
                                    right_speed=SpeedPercent(-TURN_SPEED))
                 return True
         except (EOFError, ReferenceError):
-            reset_conn()
+            self.refresh_conn()
         return False
 
     def toggle_fans(self) -> bool:
@@ -106,7 +112,7 @@ class Robot:
             self.fan_state = not self.fan_state
             return True
         except (EOFError, ReferenceError):
-            reset_conn()
+            self.refresh_conn()
         return False
 
     # This function is blocking!
@@ -147,7 +153,7 @@ class Robot:
             self.busy = False
             return True
         except (EOFError, ReferenceError):
-            reset_conn()
+            self.refresh_conn()
         return False
 
     def set_speed(self, left_speed, right_speed) -> bool:
@@ -160,7 +166,7 @@ class Robot:
                 self.motors.right_motor.run_direct(duty_cycle_sp=right_speed)
                 return True
         except (EOFError, ReferenceError):
-            reset_conn()
+            self.refresh_conn()
         return False
 
     def drive(self, pos: tuple) -> bool:
@@ -183,7 +189,7 @@ class Robot:
                 self.forward()
                 return True
         except (EOFError, ReferenceError):
-            reset_conn()
+            self.refresh_conn()
         return False
 
     def stop(self, tries=0) -> bool:
@@ -196,7 +202,7 @@ class Robot:
                     self.toggle_fans()
                 return True
             except (EOFError, ReferenceError):
-                reset_conn()
+                self.refresh_conn()
                 # keep trying pls, I don't care if it's recursive
                 self.stop(tries=tries+1)
         return False
@@ -241,7 +247,7 @@ def setup(tries=0) -> None:
 
 
 def reset_conn(tries=0):
-    global conn, ev3_motor, ev3_button
+    global conn, ev3_motor, ev3_button, ROBOT_GLOBAL
     try:
         print("Trying to reconnect to robot...")
         conn = rpyc.classic.connect(IP_ADDRESS)
@@ -262,6 +268,25 @@ def reset_conn(tries=0):
     return conn, ev3_motor, ev3_button
 
 
+def get_button() -> Optional[Button]:
+    if not conn or not ev3_button:
+        return None
+    return ev3_button.Button()  # Any buton on the robot
+
+
+def get_motors() -> Optional[MoveTank]:
+    if not conn or not ev3_motor:
+        return None
+    return ev3_motor.MoveTank(left_motor_port=ev3_motor.OUTPUT_A,
+                              right_motor_port=ev3_motor.OUTPUT_D)  # Motor on output port A and D
+
+
+def get_fan_motor() -> Optional[Motor]:
+    if not conn or not ev3_motor:
+        return None
+    return ev3_motor.Motor(ev3_motor.OUTPUT_C)
+
+
 def get_robot(current_pos: tuple = (0, 0), tries=0) -> Optional[Robot]:
     global conn, ev3_motor, ev3_button
     if not conn:
@@ -270,9 +295,8 @@ def get_robot(current_pos: tuple = (0, 0), tries=0) -> Optional[Robot]:
         return None
 
     # The motors and other things on the robot
-    buttons = ev3_button.Button()  # Any buton on the robot
-    motors = ev3_motor.MoveTank(left_motor_port=ev3_motor.OUTPUT_A,
-                                right_motor_port=ev3_motor.OUTPUT_D)  # Motor on output port A and D
-    fan_motor = ev3_motor.Motor(ev3_motor.OUTPUT_C)
+    buttons = get_button()
+    motors = get_motors()
+    fan_motor = get_fan_motor()
 
     return Robot(buttons, motors, fan_motor, current_pos)

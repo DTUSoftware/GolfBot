@@ -2,8 +2,8 @@ import datetime
 import json
 import os
 import cv2
-import drive_algorithm as drivealg
-from Utils.opencv_helpers import draw_object
+from client.Utils import path_algorithm as pathalg
+from client.Utils import opencv_helpers
 
 VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 1))
 TRACK_PRESET = os.environ.get('TRACK_PRESET', "track.json")
@@ -47,7 +47,7 @@ def setup_track_mouse_input(event, x, y, flags, param):
         draw_path.append((x, y))
 
 
-def setup_track() -> drivealg.Track:
+def setup_track() -> pathalg.Track:
     # Setup OpenCV window and mouse callback
     cv2.namedWindow("Track Setup")
     cv2.setMouseCallback("Track Setup", setup_track_mouse_input)
@@ -97,11 +97,11 @@ def setup_track() -> drivealg.Track:
         # Draw past objects
         if objects:
             for obj in objects:
-                draw_object(frame, obj["object_type"], obj["path"])
+                opencv_helpers.draw_object(frame, obj["object_type"], obj["path"])
 
         # Draw on track if adding objects
         if track_setup_mode and draw_path:
-            draw_object(frame, track_setup_mode, draw_path)
+            opencv_helpers.draw_object(frame, track_setup_mode, draw_path)
 
         cv2.imshow('Track Setup', frame)
 
@@ -152,7 +152,7 @@ def setup_track() -> drivealg.Track:
         save_preset(datetime.datetime.now().strftime("%Y%m%d%H%M%S"))
 
     # Setup the track / driving algorithm with given parameters
-    track = drivealg.setup({"x": width, "y": height})
+    track = pathalg.setup({"x": width, "y": height})
 
     # Add objects
     for obj in objects:
@@ -161,13 +161,13 @@ def setup_track() -> drivealg.Track:
             # print(f"Adding obstacle path {obj['path']} to track")
             nodes_in_path = track.graph.get_nodes_in_path(obj["path"])
             # print(f"Nodes in obstacle path: {[(node.x, node.y) for node in nodes_in_path]}")
-            obstacle = drivealg.Obstacle(nodes_in_path, obj["path"])
+            obstacle = pathalg.Obstacle(nodes_in_path, obj["path"])
             track.add_obstacle(obstacle)
         elif object_type == "small_goal":
-            goal = drivealg.Goal(track.graph.get_nodes_in_path(obj["path"]), obj["path"], small=True)
+            goal = pathalg.Goal(track.graph.get_nodes_in_path(obj["path"]), obj["path"], small=True)
             track.add_goal(goal)
         elif object_type == "big_goal":
-            goal = drivealg.Goal(track.graph.get_nodes_in_path(obj["path"]), obj["path"], small=False)
+            goal = pathalg.Goal(track.graph.get_nodes_in_path(obj["path"]), obj["path"], small=False)
             track.add_goal(goal)
 
     return track
