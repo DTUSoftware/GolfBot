@@ -1,6 +1,7 @@
+import aiohttp
 import math
 import os
-import aiohttp
+from typing import Tuple
 
 from client.Utils import math_helpers, path_algorithm
 from client.Services import robot_api
@@ -13,6 +14,10 @@ KP = float(os.environ.get('PID_KP', 5))  # Proportional gain  3.04
 KI = float(os.environ.get('PID_KI', 0.1))  # Integral gain - 0.1
 KD = float(os.environ.get('PID_KD', 0.05))  # Derivative gain - 0.05
 
+# Robot tolerance
+DISTANCE_TOLERANCE = float(os.environ.get('DISTANCE_TOLERANCE', 10.0))
+DIRECTION_TOLERANCE = float(os.environ.get('DIRECTION_TOLERANCE', 5.0))  # degrees
+
 # Robot parameters
 WHEEL_RADIUS = (float(os.environ.get('WHEEL_DIAMETER', 68.8)) / 2) / 10  # Radius of the robot's wheels in cm
 DIST_BETWEEN_WHEELS = float(
@@ -24,16 +29,36 @@ integral = 0
 previous_error = 0
 
 
-def drive_decision(robot_position: tuple[int, int], robot_direction: float, target_position: tuple[int, int]):
-    new_direction = math_helpers.calculate_direction(position1=robot_position, position2=target_position)
+async def drive_decision(robot_position: Tuple[int, int], robot_direction: float, target_position: Tuple[int, int],
+                         session: aiohttp.ClientSession) -> None:
+    """
+    The main decision-tree model for the driving of the robot.
+
+    :param robot_position: The robot's current position.
+    :param robot_direction: The robot's current direction.
+    :param target_position: The target position of the robot.
+    :return: None
+    """
+
+    # If robot position is invalid, return
+    if robot_position == (0, 0):
+        return
+
+    # Get the distance between the two targets
     distance = math_helpers.calculate_distance(position1=robot_position, position2=target_position)
-    # maybe make som kind of tolerance
-    if abs(robot_direction - new_direction) > 0:
-        # turn robot-
-        pass
-    if distance > 0:
-        # robot, drive distance
-        pass
+
+    # If the distance is above distance tolerance
+    if distance >= DISTANCE_TOLERANCE:
+        # Get difference in direction, if any
+        new_direction = math_helpers.calculate_direction(position1=robot_position, position2=target_position)
+
+        # Turn if needed
+        if abs(robot_direction - new_direction) >= math.radians(DIRECTION_TOLERANCE):
+            # turn robot-
+            pass
+
+        # Drive forward with base speed
+        await robot_api.set_speeds(session, ROBOT_BASE_SPEED, ROBOT_BASE_SPEED)
 
 
 async def adjust_speed_using_pid(track: path_algorithm.Track, target_node: path_algorithm.Node, session: aiohttp.ClientSession):
