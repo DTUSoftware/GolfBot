@@ -4,7 +4,7 @@ import torch
 from ultralytics import YOLO
 
 PRETRAINED_MODEL = os.environ.get("PRETRAINED_MODEL", "yolov8n.pt")
-DATA = os.environ.get("DATA", "datasets/RoboFlow0608-1")
+DATA = os.environ.get("DATA", "datasets/RoboFlow0608-2-smol")
 EPOCHS = int(os.environ.get("EPOCHS", 750))
 IMGSZ = int(os.environ.get("IMGSZ", 640))  # needs to be a multiple of 32
 
