@@ -1,11 +1,8 @@
 import math
 import os
-
 import aiohttp
 
-from client.Utils.math_helpers import calculate_direction, calculate_distance
-from client.Utils.path_algorithm import Track, Node
-
+from client.Utils import math_helpers, path_algorithm
 from client.Services import robot_api
 
 DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "False").lower()
@@ -27,7 +24,19 @@ integral = 0
 previous_error = 0
 
 
-async def adjust_speed_using_pid(track: Track, target_node: Node, session: aiohttp.ClientSession):
+def drive_decision(robot_position: tuple[int, int], robot_direction: float, target_position: tuple[int, int]):
+    new_direction = math_helpers.calculate_direction(position1=robot_position, position2=target_position)
+    distance = math_helpers.calculate_distance(position1=robot_position, position2=target_position)
+    # maybe make som kind of tolerance
+    if abs(robot_direction - new_direction) > 0:
+        # turn robot-
+        pass
+    if distance > 0:
+        # robot, drive distance
+        pass
+
+
+async def adjust_speed_using_pid(track: path_algorithm.Track, target_node: path_algorithm.Node, session: aiohttp.ClientSession):
     """
     An experimental PID controller for the robot.
     Inspired by https://en.wikipedia.org/wiki/PID_controller and
@@ -106,15 +115,3 @@ async def adjust_speed_using_pid(track: Track, target_node: Node, session: aioht
 
     # Set motor speeds
     await robot_api.set_speeds(session, speed_left, speed_right)
-
-
-def drive_decision(robot_position: tuple[int, int], robot_direction: float, target_position: tuple[int, int]):
-    new_direction = calculate_direction(position1=robot_position, position2=target_position)
-    distance = calculate_distance(position1=robot_position, position2=target_position)
-    # maybe make som kind of tolerance
-    if abs(robot_direction - new_direction) > 0:
-        # turn robot-
-        pass
-    if distance > 0:
-        # robot, drive distance
-        pass
