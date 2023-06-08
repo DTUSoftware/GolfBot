@@ -38,11 +38,31 @@ async def set_robot_position(session: aiohttp.ClientSession, x: int, y: int):
             await asyncio.sleep(1)
 
 
+async def set_robot_direction(session: aiohttp.ClientSession, direction: float):
+    """
+    Turns the robot.
+    THIS CALL IS BLOCKING UNTIL THE ROBOT HAS FULLY TURNED!
+    :param session:  the session
+    :param direction: the wanted direction
+    :return: None
+    """
+    async with session.post(f"{ROBOT_API_ENDPOINT}/turn?radians={direction}") as response:
+        print(await response.text())
+        if response.status != 200:
+            print(response.status)
+        else:
+            # Let the robot drive a lil' bit
+            await asyncio.sleep(0.5)
+
+
 async def set_speeds(session: aiohttp.ClientSession, speed_left, speed_right):
     async with session.post(
             f"{ROBOT_API_ENDPOINT}/drive?speed_left={speed_left}&speed_right={speed_right}") as response:
         if response.status != 200:
             print(f"Error on adjusting speed: {response.status}")
+        else:
+            # Let the robot drive a lil' bit
+            await asyncio.sleep(1)
 
 
 async def toggle_fans(session: aiohttp.ClientSession):

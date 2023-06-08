@@ -1,18 +1,21 @@
 import logging
 import os
+from threading import Event
+
 import cv2
 import torch
 from ultralytics import YOLO
 from client.Utils.opencv_helpers import draw_object
 
 VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 1))
-CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/20230601_2")
+CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/20230608-kindaworks")
 DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "True").lower()
 DEBUG = ("true" in os.environ.get('DEBUG', "True").lower()) and not DISABLE_LOGGING
 
 
 # To be run as a thread
-def run_ai(camera_queue: torch.multiprocessing.JoinableQueue, path_queue: torch.multiprocessing.JoinableQueue):
+def run_ai(camera_queue: torch.multiprocessing.JoinableQueue, path_queue: torch.multiprocessing.JoinableQueue,
+           ai_event: Event):
     if DISABLE_LOGGING:
         # THIS DISABLES LOGGING FOR YOLO
         logging.getLogger("ultralytics").setLevel(logging.WARNING)
@@ -66,21 +69,27 @@ def run_ai(camera_queue: torch.multiprocessing.JoinableQueue, path_queue: torch.
 
         # results.share_memory()
 
-        if not camera_queue.full():
-            # Put everything in shared memory
-            shared_results = []
-            for result in results:
-                shared_results.append(result.cpu())
+        if ai_event.is_set():
+            if not camera_queue.full():
+                # Put everything in shared memory
+                shared_results = []
+                for result in results:
+                    shared_results.append(result.cpu())
 
-            try:
-                camera_queue.put_nowait(shared_results)
-            except Exception as e:
+                ai_event.clear()
+                try:
+                    camera_queue.put_nowait(shared_results)
+                except Exception as e:
+                    ai_event.set()  # set the flag back
+                    if DEBUG:
+                        print("[AI] Queue full, cannot store image")
+                        print(str(e))
+            else:
                 if DEBUG:
-                    print("[AI] Queue full, cannot store image")
-                    print(str(e))
+                    print("[AI] Queue full, will not store elements.")
         else:
             if DEBUG:
-                print("Queue full, will not store elements.")
+                print("[AI] Waiting for event to get set, will not store elements.")
 
         # Draw bounding boxes and labels on the image
         if DEBUG:

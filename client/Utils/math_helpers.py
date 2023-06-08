@@ -14,7 +14,8 @@ def calculate_direction(position1: Tuple[int, int], position2: Tuple[int, int]) 
         float: The heading in radians.
     """
     dx = position2[1] - position1[1]
-    dy = position2[0] - position1[0]
+    # We need the opposite of the y-axis, since we start from the top-left, and have a y-axis that goes downwards
+    dy = -position2[0] + position1[0]
     return math.atan2(dy, dx)
 
 

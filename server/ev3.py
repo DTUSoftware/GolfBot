@@ -13,7 +13,7 @@ TURN_SPEED = 20  # Speed in percent
 FAN_TOGGLE_SPEED = 100  # Speed in percent
 FULL_TURN_TIME = 1.2  # Time it takes to spin 360 degrees, in seconds
 FAN_MOTOR_DEGREES = 80  # Degrees for turning fans off and on (off, on)
-ROBOT_TURN_RATIO = 2
+ROBOT_TURN_RATIO = 2.2
 IP_ADDRESS = os.environ.get('ROBOT_IP_ADDRESS', "192.168.1.240")  # The IP of the robot
 
 # Connect to the robot and get modules
@@ -31,7 +31,6 @@ class Robot:
         self.buttons = buttons
         self.fan_motor = fan_motor
         self.motors = motors
-        self.pos_history = []
         self.current_pos = current_pos
         self.direction = 0.0
         self.fan_state = False
@@ -46,7 +45,7 @@ class Robot:
 
     def forward(self) -> bool:
         try:
-            if not self.stopped and not self.busy:
+            if not self.stopped and not self.busy and self.motors:
                 print("going forwards")
                 self.motors.on(left_speed=SpeedPercent(DRIVE_SPEED),
                                right_speed=SpeedPercent(DRIVE_SPEED))
@@ -57,7 +56,7 @@ class Robot:
 
     def backwards(self) -> bool:
         try:
-            if not self.stopped and not self.busy:
+            if not self.stopped and not self.busy and self.motors:
                 print("going backwards")
                 self.motors.on(left_speed=SpeedPercent(-DRIVE_SPEED),
                                right_speed=SpeedPercent(-DRIVE_SPEED))
@@ -68,14 +67,14 @@ class Robot:
 
     def turn_left(self, radians=None, busy_override=False) -> bool:
         try:
-            if not self.stopped and (not self.busy or busy_override):
-                print("turning left")
+            if not self.stopped and (not self.busy or busy_override) and self.motors:
                 if radians:
-                    print("degrees: " + str(math.degrees(radians)))
+                    print("Turning wheel left " + str(math.degrees(radians)) + " deg (" + str(radians) + " rad) - with turn ratio!")
                     self.motors.on_for_degrees(left_speed=SpeedPercent(-TURN_SPEED),
                                                right_speed=SpeedPercent(TURN_SPEED),
                                                degrees=math.degrees(radians))
                 else:
+                    print("Turning wheel left (till told otherwise)")
                     self.motors.on(left_speed=SpeedPercent(-TURN_SPEED),
                                    right_speed=SpeedPercent(TURN_SPEED))
                 return True
@@ -85,10 +84,9 @@ class Robot:
 
     def turn_right(self, radians=None, busy_override=False) -> bool:
         try:
-            if not self.stopped and (not self.busy or busy_override):
-                print("turning right")
+            if not self.stopped and (not self.busy or busy_override) and self.motors:
                 if radians:
-                    print("degrees: " + str(math.degrees(radians)))
+                    print("Turning wheel right " + str(math.degrees(radians)) + " deg (" + str(radians) + " rad) - with turn ratio!")
                     self.motors.on_for_degrees(left_speed=SpeedPercent(TURN_SPEED),
                                                right_speed=SpeedPercent(-TURN_SPEED),
                                                degrees=math.degrees(radians))
@@ -96,6 +94,7 @@ class Robot:
                     # self.motors.left_motor.run_to_rel_pos(position_sp=-math.degrees(radians), speed_sp=ev3_motor.SpeedPercent(TURN_SPEED))
                     # self.motors.wait_until_not_moving()
                 else:
+                    print("Turning wheel right (till told otherwise)")
                     self.motors.on(left_speed=SpeedPercent(TURN_SPEED),
                                    right_speed=SpeedPercent(-TURN_SPEED))
                 return True
@@ -105,6 +104,8 @@ class Robot:
 
     def toggle_fans(self) -> bool:
         try:
+            if not self.fan_motor:
+                return False
             if self.fan_state:
                 self.fan_motor.on_for_degrees(speed=SpeedPercent(FAN_TOGGLE_SPEED), degrees=FAN_MOTOR_DEGREES)
             else:
@@ -126,39 +127,40 @@ class Robot:
             diff_in_angle = 0
 
             direction = direction % (2 * math.pi)
-            print("direction: " + str(direction))
-            print("self.direction: " + str(self.direction))
+            print("Turning to direction: " + str(math.degrees(direction)) + " deg (" + str(direction) + " rad)\n" +
+                  "Current direction is " + str(math.degrees(self.direction)) + " deg (" + str(self.direction) + " deg)")
 
+            status = False
             if self.direction < direction:
                 if (direction - self.direction) > math.pi:
                     # diff_in_angle = abs(direction - self.direction)
                     diff_in_angle = abs((direction - 2 * math.pi) - self.direction)
-                    self.turn_left(diff_in_angle * ROBOT_TURN_RATIO, busy_override=True)
+                    status = self.turn_left(diff_in_angle * ROBOT_TURN_RATIO, busy_override=True)
                 else:
                     diff_in_angle = abs(direction - self.direction)
-                    self.turn_right(diff_in_angle * ROBOT_TURN_RATIO, busy_override=True)
+                    status = self.turn_right(diff_in_angle * ROBOT_TURN_RATIO, busy_override=True)
             else:
                 if (self.direction - direction) > math.pi:
                     # diff_in_angle = abs(self.direction - direction)
                     diff_in_angle = abs((self.direction - 2 * math.pi) - direction)
-                    self.turn_right(diff_in_angle * ROBOT_TURN_RATIO, busy_override=True)
+                    status = self.turn_right(diff_in_angle * ROBOT_TURN_RATIO, busy_override=True)
                 else:
                     diff_in_angle = abs(self.direction - direction)
-                    self.turn_left(diff_in_angle * ROBOT_TURN_RATIO, busy_override=True)
+                    status = self.turn_left(diff_in_angle * ROBOT_TURN_RATIO, busy_override=True)
 
             # Update the direction
-            print("diff: " + str(diff_in_angle))
+            print("Diff in angle from current was (without ratio): " + str(math.degrees(diff_in_angle)) + " deg (" + str(diff_in_angle) + " rad)")
             self.direction = direction
 
             self.busy = False
-            return True
+            return status
         except (EOFError, ReferenceError):
             self.refresh_conn()
         return False
 
     def set_speed(self, left_speed, right_speed) -> bool:
         try:
-            if not self.stopped and not self.busy:
+            if not self.stopped and not self.busy and self.motors:
                 print(str("Now driving with speed:\n" +
                           "- Left: " + str(left_speed) + "\n" +
                           "- Right: " + str(right_speed)))
@@ -183,11 +185,11 @@ class Robot:
                         "Robot has to be in direction " + str(
                             angle_to_node) + " to get to the next node, current direction is " + str(
                             self.direction) + " - turning...")
-                    self.turn_to_direction(angle_to_node)  # THIS CALL IS BLOCKING!
+                    if not self.turn_to_direction(angle_to_node):  # THIS CALL IS BLOCKING!
+                        return False
                     print("Done turning, driving to the node")
 
-                self.forward()
-                return True
+                return self.forward()
         except (EOFError, ReferenceError):
             self.refresh_conn()
         return False
@@ -201,7 +203,7 @@ class Robot:
                 if self.fan_state:
                     self.toggle_fans()
                 return True
-            except (EOFError, ReferenceError):
+            except:
                 self.refresh_conn()
                 # keep trying pls, I don't care if it's recursive
                 self.stop(tries=tries+1)
@@ -214,16 +216,13 @@ class Robot:
         return False
 
     def set_position(self, pos: tuple) -> bool:
-        self.pos_history.append(pos)
-        self.current_pos = pos
-
         # Recalibrate the direction / angle
-        if len(self.pos_history) > 1:
-            last_pos = self.pos_history[-2]
-            new_angle = math.atan2(
-                self.current_pos[1] - last_pos[1], self.current_pos[0] - last_pos[0])
-            # print("New robot direction: " + str(new_angle))
-            self.set_direction(new_angle)
+        dx = self.current_pos[1] - pos[1]
+        # We need the opposite of the y-axis, since we start from the top-left, and have a y-axis that goes downwards
+        dy = -self.current_pos[0] + pos[0]
+        self.set_direction(math.atan2(dy, dx))
+        # Update position
+        self.current_pos = pos
 
         return True
 
@@ -232,7 +231,9 @@ class Robot:
         return True
 
     def buttons_pressed(self) -> bool:
-        return self.buttons.any()
+        if self.buttons:
+            return self.buttons.any()
+        return False
 
 
 def debug(*args, **kwargs) -> None:
@@ -262,7 +263,7 @@ def reset_conn(tries=0):
 
     if not conn or not ev3_motor or not ev3_button:
         # Keep trying 10 times
-        if tries < 10:
+        if tries < 5:
             setup(tries + 1)
 
     return conn, ev3_motor, ev3_button
@@ -271,7 +272,7 @@ def reset_conn(tries=0):
 def get_button() -> Optional[Button]:
     if not conn or not ev3_button:
         return None
-    return ev3_button.Button()  # Any buton on the robot
+    return ev3_button.Button()  # Any button on the robot
 
 
 def get_motors() -> Optional[MoveTank]:
