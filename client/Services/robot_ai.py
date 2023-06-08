@@ -1,4 +1,6 @@
 import os
+from threading import Event
+
 import aiohttp
 from torch import multiprocessing
 
@@ -20,8 +22,8 @@ def box_to_pos(box) -> tuple:
     return int((x1 + x2) / 2), int((y1 + y2) / 2)
 
 
-def start_ai(camera_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue):
-    run_ai(camera_queue, path_queue)
+def start_ai(camera_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue, ai_event: Event):
+    run_ai(camera_queue, path_queue, ai_event)
 
 
 async def parse_ai_results(ai_results) -> tuple:

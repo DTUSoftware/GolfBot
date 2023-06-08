@@ -257,8 +257,8 @@ class Graph:
         while open_queue:
             iteration += 1
             if iteration % 500 == 0:
-                if DEBUG:
-                    print(f"Iteration: {iteration}")
+                # if DEBUG:
+                #     print(f"Iteration: {iteration}")
                 await asyncio.sleep(0)
 
             _, current_node = heapq.heappop(open_queue)
@@ -438,21 +438,21 @@ class Graph:
 
 class Track:
     def __init__(self, bounds: dict):
-        self.bounds = bounds
+        self.bounds: dict = bounds
         self.balls: List[Ball] = []
         self.obstacles: List[Obstacle] = []
         self.small_goal: Optional[Goal] = None
         self.big_goal: Optional[Goal] = None
-        self.robot_pos = (0, 0)
-        self.robot_direction = 0.0
+        self.robot_pos: tuple = (0, 0)
+        self.robot_direction: float = 0.0
         self.path: list = []
 
         self.last_target_path: List[NodeData] = []
         self.last_target_node: Optional[Node] = None
-        self.integral = 0.0
-        self.previous_error = 0.0
+        self.integral: float = 0.0
+        self.previous_error: float = 0.0
 
-        self.graph = Graph(bounds["x"], bounds["y"])
+        self.graph: Graph = Graph(bounds["x"], bounds["y"])
 
     def add_ball(self, ball: Ball) -> None:
         self.balls.append(ball)

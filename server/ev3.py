@@ -220,8 +220,10 @@ class Robot:
         # Recalibrate the direction / angle
         if len(self.pos_history) > 1:
             last_pos = self.pos_history[-2]
+            # We need the opposite of the y-axis, since we start from the top-left,
+            # and have a y-axis that goes downwards
             new_angle = math.atan2(
-                self.current_pos[1] - last_pos[1], self.current_pos[0] - last_pos[0])
+                -self.current_pos[1] + last_pos[1], self.current_pos[0] - last_pos[0])
             # print("New robot direction: " + str(new_angle))
             self.set_direction(new_angle)
 
@@ -262,7 +264,7 @@ def reset_conn(tries=0):
 
     if not conn or not ev3_motor or not ev3_button:
         # Keep trying 10 times
-        if tries < 10:
+        if tries < 5:
             setup(tries + 1)
 
     return conn, ev3_motor, ev3_button

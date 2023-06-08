@@ -3,6 +3,8 @@ import asyncio
 import os
 import time
 import traceback
+from threading import Event
+
 import aiohttp
 from torch import multiprocessing
 
@@ -13,7 +15,7 @@ DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "False").lower()
 DEBUG = ("true" in os.environ.get('DEBUG', "True").lower()) and not DISABLE_LOGGING
 
 
-async def calculate_and_adjust(track, path_queue: multiprocessing.JoinableQueue, session: aiohttp.ClientSession):
+async def calculate_and_adjust(track: path_algorithm.Track, path_queue: multiprocessing.JoinableQueue, session: aiohttp.ClientSession):
     if DEBUG:
         print("Calculating path and adjusting speed")
 
@@ -43,7 +45,10 @@ async def calculate_and_adjust(track, path_queue: multiprocessing.JoinableQueue,
             isinstance(track.last_target_path, list):
         # Tell the robot to drive towards the node
         # await drive_to_coordinates(next_node.node, session)
-        await driving_algorithm.adjust_speed_using_pid(track, track.last_target_path[0].node, session)
+        await driving_algorithm.drive_decision(robot_position=track.robot_pos, robot_direction=track.robot_direction,
+                                               target_position=track.last_target_path[0].node.get_position(),
+                                               session=session)
+        # await driving_algorithm.adjust_speed_using_pid(track, track.last_target_path[0].node, session)
     else:
         print("No node")
 
@@ -64,7 +69,7 @@ async def calculate_and_adjust(track, path_queue: multiprocessing.JoinableQueue,
 
 
 async def do_race_iteration(track: path_algorithm.Track, ai_queue: multiprocessing.JoinableQueue,
-                            path_queue: multiprocessing.JoinableQueue, session: aiohttp.ClientSession):
+                            path_queue: multiprocessing.JoinableQueue, ai_event: Event, session: aiohttp.ClientSession):
     try:
         # Get results from AI
         # if DEBUG:
@@ -96,6 +101,7 @@ async def do_race_iteration(track: path_algorithm.Track, ai_queue: multiprocessi
         # if DEBUG:
         #     print("Marked as done with event")
         ai_queue.task_done()
+        ai_event.set()
     except Exception as e:
         print("uh oh... - " + str(e))
         traceback.print_exc()
@@ -103,7 +109,7 @@ async def do_race_iteration(track: path_algorithm.Track, ai_queue: multiprocessi
         pass
 
 
-async def race(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue,
+async def race(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue, ai_event: Event,
                track: path_algorithm.Track, session: aiohttp.ClientSession) -> None:
     if DEBUG:
         print("Getting initial AI result.")
@@ -118,6 +124,7 @@ async def race(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocess
     if DEBUG:
         print("Got result, marking as ready.")
     ai_queue.task_done()
+    ai_event.set()
     if DEBUG:
         print("AI thread ready.")
 
@@ -131,14 +138,14 @@ async def race(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocess
 
     print("Racing!")
     while time_taken <= 8 * 60:
-        await do_race_iteration(track, ai_queue, path_queue, session)
+        await do_race_iteration(track, ai_queue, path_queue, ai_event, session)
         time_taken = time.time() - start_time
         # Never remove this sleep
         await asyncio.sleep(0)
     print("Done with race!")
 
 
-async def main(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue, track):
+async def main(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue, ai_event: Event, track):
     # Update TRACK_GLOBAL in path algorithm since we just joined an async loop
     path_algorithm.TRACK_GLOBAL = track
     print("Running main...")
@@ -156,7 +163,7 @@ async def main(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocess
                     await asyncio.sleep(5)
 
             # Do the race
-            await race(ai_queue, path_queue, track, session)
+            await race(ai_queue, path_queue, ai_event, track, session)
     except KeyboardInterrupt:
         robot_api.set_robot_stop()
         raise KeyboardInterrupt()
@@ -164,19 +171,19 @@ async def main(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocess
         print("Failed to connect to robot. Is the API on?")
 
 
-def main_entrypoint(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue):
+def main_entrypoint(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue, ai_event: Event):
     print("Running main entrypoint")
 
     # Setup the track
     print("Setting up track...")
     track = track_setup.setup_track()
-    ai_queue.put("Done!")
+    path_queue.put("Done!")
 
     # Run main task in async
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-    asyncio.run(main(ai_queue, path_queue, track))
+    asyncio.run(main(ai_queue, path_queue, ai_event, track))
 
 
 if __name__ == '__main__':
@@ -190,10 +197,14 @@ if __name__ == '__main__':
         ai_queue = multiprocessing.JoinableQueue(maxsize=1)
         path_queue = multiprocessing.JoinableQueue(maxsize=10)
 
+        ai_queue_event = multiprocessing.Event()
+        ai_queue_event.set()  # set it initially, we clear it when sending stuff through the queue
+
         # Create a process for both the AI producer and the main consumer.
         # Run the AI as the "main thread" and the consumer in the background.
-        ai_producer = multiprocessing.Process(target=robot_ai.start_ai, args=(ai_queue, path_queue))
-        main_consumer = multiprocessing.Process(target=main_entrypoint, args=(ai_queue, path_queue), daemon=True)
+        ai_producer = multiprocessing.Process(target=robot_ai.start_ai, args=(ai_queue, path_queue, ai_queue_event))
+        main_consumer = multiprocessing.Process(target=main_entrypoint, args=(ai_queue, path_queue, ai_queue_event),
+                                                daemon=True)
 
         # First we start the consumer, since it needs to initialize the track
         main_consumer.start()
@@ -201,8 +212,8 @@ if __name__ == '__main__':
         # Wait for the track to be initialized before starting the AI
         if DEBUG:
             print("[main] Waiting for track to be initialized...")
-        ai_queue.get()
-        ai_queue.task_done()
+        path_queue.get()
+        path_queue.task_done()
         if DEBUG:
             print("[main] Track initialized! Starting AI producer...")
 
