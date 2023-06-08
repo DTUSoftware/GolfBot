@@ -2,8 +2,8 @@ import datetime
 import json
 import os
 import cv2
-import path_algorithm as pathalg
-from opencv_helpers import draw_object
+from client.Utils import path_algorithm as pathalg
+from client.Utils import opencv_helpers
 
 VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 1))
 TRACK_PRESET = os.environ.get('TRACK_PRESET', "track.json")
@@ -97,11 +97,11 @@ def setup_track() -> pathalg.Track:
         # Draw past objects
         if objects:
             for obj in objects:
-                draw_object(frame, obj["object_type"], obj["path"])
+                opencv_helpers.draw_object(frame, obj["object_type"], obj["path"])
 
         # Draw on track if adding objects
         if track_setup_mode and draw_path:
-            draw_object(frame, track_setup_mode, draw_path)
+            opencv_helpers.draw_object(frame, track_setup_mode, draw_path)
 
         cv2.imshow('Track Setup', frame)
 

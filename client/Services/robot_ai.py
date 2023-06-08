@@ -2,7 +2,7 @@ import os
 import aiohttp
 from torch import multiprocessing
 
-import robot_api
+from client.Services import robot_api
 from client.Utils import path_algorithm
 from client.ai.main import run_ai
 

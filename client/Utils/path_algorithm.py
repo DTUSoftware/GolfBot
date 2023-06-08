@@ -11,7 +11,7 @@ from colorama import Style
 from colorama import init as colorama_init
 from torch import multiprocessing
 
-import math_helpers
+from client.Utils import math_helpers
 
 DEBUG = "true" in os.environ.get('DEBUG', "True").lower()
 TIMEOUT_GET_PATH = 5  # in seconds
@@ -677,6 +677,8 @@ async def check_new_path(path_queue: multiprocessing.JoinableQueue) -> bool:
     :return: True if we should drive, else False.
     """
     track = TRACK_GLOBAL
+    if not track:
+        return False
     # if DEBUG:
     #     print(
     #         f"current last target path: {[nodedata.node.get_position() for nodedata in last_target_path] if last_target_path else []}\n"

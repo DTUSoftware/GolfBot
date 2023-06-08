@@ -52,7 +52,7 @@ class Robot:
                                right_speed=SpeedPercent(DRIVE_SPEED))
                 return True
         except (EOFError, ReferenceError):
-            reset_conn()
+            self.refresh_conn()
         return False
 
     def backwards(self) -> bool:
@@ -63,7 +63,7 @@ class Robot:
                                right_speed=SpeedPercent(-DRIVE_SPEED))
                 return True
         except (EOFError, ReferenceError):
-            reset_conn()
+            self.refresh_conn()
         return False
 
     def turn_left(self, radians=None, busy_override=False) -> bool:
@@ -80,7 +80,7 @@ class Robot:
                                    right_speed=SpeedPercent(TURN_SPEED))
                 return True
         except (EOFError, ReferenceError):
-            reset_conn()
+            self.refresh_conn()
         return False
 
     def turn_right(self, radians=None, busy_override=False) -> bool:
@@ -100,7 +100,7 @@ class Robot:
                                    right_speed=SpeedPercent(-TURN_SPEED))
                 return True
         except (EOFError, ReferenceError):
-            reset_conn()
+            self.refresh_conn()
         return False
 
     def toggle_fans(self) -> bool:
@@ -112,7 +112,7 @@ class Robot:
             self.fan_state = not self.fan_state
             return True
         except (EOFError, ReferenceError):
-            reset_conn()
+            self.refresh_conn()
         return False
 
     # This function is blocking!
@@ -153,7 +153,7 @@ class Robot:
             self.busy = False
             return True
         except (EOFError, ReferenceError):
-            reset_conn()
+            self.refresh_conn()
         return False
 
     def set_speed(self, left_speed, right_speed) -> bool:
@@ -166,7 +166,7 @@ class Robot:
                 self.motors.right_motor.run_direct(duty_cycle_sp=right_speed)
                 return True
         except (EOFError, ReferenceError):
-            reset_conn()
+            self.refresh_conn()
         return False
 
     def drive(self, pos: tuple) -> bool:
@@ -189,7 +189,7 @@ class Robot:
                 self.forward()
                 return True
         except (EOFError, ReferenceError):
-            reset_conn()
+            self.refresh_conn()
         return False
 
     def stop(self, tries=0) -> bool:
@@ -202,7 +202,7 @@ class Robot:
                     self.toggle_fans()
                 return True
             except (EOFError, ReferenceError):
-                reset_conn()
+                self.refresh_conn()
                 # keep trying pls, I don't care if it's recursive
                 self.stop(tries=tries+1)
         return False

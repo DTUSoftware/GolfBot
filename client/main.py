@@ -139,6 +139,8 @@ async def race(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocess
 
 
 async def main(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue, track):
+    # Update TRACK_GLOBAL in path algorithm since we just joined an async loop
+    path_algorithm.TRACK_GLOBAL = track
     print("Running main...")
     try:
         async with aiohttp.ClientSession() as session:
