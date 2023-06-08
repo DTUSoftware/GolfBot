@@ -5,7 +5,7 @@ import os
 import random
 import time
 import traceback
-from typing import Optional, List
+from typing import List
 
 import aiohttp
 from torch import multiprocessing
@@ -114,7 +114,6 @@ async def update_balls_from_ai_result(track, golf_ball_results, golden_ball_resu
         if confidence > GOLF_BALL_CONFIDENCE_GATE:
             ball = Ball(box_to_pos(ball_box), golden=True)
             track.add_ball(ball)
-
 
 
 async def calculate_and_adjust(track, path_queue: multiprocessing.JoinableQueue, session: aiohttp.ClientSession):
