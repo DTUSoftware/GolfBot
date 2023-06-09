@@ -146,37 +146,53 @@ class Ball:
 
 
 class Obstacle:
-    def __init__(self, path: list, points: list = None) -> None:
+    def __init__(self, path: List[Node], points: Optional[List[Tuple[int, int]]] = None) -> None:
         """
         Initializes a new instance of the Obstacle class.
 
         Args:
             path (list): The path of the obstacle.
-            points (list, optional): Additional points of the obstacle.
+            points (list, optional): The points marking the corners of the obstacle. Used to draw the path.
 
         Returns:
             None
         """
-        self.path = path
-        self.points = points
+        self.path: List[Node] = path
+        self.points: Optional[List[Tuple[int, int]]] = points
+
+    def is_about_to_collide(self, position: Tuple[int, int], heading: float) -> bool:
+        """
+        Checks whether the robot is about to collide with the obstacle.
+        :param position: the position of the robot
+        :param heading: the heading of the robot
+        :return: True if the robot is about to collide with the obstacle, False otherwise
+        """
+        COLLOSION_DISTANCE = 10  # in units (pixels)
+        DIRECTION_DIFFERENCE = 0.1  # in radians
+        for node in self.path:
+            node_pos = node.get_position()
+            if math_helpers.calculate_distance(position, node_pos) < COLLOSION_DISTANCE:
+                if math_helpers.calculate_direction(position, node_pos) - heading < DIRECTION_DIFFERENCE:
+                    return True
+        return False
 
 
 class Goal:
-    def __init__(self, path: list, points: list = None, small=False) -> None:
+    def __init__(self, path: List[Node], points: Optional[List[Tuple[int, int]]] = None, small=False) -> None:
         """
         Initializes a new instance of the Goal class.
 
         Args:
             path (list): The path of the goal.
-            points (list, optional): Additional points of the goal.
+            points (list, optional): The points marking the corners of the goal. Used to draw the path.
             small (bool, optional): Indicates whether the goal is small or big. Defaults to False == Big goal.
 
         Returns:
             None
         """
-        self.path = path
+        self.path: List[Node] = path
         self.small = small
-        self.points = points
+        self.points: Optional[List[Tuple[int, int]]] = points
 
 
 class NodeData:
@@ -621,12 +637,12 @@ class Graph:
 
 
 class Track:
-    def __init__(self, bounds: Dict[str, float]):
+    def __init__(self, bounds: Dict[str, int]):
         """
         Initialise the track with the bounds of the track
         :param bounds: The bounds of the track
         """
-        self.bounds: Dict[str, float] = bounds
+        self.bounds: Dict[str, int] = bounds
         self.balls: List[Ball] = []
         self.obstacles: List[Obstacle] = []
         self.small_goal: Optional[Goal] = None
@@ -1064,6 +1080,8 @@ def setup(bounds: Dict[str, float]) -> Track:
         Track: The created track object.
 
     """
+
+    # Make sure bounds are integers
     bounds["x"] = math.ceil(bounds["x"])
     bounds["y"] = math.ceil(bounds["y"])
 

@@ -49,6 +49,13 @@ async def drive_decision(robot_position: Tuple[int, int], robot_direction: float
         await robot_api.set_speeds(session=session, speed_left=0, speed_right=0)
         return
 
+    # If the robot is about to drive into a wall or other obstacle, stop the robot
+    if await math_helpers.is_about_to_collide_with_obstacle(robot_position, robot_direction):
+        if DEBUG:
+            print("Robot is about to collide with an obstacle, driving robot backwards")
+        await robot_api.set_speeds(session=session, speed_left=-ROBOT_BASE_SPEED, speed_right=-ROBOT_BASE_SPEED)
+        return
+
     # Get the distance between the two targets
     distance = math_helpers.calculate_distance(position1=robot_position, position2=target_position)
 

@@ -1,6 +1,8 @@
 import math
 from typing import Tuple
 
+from client.Utils import path_algorithm
+
 
 def calculate_direction(position1: Tuple[int, int], position2: Tuple[int, int]) -> float:
     """
@@ -83,3 +85,16 @@ def has_passed_target(frompos: Tuple[int, int], target: Tuple[int, int], current
     if current_length - length_to_obtain >= position_threshold:
         return True
     return False
+
+
+def is_about_to_collide_with_obstacle(pos: Tuple[int, int], direction: float):
+    """
+    Checks if you are about to collide with an obstacle.
+    :param pos: your current position
+    :param direction: your current direction
+    :return: True if you are about to collide, else False
+    """
+    obstacles = path_algorithm.TRACK_GLOBAL.obstacles
+    for obstacle in obstacles:
+        if obstacle.is_about_to_collide(pos, direction):
+            return True
