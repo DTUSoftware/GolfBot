@@ -5,15 +5,27 @@ import cv2
 from client.Utils import path_algorithm as pathalg
 from client.Utils import opencv_helpers
 
+# The webcam to use
 VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 1))
+# The track preset to use
 TRACK_PRESET = os.environ.get('TRACK_PRESET', "track.json")
 
-track_setup_mode = None
-draw_path = []
-objects = []
+# Global variables
+track_setup_mode = None  # The current track setup mode
+draw_path = []  # The path to draw
+objects = []  # The objects to draw
 
 
 def save_preset(filename):
+    """
+    Saves the current track presets to a JSON file.
+
+    Args:
+        filename (str): The name of the preset file (without the extension).
+
+    Returns:
+        None
+    """
     if not os.path.exists("track_presets"):
         os.mkdir("track_presets")
     with open(f"track_presets/{filename}.json", "w+") as preset_file:
@@ -21,12 +33,27 @@ def save_preset(filename):
 
 
 def list_presets():
+    """
+    Lists all available track presets.
+
+    Returns:
+        list: A list of preset filenames.
+    """
     if not os.path.exists("track_presets"):
         os.mkdir("track_presets")
     return os.listdir("track_presets")
 
 
 def load_preset(preset):
+    """
+    Loads a track preset from a JSON file.
+
+    Args:
+        preset (str): The name of the preset file (including the extension).
+
+    Returns:
+        None
+    """
     if not os.path.exists(f"track_presets/{preset}"):
         return
     with open(f"track_presets/{preset}", "r") as preset_file:
@@ -42,12 +69,31 @@ def load_preset(preset):
 
 
 def setup_track_mouse_input(event, x, y, flags, param):
+    """
+    Mouse callback function for track setup.
+
+    Args:
+        event (int): The mouse event (e.g., cv2.EVENT_LBUTTONDBLCLK).
+        x (int): The x-coordinate of the mouse position.
+        y (int): The y-coordinate of the mouse position.
+        flags (int): Additional flags.
+        param (Any): Optional parameters.
+
+    Returns:
+        None
+    """
     if event == cv2.EVENT_LBUTTONDBLCLK and track_setup_mode:
         global draw_path
         draw_path.append((x, y))
 
 
 def setup_track() -> pathalg.Track:
+    """
+    Sets up the track for capturing mouse input.
+
+    Returns:
+        pathalg.Track: The track object.
+    """
     # Setup OpenCV window and mouse callback
     cv2.namedWindow("Track Setup")
     cv2.setMouseCallback("Track Setup", setup_track_mouse_input)

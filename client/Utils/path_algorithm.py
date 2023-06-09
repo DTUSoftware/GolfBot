@@ -13,29 +13,77 @@ from torch import multiprocessing
 
 from client.Utils import math_helpers
 
+# If debugging should be enabled
 DEBUG = "true" in os.environ.get('DEBUG', "True").lower()
+# The timeout for calculating a path
 TIMEOUT_GET_PATH = 5  # in seconds
 
+# Initialize colorama
 colorama_init()
+# Calculate the distance across a square
 distance_across = math.sqrt(1 ** 2 + 1 ** 2)
 
 
 class Node:
     def __init__(self, coordinates: tuple) -> None:
+        """
+        Initializes a new instance of the Node class.
+
+        Args:
+            coordinates (tuple): The coordinates of the node as a tuple of (x, y).
+
+        Returns:
+            None
+        """
         self.x = coordinates[0]
         self.y = coordinates[1]
         self.neighbours: List[Dict[str, Union['Node', float]]] = []
 
     def __lt__(self, other: Any) -> bool:
+        """
+        Less than comparison operator.
+
+        Args:
+            other (Any): The other object to compare.
+
+        Returns:
+            bool: Always returns True.
+        """
         return True
 
     def __le__(self, other: Any) -> bool:
+        """
+        Less than or equal to comparison operator.
+
+        Args:
+            other (Any): The other object to compare.
+
+        Returns:
+            bool: Always returns True.
+        """
         return True
 
     def get_position(self) -> Tuple[int, int]:
+        """
+        Returns the position of the node as a tuple of (x, y) coordinates.
+
+        Returns:
+            Tuple[int, int]: The position of the node.
+        """
         return self.x, self.y
 
     def add_neighbour(self, node: 'Node', weight: float = None) -> None:
+        """
+        Adds a neighbour node with an optional weight to the current node.
+
+        Args:
+            node (Node): The neighbour node to add.
+            weight (float, optional): The weight of the edge connecting the nodes. If not provided,
+                the weight is calculated based on the Euclidean distance between the nodes.
+
+        Returns:
+            None
+        """
         if not weight:
             if self.x == node.x or self.y == node.y:
                 weight = max(abs(self.x - node.x), abs(self.y - node.y))
@@ -44,20 +92,54 @@ class Node:
         self.neighbours.append({"node": node, "weight": weight})
 
     def remove_neighbour(self, node: 'Node') -> None:
+        """
+        Removes a neighbour node from the current node.
+
+        Args:
+            node (Node): The neighbour node to remove.
+
+        Returns:
+            None
+        """
         for i in range(len(self.neighbours)):
             if self.neighbours[i]["node"] == node:
                 self.neighbours.pop(i)
                 return
 
     def get_neighbour_nodes(self) -> List['Node']:
+        """
+        Returns a list of neighbour nodes.
+
+        Returns:
+            List[Node]: A list of neighbour nodes.
+        """
         return [neighbour["node"] for neighbour in self.neighbours]
 
     def get_heading(self, from_position: tuple) -> float:
+        """
+        Returns the heading from a given position to the current node.
+
+        Args:
+            from_position (tuple): The starting position as a tuple of (x, y) coordinates.
+
+        Returns:
+            float: The heading in radians.
+        """
         return math_helpers.calculate_direction(from_position, self.get_position())
 
 
 class Ball:
     def __init__(self, pos: tuple, golden=False) -> None:
+        """
+        Initializes a new instance of the Ball class.
+
+        Args:
+            pos (tuple): The position of the ball as a tuple of (x, y) coordinates.
+            golden (bool, optional): Indicates whether the ball is golden. Defaults to False.
+
+        Returns:
+            None
+        """
         self.x = pos[0]
         self.y = pos[1]
         self.golden = golden
@@ -65,12 +147,33 @@ class Ball:
 
 class Obstacle:
     def __init__(self, path: list, points: list = None) -> None:
+        """
+        Initializes a new instance of the Obstacle class.
+
+        Args:
+            path (list): The path of the obstacle.
+            points (list, optional): Additional points of the obstacle.
+
+        Returns:
+            None
+        """
         self.path = path
         self.points = points
 
 
 class Goal:
     def __init__(self, path: list, points: list = None, small=False) -> None:
+        """
+        Initializes a new instance of the Goal class.
+
+        Args:
+            path (list): The path of the goal.
+            points (list, optional): Additional points of the goal.
+            small (bool, optional): Indicates whether the goal is small or big. Defaults to False == Big goal.
+
+        Returns:
+            None
+        """
         self.path = path
         self.small = small
         self.points = points
@@ -78,6 +181,18 @@ class Goal:
 
 class NodeData:
     def __init__(self, node: Node, g: float, h: float, parent: Optional[Node]) -> None:
+        """
+        Initializes a new instance of the NodeData class.
+
+        Args:
+            node (Node): The node associated with the data.
+            g (float): The cost from the start node to the current node.
+            h (float): The estimated cost from the current node to the goal node.
+            parent (Optional[Node]): The parent node. Defaults to None.
+
+        Returns:
+            None
+        """
         self.node = node
         self.g = g
         self.h = h
@@ -86,14 +201,37 @@ class NodeData:
         self.f = self.g + self.h
 
     def __lt__(self, other: Any) -> bool:
+        """
+        Less than comparison operator.
+
+        Args:
+            other (Any): The other object to compare.
+
+        Returns:
+            bool: Always returns True.
+        """
         return True
 
     def __le__(self, other: Any) -> bool:
+        """
+        Less than or equal to comparison operator.
+
+        Args:
+            other (Any): The other object to compare.
+
+        Returns:
+            bool: Always returns True.
+        """
         return True
 
 
 class Graph:
     def __init__(self, size_x: int = 500, size_y: int = 200) -> None:
+        """
+        Initializes a new instance of the Graph class.
+        :param size_x: The width of the graph.
+        :param size_y: The height of the graph.
+        """
         if size_x and size_y:
             range_x = range(size_x)
             range_y = range(size_y)
@@ -148,15 +286,30 @@ class Graph:
                         node.add_neighbour(bottom, 1)
 
     def add_node(self, coordinates: tuple) -> None:
+        """
+        Adds a node to the graph.
+        :param coordinates: The coordinates of the node.
+        :return: None
+        """
         np.append(self.nodes, Node(coordinates))
 
     def get_node(self, pos: tuple) -> Optional[Node]:
+        """
+        Gets the node at the specified position.
+        :param pos: The position of the node.
+        :return: The node at the specified position.
+        """
         if 0 <= pos[0] < len(self.nodes[0]) and 0 <= pos[1] < len(self.nodes):
             return self.nodes[pos[1]][pos[0]]
         else:
             return None
 
     def get_nodes_in_path(self, path: list) -> list:
+        """
+        Gets all nodes in the specified path.
+        :param path: The path to get the nodes from.
+        :return: A list of nodes in the path.
+        """
         node_plusminus = 1
         nodes_in_path = []
         for i in range(len(path)):
@@ -209,6 +362,12 @@ class Graph:
         return list(set(nodes_in_path))
 
     def add_edge(self, node_1: Node, node_2: Node) -> None:
+        """
+        Adds an edge between two nodes.
+        :param node_1: The first node.
+        :param node_2: The second node.
+        :return: None
+        """
         if node_1 is not node_2 and node_1 and node_2:
             if node_2 not in node_1.get_neighbour_nodes():
                 node_1.add_neighbour(node_2)
@@ -216,6 +375,12 @@ class Graph:
                 node_2.add_neighbour(node_1)
 
     def remove_edge(self, node_1: Node, node_2: Node) -> None:
+        """
+        Removes an edge between two nodes.
+        :param node_1: The first node.
+        :param node_2: The second node.
+        :return: None
+        """
         if node_1 is not node_2 and node_1 and node_2:
             if node_2 in node_1.get_neighbour_nodes():
                 node_1.remove_neighbour(node_2)
@@ -224,12 +389,24 @@ class Graph:
 
     # Manhattan Distance heuristic for A*
     def h(self, start_node: Node, dst_node: Node) -> float:
+        """
+        The heuristic function for A*. This is the Manhattan Distance.
+        :param start_node: The start node.
+        :param dst_node: The destination node.
+        :return: The heuristic value.
+        """
         dx = abs(start_node.x - dst_node.x)
         dy = abs(start_node.y - dst_node.y)
         return dx + dy
 
     # Get path and cost using A*
     async def get_path(self, start_node: Node, dst_node: Node) -> List[NodeData]:
+        """
+        Gets the path between two nodes using A*.
+        :param start_node: The start node.
+        :param dst_node: The destination node.
+        :return: A list of nodes in the path.
+        """
         if DEBUG:
             print(f"Getting path between {start_node.x}, {start_node.y} and {dst_node.x}, {dst_node.y}")
 
@@ -313,6 +490,13 @@ class Graph:
         return []
 
     def draw(self, robot_pos: tuple = None, balls: list = None, path: list = None) -> None:
+        """
+        Draws the grid.
+        :param robot_pos: The position of the robot.
+        :param balls: The list of balls.
+        :param path: The path to draw.
+        :return: None
+        """
         if balls is None:
             balls = []
         if path is None:
@@ -437,15 +621,19 @@ class Graph:
 
 
 class Track:
-    def __init__(self, bounds: dict):
-        self.bounds: dict = bounds
+    def __init__(self, bounds: Dict[str, float]):
+        """
+        Initialise the track with the bounds of the track
+        :param bounds: The bounds of the track
+        """
+        self.bounds: Dict[str, float] = bounds
         self.balls: List[Ball] = []
         self.obstacles: List[Obstacle] = []
         self.small_goal: Optional[Goal] = None
         self.big_goal: Optional[Goal] = None
-        self.robot_pos: tuple = (0, 0)
+        self.robot_pos: Tuple[int, int] = (0, 0)
         self.robot_direction: float = 0.0
-        self.path: list = []
+        self.path: List[NodeData] = []
 
         self.last_target_path: List[NodeData] = []
         self.last_target_node: Optional[Node] = None
@@ -455,18 +643,36 @@ class Track:
         self.graph: Graph = Graph(bounds["x"], bounds["y"])
 
     def add_ball(self, ball: Ball) -> None:
+        """
+        Add a ball to the track
+        :param ball: The ball to add
+        :return: None
+        """
         self.balls.append(ball)
 
     def clear_balls(self) -> None:
+        """
+        Clear all balls from the track
+        :return: None
+        """
         self.balls = []
 
     def set_robot_pos(self, robot_pos: tuple) -> None:
+        """
+        Set the position of the robot
+        :param robot_pos: The position of the robot
+        :return: None
+        """
         # Recalibrate the direction / angle
         self.robot_direction = math_helpers.calculate_direction(robot_pos, self.robot_pos)
         # Update position
         self.robot_pos = robot_pos
 
     async def calculate_path(self) -> None:
+        """
+        Calculate the path to the next ball
+        :return: None
+        """
         # if DEBUG:
         #     print("Calculating path")
         if not self.balls:
@@ -530,6 +736,10 @@ class Track:
             self.path = []
 
     def clear_obstacles(self) -> None:
+        """
+        Clear all obstacles from the track
+        :return: None
+        """
         for obstacle in self.obstacles:
             for node in obstacle.path:
                 for x in range(-1, 1 + 1):
@@ -539,6 +749,11 @@ class Track:
         self.obstacles = []
 
     def add_obstacle(self, obstacle: Obstacle) -> None:
+        """
+        Add an obstacle to the track
+        :param obstacle: The obstacle to add
+        :return: None
+        """
         for node in obstacle.path:
             # print(f"Removing node edges for node at {node.x}, {node.y}")
             for x in range(-1, 1 + 1):
@@ -551,19 +766,33 @@ class Track:
         self.obstacles.append(obstacle)
 
     def add_goal(self, goal: Goal) -> None:
+        """
+        Add a goal to the track
+        :param goal: The goal to add
+        :return: None
+        """
         if goal.small:
             self.small_goal = goal
         else:
             self.big_goal = goal
 
     def draw(self, with_path: bool = False) -> None:
+        """
+        Draw the track
+        :param with_path: Whether to draw the path or not
+        :return: None
+        """
         if with_path:
             self.graph.draw(robot_pos=self.robot_pos,
                             balls=self.balls, path=self.path)
         else:
             self.graph.draw(robot_pos=self.robot_pos, balls=self.balls)
 
-    async def plot(self):
+    async def plot(self) -> None:
+        """
+        Plot the path
+        :return: None
+        """
         await self.calculate_path()
         points_in_path = [[], []]
         for nodeData in self.path:
@@ -765,6 +994,13 @@ async def check_new_path(path_queue: multiprocessing.JoinableQueue) -> bool:
 
 
 def is_target_different(track: Track, target_node: Node, other_node: Node) -> bool:
+    """
+    Checks if the target is different from another node.
+    :param track: The track object
+    :param target_node: The target node
+    :param other_node: The other node
+    :return: True if the target is different, else False
+    """
     # Define a threshold for difference based on your requirements
     # Assume a difference of 1.0 cm is significant, we use pixels though, so it depends on the distance and camera
     position_threshold = 30.0
@@ -788,6 +1024,10 @@ def is_target_different(track: Track, target_node: Node, other_node: Node) -> bo
 
 
 def setup_debug() -> None:
+    """
+    Sets up the debug environment.
+    :return: None
+    """
     bounds = {"x": 15, "y": 20}
     track = setup(bounds)
 
@@ -812,7 +1052,18 @@ def setup_debug() -> None:
     TRACK_GLOBAL = track
 
 
-def setup(bounds: dict) -> Track:
+def setup(bounds: Dict[str, float]) -> Track:
+    """
+    Set up a track based on the provided bounds.
+
+    Args:
+        bounds (Dict[str, float]): The bounds of the track as a dictionary with keys 'x' and 'y',
+                                   representing the maximum x-coordinate and y-coordinate respectively.
+
+    Returns:
+        Track: The created track object.
+
+    """
     bounds["x"] = math.ceil(bounds["x"])
     bounds["y"] = math.ceil(bounds["y"])
 

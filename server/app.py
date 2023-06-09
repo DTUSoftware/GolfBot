@@ -2,14 +2,22 @@ from flask import Flask, Blueprint, request
 import ev3
 import math
 
+# The version of the API
 VERSION = "v1"
 
+# The server blueprint
 server = Blueprint('ev3', __name__)
+
+# The robot global variable
 robot = None
 
 
 @server.before_request
 def check_robot_connection():
+    """
+    Checks if the robot is connected.
+    :return: None
+    """
     global robot
     if not robot:
         # Setup the robot
@@ -23,6 +31,10 @@ def check_robot_connection():
 
 @server.route('/drive', methods=['POST'])
 def drive():
+    """
+    Drives the robot.
+    :return: The response
+    """
     speed_left = request.args.get("speed_left")
     speed_right = request.args.get("speed_right")
     if speed_left and speed_right:
@@ -52,6 +64,10 @@ def drive():
 
 @server.route("/turn", methods=['POST'])
 def turn():
+    """
+    Turns the robot.
+    :return: The response
+    """
     direction = request.args.get("direction")
     if direction:
         if str(direction).lower() == "left":
@@ -80,6 +96,10 @@ def turn():
 
 @server.route("/toggle_fans", methods=['POST'])
 def toggle_fans():
+    """
+    Toggles the fans.
+    :return: The response
+    """
     if robot.toggle_fans():
         return "Toggled the fans.", 200
     return "Failed to toggle the fans.", 500
@@ -87,6 +107,10 @@ def toggle_fans():
 
 @server.route("/stop", methods=['POST'])
 def stop_robot():
+    """
+    Stops the robot.
+    :return: The response
+    """
     if robot.stop():
         return "Stopped the robot.", 200
     return "Failed to stop the robot. Is it already stopped?", 500
@@ -94,6 +118,10 @@ def stop_robot():
 
 @server.route("/start", methods=['POST'])
 def start_robot():
+    """
+    Starts the robot.
+    :return: The response
+    """
     if robot.start():
         return "Started the robot.", 200
     return "Failed to start the robot. Is it already started?", 500
@@ -101,6 +129,10 @@ def start_robot():
 
 @server.route("/position", methods=['GET', 'POST'])
 def robot_position():
+    """
+    Gets or sets the position of the robot.
+    :return: The response
+    """
     if request.method == "GET":
         return str(robot.current_pos), 200
     elif request.method == "POST":
@@ -116,13 +148,19 @@ def robot_position():
 
 @server.route("/status", methods=['GET'])
 def robot_status():
+    """
+    Gets the status of the robot.
+    :return: The response
+    """
     return ("Stopped: " + str(robot.stopped) + "\n" +
             "Busy:  " + str(robot.busy) + "\n" +
             "Position: " + str(robot.current_pos) + "\n" +
             "Direction: " + str(robot.direction)), 200
 
 
+# Create the app
 app = Flask(__name__)
+# Register the blueprint
 app.register_blueprint(server, url_prefix="/api/" + VERSION)
 
 if __name__ == '__main__':
@@ -136,6 +174,7 @@ if __name__ == '__main__':
         # Start the app
         app.run()
     except KeyboardInterrupt:
+        # Stop the robot
         if robot:
             robot.stop()
         raise KeyboardInterrupt()

@@ -3,13 +3,21 @@ import os
 import torch
 from ultralytics import YOLO
 
+# Path to the pretrained model
 PRETRAINED_MODEL = os.environ.get("PRETRAINED_MODEL", "yolov8n.pt")
+# Path to the dataset
 DATA = os.environ.get("DATA", "datasets/RoboFlow0608-plz2-sehrgud")
+# Number of epochs to train for
 EPOCHS = int(os.environ.get("EPOCHS", 750))
+# Image size
 IMGSZ = int(os.environ.get("IMGSZ", 640))  # needs to be a multiple of 32
 
 
 def train():
+    """
+    Train the model
+    :return: None
+    """
     # Set device for AI processing
     torch_device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     device = 0 if "cuda" in torch_device.type else "cpu"

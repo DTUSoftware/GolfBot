@@ -6,7 +6,9 @@ from typing import Tuple
 from client.Utils import math_helpers, path_algorithm
 from client.Services import robot_api
 
+# If logging should be disabled
 DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "False").lower()
+# If debugging should be enabled
 DEBUG = ("true" in os.environ.get('DEBUG', "True").lower()) and not DISABLE_LOGGING
 
 # PID constants
@@ -14,7 +16,7 @@ KP = float(os.environ.get('PID_KP', 5))  # Proportional gain  3.04
 KI = float(os.environ.get('PID_KI', 0.1))  # Integral gain - 0.1
 KD = float(os.environ.get('PID_KD', 0.05))  # Derivative gain - 0.05
 
-# Robot tolerance
+# Distance and direction tolerance
 DISTANCE_TOLERANCE = float(os.environ.get('DISTANCE_TOLERANCE', 10.0))
 DIRECTION_TOLERANCE = float(os.environ.get('DIRECTION_TOLERANCE', 5.0))  # degrees
 

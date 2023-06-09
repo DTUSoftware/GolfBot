@@ -28,6 +28,13 @@ ROBOT_GLOBAL = None
 class Robot:
     def __init__(self, buttons: Button, motors: MoveTank, fan_motor: Motor,
                  current_pos: tuple = (0, 0)) -> None:
+        """
+        Initialize the robot.
+        :param buttons: the buttons
+        :param motors: the motors
+        :param fan_motor: the fan motor
+        :param current_pos: the current position of the robot
+        """
         self.buttons = buttons
         self.fan_motor = fan_motor
         self.motors = motors
@@ -38,12 +45,20 @@ class Robot:
         self.busy = False
 
     def refresh_conn(self):
+        """
+        Refresh the connection to the robot.
+        :return: None
+        """
         reset_conn()
         self.motors = get_motors()
         self.fan_motor = get_fan_motor()
         self.buttons = get_button()
 
     def forward(self) -> bool:
+        """
+        Drive the robot forwards.
+        :return: True if successful, False otherwise
+        """
         try:
             if not self.stopped and not self.busy and self.motors:
                 print("going forwards")
@@ -55,6 +70,10 @@ class Robot:
         return False
 
     def backwards(self) -> bool:
+        """
+        Drive the robot backwards.
+        :return: True if successful, False otherwise
+        """
         try:
             if not self.stopped and not self.busy and self.motors:
                 print("going backwards")
@@ -66,6 +85,12 @@ class Robot:
         return False
 
     def turn_left(self, radians=None, busy_override=False) -> bool:
+        """
+        Turn the robot left.
+        :param radians: the radians to turn
+        :param busy_override: whether to override the busy state
+        :return: True if successful, False otherwise
+        """
         try:
             if not self.stopped and (not self.busy or busy_override) and self.motors:
                 if radians:
@@ -83,6 +108,12 @@ class Robot:
         return False
 
     def turn_right(self, radians=None, busy_override=False) -> bool:
+        """
+        Turn the robot right.
+        :param radians: the radians to turn
+        :param busy_override: whether to override the busy state
+        :return: True if successful, False otherwise
+        """
         try:
             if not self.stopped and (not self.busy or busy_override) and self.motors:
                 if radians:
@@ -103,6 +134,10 @@ class Robot:
         return False
 
     def toggle_fans(self) -> bool:
+        """
+        Toggle the fans.
+        :return: True if successful, False otherwise
+        """
         try:
             if not self.fan_motor:
                 return False
@@ -118,6 +153,11 @@ class Robot:
 
     # This function is blocking!
     def turn_to_direction(self, direction: float) -> bool:
+        """
+        Turn the robot to a direction.
+        :param direction: the direction to turn to
+        :return: True if successful, False otherwise
+        """
         try:
             if self.stopped or self.busy or direction == self.direction or abs(direction - self.direction) == 2 * math.pi:
                 return False
@@ -159,6 +199,12 @@ class Robot:
         return False
 
     def set_speed(self, left_speed, right_speed) -> bool:
+        """
+        Set the speed of the robot.
+        :param left_speed: the speed of the left motor
+        :param right_speed: the speed of the right motor
+        :return: True if successful, False otherwise
+        """
         try:
             if not self.stopped and not self.busy and self.motors:
                 print(str("Now driving with speed:\n" +
@@ -172,6 +218,11 @@ class Robot:
         return False
 
     def drive(self, pos: tuple) -> bool:
+        """
+        Drive to a position.
+        :param pos: the position to drive to
+        :return: True if successful, False otherwise
+        """
         try:
             if not self.stopped and not self.busy:
                 # Turn to face the next node
@@ -195,6 +246,11 @@ class Robot:
         return False
 
     def stop(self, tries=0) -> bool:
+        """
+        Stop the robot.
+        :param tries: the amount of tries to stop the robot
+        :return: True if successful, False otherwise
+        """
         if not self.stopped and tries <= 10:
             try:
                 self.stopped = True
@@ -210,12 +266,21 @@ class Robot:
         return False
 
     def start(self) -> bool:
+        """
+        Start the robot.
+        :return: True if successful, False otherwise
+        """
         if self.stopped:
             self.stopped = False
             return True
         return False
 
     def set_position(self, pos: tuple) -> bool:
+        """
+        Set the position of the robot.
+        :param pos: the position to set
+        :return: True if successful, False otherwise
+        """
         # Recalibrate the direction / angle
         dx = self.current_pos[1] - pos[1]
         # We need the opposite of the y-axis, since we start from the top-left, and have a y-axis that goes downwards
@@ -227,20 +292,40 @@ class Robot:
         return True
 
     def set_direction(self, direction: float) -> bool:
+        """
+        Set the direction of the robot.
+        :param direction: the direction to set
+        :return: True if successful, False otherwise
+        """
         self.direction = direction
         return True
 
     def buttons_pressed(self) -> bool:
+        """
+        Check if any buttons are pressed.
+        :return: True if any buttons are pressed, False otherwise
+        """
         if self.buttons:
             return self.buttons.any()
         return False
 
 
 def debug(*args, **kwargs) -> None:
+    """
+    Print debug messages.
+    :param args: the arguments to print
+    :param kwargs: the keyword arguments to print
+    :return: None
+    """
     print(*args, **kwargs, file=sys.stderr)
 
 
 def setup(tries=0) -> None:
+    """
+    Setup the robot.
+    :param tries: the amount of tries to setup the robot
+    :return: None
+    """
     # os.system('setfont Lat15-TerminusBold14')  # Sets the console font
     # print('\x1Bc', end='')  # Resets the console
     global ROBOT_GLOBAL
@@ -248,6 +333,11 @@ def setup(tries=0) -> None:
 
 
 def reset_conn(tries=0):
+    """
+    Reset the connection to the robot.
+    :param tries: the amount of tries to reset the connection
+    :return: None
+    """
     global conn, ev3_motor, ev3_button, ROBOT_GLOBAL
     try:
         print("Trying to reconnect to robot...")
@@ -270,12 +360,20 @@ def reset_conn(tries=0):
 
 
 def get_button() -> Optional[Button]:
+    """
+    Get the buttons on the robot.
+    :return: the buttons on the robot
+    """
     if not conn or not ev3_button:
         return None
     return ev3_button.Button()  # Any button on the robot
 
 
 def get_motors() -> Optional[MoveTank]:
+    """
+    Get the main wheel motors on the robot.
+    :return: the wheel motors on the robot
+    """
     if not conn or not ev3_motor:
         return None
     return ev3_motor.MoveTank(left_motor_port=ev3_motor.OUTPUT_A,
@@ -283,12 +381,22 @@ def get_motors() -> Optional[MoveTank]:
 
 
 def get_fan_motor() -> Optional[Motor]:
+    """
+    Get the fan motor on the robot.
+    :return: the fan motor on the robot
+    """
     if not conn or not ev3_motor:
         return None
     return ev3_motor.Motor(ev3_motor.OUTPUT_C)
 
 
 def get_robot(current_pos: tuple = (0, 0), tries=0) -> Optional[Robot]:
+    """
+    Get the robot.
+    :param current_pos: the current position of the robot
+    :param tries: the amount of tries to get the robot
+    :return: the robot
+    """
     global conn, ev3_motor, ev3_button
     if not conn:
         conn, ev3_motor, ev3_button = reset_conn(tries)

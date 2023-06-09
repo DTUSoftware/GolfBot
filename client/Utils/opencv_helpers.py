@@ -2,6 +2,13 @@ import cv2
 
 
 def draw_object(img, object_type, path):
+    """
+    Draws a path on an image.
+    :param img: The image to draw on.
+    :param object_type: The type of object to draw.
+    :param path: The path to draw.
+    :return: None
+    """
     color = (0, 0, 0)
     if object_type == "obstacle":
         color = (0, 0, 255)

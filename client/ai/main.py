@@ -7,15 +7,26 @@ import torch
 from ultralytics import YOLO
 from client.Utils.opencv_helpers import draw_object
 
+# The webcam to use
 VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 1))
+# The model to use
 CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/20230608-kindaworks")
+# If logging should be disabled
 DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "True").lower()
+# If debugging should be enabled
 DEBUG = ("true" in os.environ.get('DEBUG', "True").lower()) and not DISABLE_LOGGING
 
 
 # To be run as a thread
 def run_ai(camera_queue: torch.multiprocessing.JoinableQueue, path_queue: torch.multiprocessing.JoinableQueue,
            ai_event: Event):
+    """
+    Run the AI
+    :param camera_queue: the queue to send the results from the AI to
+    :param path_queue: the queue to get the path from the robot from
+    :param ai_event: the event to let the AI know that the robot has processed the results
+    :return: None
+    """
     if DISABLE_LOGGING:
         # THIS DISABLES LOGGING FOR YOLO
         logging.getLogger("ultralytics").setLevel(logging.WARNING)

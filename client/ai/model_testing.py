@@ -6,12 +6,22 @@ import torch
 from PIL import Image
 from ultralytics import YOLO
 
+# Which webcam to use
 VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 1))
+# The model to use
 CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/20230608-kindaworks")
+# The directory to save the captured results to
 DATA = os.environ.get("DATA", "datasets/RoboFlow0506-1")
 
 
 def save_result(results, frame=None, missing=False):
+    """
+    Save the results from the model to the local filesystem
+    :param results: the results from the model
+    :param frame: the frame to save
+    :param missing: true if we should save without annotations
+    :return: None
+    """
     print("Saving result...")
     if not os.path.exists(DATA + "/custom/images"):
         os.makedirs(DATA + "/custom/images", exist_ok=True)
@@ -54,6 +64,10 @@ def save_result(results, frame=None, missing=False):
 
 
 def test_model():
+    """
+    Test the model by running it on the webcam
+    :return: None
+    """
     # Set device for AI processing
     torch_device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     device = 0 if "cuda" in torch_device.type else "cpu"
