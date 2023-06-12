@@ -18,6 +18,7 @@ from Utils import math_helpers
 DEBUG = "true" in os.environ.get('DEBUG', "True").lower()
 # The timeout for calculating a path
 TIMEOUT_GET_PATH = 5  # in seconds
+PATH_OBSTACLE_DISTANCE = 10  # in units
 
 # Initialize colorama
 colorama_init()
@@ -165,6 +166,25 @@ class Obstacle:
         self.path: List[Node] = path
         self.points: Optional[List[Tuple[int, int]]] = points
 
+    def get_distance(self, position: Tuple[int, int]) -> Tuple[float, Node]:
+        """
+        Returns the distance from the given position to the obstacle.
+
+        Args:
+            position (tuple): The position as a tuple of (x, y) coordinates.
+
+        Returns:
+            Tuple[float, Node]: The distance to the obstacle and the closest node.
+        """
+        min_distance = math.inf
+        closest_node = None
+        for node in self.path:
+            distance = math_helpers.calculate_distance(position, node.get_position())
+            if distance < min_distance:
+                min_distance = distance
+                closest_node = node
+        return min_distance, closest_node
+
     def is_about_to_collide(self, position: Tuple[int, int], heading: float) -> bool:
         """
         Checks whether the robot is about to collide with the obstacle.
@@ -174,11 +194,10 @@ class Obstacle:
         """
         COLLOSION_DISTANCE = 10  # in units (pixels)
         DIRECTION_DIFFERENCE = 0.1  # in radians
-        for node in self.path:
-            node_pos = node.get_position()
-            if math_helpers.calculate_distance(position, node_pos) < COLLOSION_DISTANCE:
-                if math_helpers.calculate_direction(position, node_pos) - heading < DIRECTION_DIFFERENCE:
-                    return True
+        distance, node = self.get_distance(position)
+        if distance < COLLOSION_DISTANCE:
+            if math_helpers.calculate_direction(position, node.get_position()) - heading < DIRECTION_DIFFERENCE:
+                return True
         return False
 
 
@@ -914,6 +933,56 @@ async def simplify_path(path: List[NodeData]) -> List[NodeData]:
     return new_path
 
 
+async def add_buffer_to_path(path: List[NodeData]) -> List[NodeData]:
+    """
+    Using the list of obstacles in the track, moves nodes in a path away from the obstacles by a certain amount.
+
+    Args:
+        path (List[NodeData]): The path to move away from obstacles.
+
+    Returns:
+        list: The new path as a list of NodeData objects.
+    """
+    new_path: List[NodeData] = []
+
+    # If the path is empty, return it
+    if not path:
+        return path
+
+    # Loop through the path
+    for i in range(1, len(path)):
+        # Get the current node
+        current_node = path[i]
+
+        # Check if the current node is in an obstacle
+        for obstacle in TRACK_GLOBAL.obstacles:
+            distance_from_obstacle, obstacle_node = obstacle.get_distance(current_node.node.get_position())
+            if distance_from_obstacle < PATH_OBSTACLE_DISTANCE:
+                # If the node is in an obstacle, move it away from the obstacle
+                node_x = current_node.node.x
+                node_y = current_node.node.y
+                # if, on the x-axis, the obstacle is on the left of the node, move the node to the right
+                if obstacle_node.x < node_x < obstacle_node.x + PATH_OBSTACLE_DISTANCE:
+                    node_x = obstacle_node.x + PATH_OBSTACLE_DISTANCE
+                elif obstacle_node.x > node_x > obstacle_node.x - PATH_OBSTACLE_DISTANCE:
+                    node_x = obstacle_node.x - PATH_OBSTACLE_DISTANCE
+                # same for y-axis
+                if obstacle_node.y < node_y < obstacle_node.y + PATH_OBSTACLE_DISTANCE:
+                    node_y = obstacle_node.y + PATH_OBSTACLE_DISTANCE
+                elif obstacle_node.y > node_y > obstacle_node.y - PATH_OBSTACLE_DISTANCE:
+                    node_y = obstacle_node.y - PATH_OBSTACLE_DISTANCE
+                # Update the current node
+                current_node = NodeData(Node((math.ceil(node_x), math.ceil(node_y))), g=current_node.g,
+                                        h=current_node.h, parent=current_node.parent)
+
+                break
+
+        # Add the current node to the new path
+        new_path.append(current_node)
+
+    return new_path
+
+
 async def check_new_path(path_queue: multiprocessing.JoinableQueue) -> bool:
     """
     Checks if the path in the track is the same as last, and if it is, updates the current path. Also updates if it isn't.
@@ -978,6 +1047,10 @@ async def check_new_path(path_queue: multiprocessing.JoinableQueue) -> bool:
     track.last_target_path = await simplify_path(track.path)
     logger.debug(
         f"Current target optimized path: {[(nodedata.node.x, nodedata.node.y) for nodedata in track.last_target_path]}")
+
+    track.last_target_path = await add_buffer_to_path(track.last_target_path)
+    logger.debug(
+        f"Current target optimized path, with buffer: {[(nodedata.node.x, nodedata.node.y) for nodedata in track.last_target_path]}")
 
     # Adjust and go to
     if track.last_target_path:
