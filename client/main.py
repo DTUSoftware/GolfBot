@@ -3,6 +3,7 @@ import asyncio
 import os
 from threading import Event
 import aiohttp
+import logging
 from torch import multiprocessing
 
 from Services import robot_api, robot_ai, robot_racing
@@ -12,6 +13,9 @@ from Utils import path_algorithm, track_setup
 DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "False").lower()
 # If debugging should be enabled
 DEBUG = ("true" in os.environ.get('DEBUG', "True").lower()) and not DISABLE_LOGGING
+if DEBUG:
+    logging.getLogger().setLevel(logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 
 async def main(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue, ai_event: Event, track):
@@ -25,18 +29,17 @@ async def main(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocess
     """
     # Update TRACK_GLOBAL in path algorithm since we just joined an async loop
     path_algorithm.TRACK_GLOBAL = track
-    print("Running main...")
+    logger.info("Running main...")
     try:
         async with aiohttp.ClientSession() as session:
-            if DEBUG:
-                print("Starting robot...")
+            logger.debug("Starting robot...")
             while True:
                 try:
                     # Start robot
                     await robot_api.set_robot_start(session)
                     break
                 except Exception as e:
-                    print(f"Failed to start robot with exception {e}.\nRetrying in 5 seconds...")
+                    logging.error(f"Failed to start robot with exception {e}.\nRetrying in 5 seconds...")
                     await asyncio.sleep(5)
 
             # Do the race
@@ -45,7 +48,7 @@ async def main(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocess
         robot_api.set_robot_stop()
         raise KeyboardInterrupt()
     except ConnectionError:
-        print("Failed to connect to robot. Is the API on?")
+        logging.error("Failed to connect to robot. Is the API on?")
 
 
 def main_entrypoint(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue, ai_event: Event):
@@ -56,10 +59,10 @@ def main_entrypoint(ai_queue: multiprocessing.JoinableQueue, path_queue: multipr
     :param ai_event: The event to let the AI know that the robot has processed the results
     :return: None
     """
-    print("Running main entrypoint")
+    logger.info("Running main entrypoint")
 
     # Setup the track
-    print("Setting up track...")
+    logger.info("Setting up track...")
     track = track_setup.setup_track()
     path_queue.put("Done!")
 
@@ -72,7 +75,7 @@ def main_entrypoint(ai_queue: multiprocessing.JoinableQueue, path_queue: multipr
 
 if __name__ == '__main__':
     try:
-        print("Preparing the robot and AI... Please wait!")
+        logger.info("Preparing the robot and AI... Please wait!")
 
         multiprocessing.set_start_method('spawn', force=True)
 
@@ -94,25 +97,21 @@ if __name__ == '__main__':
         main_consumer.start()
 
         # Wait for the track to be initialized before starting the AI
-        if DEBUG:
-            print("[main] Waiting for track to be initialized...")
+        logger.debug("Waiting for track to be initialized...")
         path_queue.get()
         path_queue.task_done()
-        if DEBUG:
-            print("[main] Track initialized! Starting AI producer...")
+        logger.debug("Track initialized! Starting AI producer...")
 
         # Now we start the AI
         # run_ai(queue)
         ai_producer.start()
 
-        if DEBUG:
-            print("[main] AI producer started!")
+        logger.debug("AI producer started!")
 
         # It shouldn't join, unless it ends somehow, but we put it here anyway
         ai_producer.join()
 
-        if DEBUG:
-            print("[main] AI producer joined!? Stopping race!")
+        logger.debug("AI producer joined!? Stopping race!")
     except KeyboardInterrupt:
         pass
     robot_api.set_robot_stop()

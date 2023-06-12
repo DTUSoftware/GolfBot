@@ -1,3 +1,4 @@
+import logging
 import os
 from threading import Event
 from typing import Tuple
@@ -15,6 +16,9 @@ DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "False").lower()
 DEBUG = ("true" in os.environ.get('DEBUG', "True").lower()) and not DISABLE_LOGGING
 # The confidence gate for the robot deciding to go for a golf ball
 GOLF_BALL_CONFIDENCE_GATE = float(os.environ.get('GOLF_BALL_CONFIDENCE_GATE', 0.45))
+if DEBUG:
+    logging.getLogger().setLevel(logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 
 def box_confidence(box) -> float:
@@ -93,14 +97,11 @@ async def update_robot_from_ai_result(track: path_algorithm.Track, robot_results
     if robot_results:
         robot_box = robot_results[0]
         current_pos = box_to_pos(robot_box)
-        if DEBUG:
-            print(
-                f"Using robot with confidence {box_confidence(robot_box):.2f} at position ({current_pos[0]}, {current_pos[1]})")
+        logger.debug(f"Using robot with confidence {box_confidence(robot_box):.2f} at position ({current_pos[0]}, {current_pos[1]})")
         track.set_robot_pos(current_pos)
         await robot_api.set_robot_position(session, x=current_pos[0], y=current_pos[1])
     else:
-        if DEBUG:
-            print("No robot on track!")
+        logger.debug("No robot on track!")
 
 
 async def update_balls_from_ai_result(track: path_algorithm.Track, golf_ball_results, golden_ball_results) -> None:

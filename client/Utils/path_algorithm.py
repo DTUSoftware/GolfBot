@@ -1,5 +1,6 @@
 import asyncio
 import heapq
+import logging
 import math
 import os
 from typing import Any, Optional, List, Tuple, Set, Dict, Union
@@ -15,6 +16,8 @@ from client.Utils import math_helpers
 
 # If debugging should be enabled
 DEBUG = "true" in os.environ.get('DEBUG', "True").lower()
+if DEBUG:
+    logging.getLogger().setLevel(logging.DEBUG)
 # The timeout for calculating a path
 TIMEOUT_GET_PATH = 5  # in seconds
 
@@ -22,6 +25,7 @@ TIMEOUT_GET_PATH = 5  # in seconds
 colorama_init()
 # Calculate the distance across a square
 distance_across = math.sqrt(1 ** 2 + 1 ** 2)
+logger = logging.getLogger(__name__)
 
 
 class Node:
@@ -332,8 +336,7 @@ class Graph:
             pos = path[i]
             node = self.get_node(pos)
             if node:
-                if DEBUG:
-                    print(f"Adding {pos[0]}, {pos[1]}")
+                logger.debug(f"Adding {pos[0]}, {pos[1]}")
                 nodes_in_path.append(node)
                 if i >= 1:
                     # Get all nodes between the current node and the previous node
@@ -351,8 +354,7 @@ class Graph:
                         x_max = max(x1, x2)
                         for x in range(int(x_min + 1), int(x_max)):
                             y = int(slope * float(x) + y_intercept)
-                            if DEBUG:
-                                print(f"Adding {x}+-{node_plusminus}, {y}+-{node_plusminus}")
+                            logger.debug(f"Adding {x}+-{node_plusminus}, {y}+-{node_plusminus}")
                             for j in range(-node_plusminus, node_plusminus + 1):
                                 pos = (x + j, y + j)
                                 if pos not in path:
@@ -366,8 +368,7 @@ class Graph:
                         y_max = max(y1, y2)
                         for y in range(int(y_min + 1), int(y_max)):
                             x = int(slope * float(y) + x_intercept)
-                            if DEBUG:
-                                print(f"Adding {x}+-{node_plusminus}, {y}+-{node_plusminus}")
+                            logger.debug(f"Adding {x}+-{node_plusminus}, {y}+-{node_plusminus}")
                             for j in range(-node_plusminus, node_plusminus + 1):
                                 pos = (x + j, y + j)
                                 if pos not in path:
@@ -423,8 +424,7 @@ class Graph:
         :param dst_node: The destination node.
         :return: A list of nodes in the path.
         """
-        if DEBUG:
-            print(f"Getting path between {start_node.x}, {start_node.y} and {dst_node.x}, {dst_node.y}")
+        logger.debug(f"Getting path between {start_node.x}, {start_node.y} and {dst_node.x}, {dst_node.y}")
 
         # Initialize the start node data
         start_node_data = NodeData(start_node, 0, self.h(start_node, dst_node), None)
@@ -692,8 +692,7 @@ class Track:
         # if DEBUG:
         #     print("Calculating path")
         if not self.balls:
-            if DEBUG:
-                print("No balls, returning empty path")
+            logger.debug("No balls, returning empty path")
             self.path = []
             return
 
@@ -701,22 +700,19 @@ class Track:
         balls_to_catch = [ball for ball in self.balls if not ball.golden]
         # If no balls that aren't golden
         if not balls_to_catch:
-            if DEBUG:
-                print("Only the golden ball is left, fetching it")
+            logger.debug("Only the golden ball is left, fetching it")
             # Include the golden ball
             balls_to_catch = self.balls
 
         # For every ball calculate the path, then choose the best path
-        if DEBUG:
-            print("Calculating path for every ball")
+        logger.debug("Calculating path for every ball")
         paths = []
         if balls_to_catch:
             robot_node = self.graph.get_node(self.robot_pos)
             ball_nodes = [self.graph.get_node((ball.x, ball.y)) for ball in balls_to_catch]
             tasks = [self.graph.get_path(start_node=robot_node, dst_node=ball_node) for ball_node in ball_nodes]
             done, pending = await asyncio.wait(tasks, timeout=TIMEOUT_GET_PATH, return_when=asyncio.ALL_COMPLETED)
-            if DEBUG:
-                print(f"Done calculating paths: {len(done)} done, {len(pending)} timed out")
+            logger.debug(f"Done calculating paths: {len(done)} done, {len(pending)} timed out")
             [task.cancel() for task in pending]
             for task in done:
                 try:
@@ -734,21 +730,19 @@ class Track:
                         min_path["path"] = path
                         min_path["f"] = path[-1].f
             if min_path["path"] and len(min_path["path"]) > 1:
-                if DEBUG:
-                    print(f"Best path found with weight {min_path['f']}")
-                    # Log the path found
-                    # for i in range(len(min_path["path"])):
-                    #     node = min_path["path"][i].node
-                    #     end = " -> " if i < len(min_path['path']) - 1 else "\n"
-                    #     if DEBUG:
-                    #         print(f"({node.x}, {node.y})", end=end)
+                logger.debug(f"Best path found with weight {min_path['f']}")
+                # Log the path found
+                # for i in range(len(min_path["path"])):
+                #     node = min_path["path"][i].node
+                #     end = " -> " if i < len(min_path['path']) - 1 else "\n"
+                #     if DEBUG:
+                #         print(f"({node.x}, {node.y})", end=end)
                 self.path = min_path["path"]
             else:
-                if DEBUG:
-                    print("Found no path!")
+                logger.debug("Found no path!")
                 self.path = []
         else:
-            print("Got no paths, returning empty")
+            logger.debug("Got no paths, returning empty")
             self.path = []
 
     def clear_obstacles(self) -> None:
@@ -776,9 +770,9 @@ class Track:
                 for y in range(-1, 1 + 1):
                     neighbour = self.graph.get_node((node.x + x, node.y + y))
                     self.graph.remove_edge(node, neighbour)
-            if node.neighbours and DEBUG:
-                print(
-                    f"Failed to remove all neighbours for obstacle node at {node.x}, {node.y}")
+            if node.neighbours:
+                logger.debug(
+                    f"[add_obstacle] Failed to remove all neighbours for obstacle node at {node.x}, {node.y}")
         self.obstacles.append(obstacle)
 
     def add_goal(self, goal: Goal) -> None:
@@ -938,33 +932,19 @@ async def check_new_path(path_queue: multiprocessing.JoinableQueue) -> bool:
         # If robot is at target, pop
         # if DEBUG:
         #     print("Checking if robot has reached target")
-        if not is_target_different(track, track.last_target_path[0].node, track.graph.get_node(track.robot_pos)):
-            if DEBUG:
-                print("Robot reached target, popping")
+        while not is_target_different(track, track.last_target_path[0].node, track.graph.get_node(track.robot_pos)):
+            logger.debug("Robot reached target, popping")
             track.last_target_path.pop(0)
             track.last_target_node = track.graph.get_node(track.robot_pos)
         # If we passed the target, pop
-        has_passed_result = math_helpers.has_passed_target(track.last_target_path[0].node.get_position(),
-                                                           track.graph.get_node(track.robot_pos).get_position(),
-                                                           track.last_target_node.get_position())
-        if has_passed_result:
-            if DEBUG:
-                print("Robot passed target, popping")
+        while math_helpers.has_passed_target(track.last_target_path[0].node.get_position(),
+                                             track.graph.get_node(track.robot_pos).get_position(),
+                                             track.last_target_node.get_position()):
+            logger.debug("Robot passed target, popping")
             track.last_target_path.pop(0)
             track.last_target_node = track.graph.get_node(track.robot_pos)
-        elif has_passed_result is None:
-            if DEBUG:
-                print("Robot went completely wrong way?!?? Removing path!")
-            track.last_target_node = None
-            track.last_target_path = None
-            # if not path_queue.full():
-            #     try:
-            #         path_queue.put([])
-            #     except:
-            #         pass
 
-        if DEBUG:
-            print(
+        logger.debug(
                 f"Current optimized path: {[(nodedata.node.x, nodedata.node.y) for nodedata in track.last_target_path]}")
         if track.last_target_path:
             # Call adjust to adjust for error, and to clear point from list if we reach the target
@@ -976,8 +956,7 @@ async def check_new_path(path_queue: multiprocessing.JoinableQueue) -> bool:
             #     except:
             #         pass
             pass
-    if DEBUG:
-        print("New target, making new path")
+    logger.debug("New target, making new path")
 
     if track.path[0].node.x == 0 and track.path[0].node.y == 0:
         # if DEBUG:
@@ -989,8 +968,7 @@ async def check_new_path(path_queue: multiprocessing.JoinableQueue) -> bool:
 
     # "Summarize" path into good points for targets
     track.last_target_path = await simplify_path(track.path)
-    if DEBUG:
-        print(
+    logger.debug(
             f"Current target optimized path: {[(nodedata.node.x, nodedata.node.y) for nodedata in track.last_target_path]}")
 
     # Adjust and go to
@@ -1005,7 +983,14 @@ async def check_new_path(path_queue: multiprocessing.JoinableQueue) -> bool:
                                 "big_goal": track.big_goal.points if track.big_goal else []})
             except:
                 pass
+
         track.last_target_node = track.last_target_path[-1].node
+
+        while not is_target_different(track, track.last_target_path[0].node, track.graph.get_node(track.robot_pos)):
+            logger.debug("Robot reached target, popping")
+            track.last_target_path.pop(0)
+            track.last_target_node = track.graph.get_node(track.robot_pos)
+
         return True
 
 

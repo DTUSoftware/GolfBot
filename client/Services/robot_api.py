@@ -2,9 +2,18 @@ import asyncio
 import os
 import aiohttp
 import requests
+import logging
 
 # The endpoint of the robot API
 ROBOT_API_ENDPOINT = os.environ.get('API_ENDPOINT', "http://localhost:8069/api/v1")
+
+# If logging should be disabled
+DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "False").lower()
+# If debugging should be enabled
+DEBUG = ("true" in os.environ.get('DEBUG', "True").lower()) and not DISABLE_LOGGING
+if DEBUG:
+    logging.getLogger().setLevel(logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 
 async def set_robot_start(session: aiohttp.ClientSession) -> bool:
@@ -13,11 +22,11 @@ async def set_robot_start(session: aiohttp.ClientSession) -> bool:
     :param session: the session
     :return: True if the robot started, False otherwise
     """
-    print("Setting robot start")
+    logger.debug("Setting robot start")
     async with session.post(f"{ROBOT_API_ENDPOINT}/start") as response:
-        print(await response.text())
+        logger.debug(await response.text())
         if response.status != 200:
-            print(response.status)
+            logger.debug(response.status)
             return False
     return True
 
@@ -28,9 +37,9 @@ def set_robot_stop() -> bool:
     :return: True if the robot stopped, False otherwise
     """
     response = requests.post(f"{ROBOT_API_ENDPOINT}/stop")
-    print(response.text)
+    logger.debug(response.text)
     if response.status_code != 200:
-        print(response.status_code)
+        logger.debug(response.status_code)
         return False
     return True
 
@@ -41,12 +50,12 @@ async def get_robot_status(session: aiohttp.ClientSession) -> bool:
     :param session: the session
     :return: True if the robot is running, False otherwise
     """
-    print("Getting robot status")
+    logger.debug("Getting robot status")
     async with session.get(f"{ROBOT_API_ENDPOINT}/status") as response:
         if response.status != 200:
-            print(response.status)
+            logger.debug(response.status)
             return False
-        print(await response.text())
+        logger.debug(await response.text())
     return True
 
 
@@ -58,11 +67,11 @@ async def set_robot_position(session: aiohttp.ClientSession, x: int, y: int) -> 
     :param y: The y coordinate
     :return: True if the robot position was set, False otherwise
     """
-    print("Setting robot position")
+    logger.debug("Setting robot position")
     async with session.post(f"{ROBOT_API_ENDPOINT}/position?x={x}&y={y}") as response:
-        print(await response.text())
+        logger.debug(await response.text())
         if response.status != 200:
-            print(response.status)
+            logger.debug(response.status)
             return False
         else:
             # Let the robot drive a lil' bit
@@ -79,9 +88,9 @@ async def set_robot_direction(session: aiohttp.ClientSession, direction: float) 
     :return: None
     """
     async with session.post(f"{ROBOT_API_ENDPOINT}/turn?radians={direction}") as response:
-        print(await response.text())
+        logger.debug(await response.text())
         if response.status != 200:
-            print(response.status)
+            logger.debug(response.status)
             return False
         else:
             # Let the robot drive a lil' bit
@@ -100,7 +109,7 @@ async def set_speeds(session: aiohttp.ClientSession, speed_left: float, speed_ri
     async with session.post(
             f"{ROBOT_API_ENDPOINT}/drive?speed_left={speed_left}&speed_right={speed_right}") as response:
         if response.status != 200:
-            print(f"Error on adjusting speed: {response.status}")
+            logger.debug(f"Error on adjusting speed: {response.status}")
             return False
         else:
             # Let the robot drive a lil' bit
@@ -117,6 +126,6 @@ async def toggle_fans(session: aiohttp.ClientSession) -> bool:
     async with session.post(
             f"{ROBOT_API_ENDPOINT}/toggle_fans") as response:
         if response.status != 200:
-            print(f"Error on toggling fans: {response.status}")
+            logger.debug(f"Error on toggling fans: {response.status}")
             return False
     return True

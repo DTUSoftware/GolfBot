@@ -1,3 +1,6 @@
+import asyncio
+import logging
+
 import aiohttp
 import math
 import os
@@ -10,6 +13,9 @@ from client.Services import robot_api
 DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "False").lower()
 # If debugging should be enabled
 DEBUG = ("true" in os.environ.get('DEBUG', "True").lower()) and not DISABLE_LOGGING
+if DEBUG:
+    logging.getLogger().setLevel(logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 # PID constants
 KP = float(os.environ.get('PID_KP', 5))  # Proportional gain  3.04
@@ -24,7 +30,7 @@ DIRECTION_TOLERANCE = float(os.environ.get('DIRECTION_TOLERANCE', 5.0))  # degre
 WHEEL_RADIUS = (float(os.environ.get('WHEEL_DIAMETER', 68.8)) / 2) / 10  # Radius of the robot's wheels in cm
 DIST_BETWEEN_WHEELS = float(
     os.environ.get('DIST_BETWEEN_WHEELS', 83.0 * 2)) / 10  # Distance between the robot's wheels in cm
-ROBOT_BASE_SPEED = float(os.environ.get('ROBOT_BASE_SPEED', 50.0))
+ROBOT_BASE_SPEED = float(os.environ.get('ROBOT_BASE_SPEED', 25.0))
 
 
 async def drive_decision(robot_position: Tuple[int, int], robot_direction: float, target_position: Tuple[int, int],
@@ -39,9 +45,8 @@ async def drive_decision(robot_position: Tuple[int, int], robot_direction: float
     :return: None
     """
 
-    if DEBUG:
-        print(f"Trying to get robot from {robot_position} to {target_position}. Robot currently has a direction of "
-              f"{math.degrees(robot_direction)} deg ({robot_direction} rad)")
+    logger.debug(f"Trying to get robot from {robot_position} to {target_position}. Robot currently has a direction of "
+                  f"{math.degrees(robot_direction)} deg ({robot_direction} rad)")
 
     # If robot position is invalid, return
     if robot_position == (0, 0):
@@ -50,11 +55,11 @@ async def drive_decision(robot_position: Tuple[int, int], robot_direction: float
         return
 
     # If the robot is about to drive into a wall or other obstacle, stop the robot
-    if await math_helpers.is_about_to_collide_with_obstacle(robot_position, robot_direction):
-        if DEBUG:
-            print("Robot is about to collide with an obstacle, driving robot backwards")
-        await robot_api.set_speeds(session=session, speed_left=-ROBOT_BASE_SPEED, speed_right=-ROBOT_BASE_SPEED)
-        return
+    # if math_helpers.is_about_to_collide_with_obstacle(robot_position, robot_direction):
+    #     if DEBUG:
+    #         print("Robot is about to collide with an obstacle, driving robot backwards")
+    #     await robot_api.set_speeds(session=session, speed_left=-ROBOT_BASE_SPEED, speed_right=-ROBOT_BASE_SPEED)
+    #     return
 
     # Get the distance between the two targets
     distance = math_helpers.calculate_distance(position1=robot_position, position2=target_position)
@@ -64,33 +69,36 @@ async def drive_decision(robot_position: Tuple[int, int], robot_direction: float
         # Get difference in direction, if any
         new_direction = math_helpers.calculate_direction(position1=target_position, position2=robot_position)
 
-        if DEBUG:
-            print(f"The distance between the robot and the target is {distance} units, and the angle from robot to "
-                  f"target is {math.degrees(new_direction)} deg ({new_direction} rad)\n"
-                  f"The adjustment in direction needed is {math.degrees(new_direction-robot_direction)} deg "
-                  f"({new_direction-robot_direction} rad)")
+        logger.debug(f"The distance between the robot and the target is {distance} units, and the angle from robot to "
+                      f"target is {math.degrees(new_direction)} deg ({new_direction} rad)\n"
+                      f"The adjustment in direction needed is {math.degrees(new_direction - robot_direction)} deg "
+                      f"({new_direction - robot_direction} rad)")
 
         # Turn if needed
         if abs(robot_direction - new_direction) >= math.radians(DIRECTION_TOLERANCE):
-            if DEBUG:
-                print("Turning robot")
+            logger.debug("Turning robot")
             await robot_api.set_robot_direction(session=session, direction=new_direction)
         else:
-            if DEBUG:
-                print("Robot is in the correct heading (within tolerance), will not turn.")
+            logger.debug("Robot is in the correct heading (within tolerance), will not turn.")
 
-        if DEBUG:
-            print("Driving robot forward.")
+        logger.debug("Driving robot forward.")
         # Drive forward with base speed
         await robot_api.set_speeds(session=session, speed_left=ROBOT_BASE_SPEED, speed_right=ROBOT_BASE_SPEED)
     else:
-        if DEBUG:
-            print("Robot has reached the target (within tolerance), stopping robot.")
+        logger.debug("Robot has reached the target (within tolerance), stopping robot.")
         # Stop robot
         await robot_api.set_speeds(session=session, speed_left=0, speed_right=0)
 
+    # if DEBUG:
+    #     logger.debug("Wait to read results")
+    #     await asyncio.sleep(2)
+    #     await robot_api.set_speeds(session=session, speed_left=0, speed_right=0)
+    #     await asyncio.sleep(5)
+    #     logger.debug("Wait done")
 
-async def adjust_speed_using_pid(track: path_algorithm.Track, target_node: path_algorithm.Node, session: aiohttp.ClientSession):
+
+async def adjust_speed_using_pid(track: path_algorithm.Track, target_node: path_algorithm.Node,
+                                 session: aiohttp.ClientSession):
     """
     An experimental PID controller for the robot.
     Inspired by https://en.wikipedia.org/wiki/PID_controller and
@@ -105,8 +113,7 @@ async def adjust_speed_using_pid(track: path_algorithm.Track, target_node: path_
     current_position = track.robot_pos
 
     if (current_position[0] == 0 and current_position[1] == 0) or not target_node:
-        if DEBUG:
-            print("Current position is (0,0), stopping speed adjustment")
+        logger.debug("Current position is (0,0), stopping speed adjustment")
         return
 
     # Calculate target heading to the next path point
@@ -141,19 +148,18 @@ async def adjust_speed_using_pid(track: path_algorithm.Track, target_node: path_
 
     # DEBUG Testing of finding good variables
     KI += 0.0001
-    print(f"=============================================================\n"
-          f"USING A KI VALUE OF {KI}\n"
-          f"=============================================================")
+    logger.debug(f"=============================================================\n"
+                  f"USING A KI VALUE OF {KI}\n"
+                  f"=============================================================")
 
     # Calculate PID output
     output = KP * error + KI * integral + KD * derivative
 
-    if DEBUG:
-        print(f"PID Output:\n"
-              f"- Output: {output}\n"
-              f"- Error: {error} (previous error {track.previous_error}) - Pi: {KP}\n"
-              f"- Integral: {integral} - KI: {KI}\n"
-              f"- Derivative: {derivative} - KD: {KD}")
+    logger.debug(f"PID Output:\n"
+                  f"- Output: {output}\n"
+                  f"- Error: {error} (previous error {track.previous_error}) - Pi: {KP}\n"
+                  f"- Integral: {integral} - KI: {KI}\n"
+                  f"- Derivative: {derivative} - KD: {KD}")
 
     # Update previous error
     track.previous_error = error
@@ -164,8 +170,7 @@ async def adjust_speed_using_pid(track: path_algorithm.Track, target_node: path_
     speed_left = max(min(-output + ROBOT_BASE_SPEED, 100), -100)
     speed_right = max(min(output + ROBOT_BASE_SPEED, 100), -100)
 
-    if DEBUG:
-        print(f"Speed: L:{speed_left} R:{speed_right}")
+    logger.debug(f"Speed: L:{speed_left} R:{speed_right}")
 
     # Set motor speeds
     await robot_api.set_speeds(session, speed_left, speed_right)

@@ -15,6 +15,9 @@ CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/20230608-kindaworks")
 DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "True").lower()
 # If debugging should be enabled
 DEBUG = ("true" in os.environ.get('DEBUG', "True").lower()) and not DISABLE_LOGGING
+if DEBUG:
+    logging.getLogger().setLevel(logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 
 # To be run as a thread
@@ -30,29 +33,27 @@ def run_ai(camera_queue: torch.multiprocessing.JoinableQueue, path_queue: torch.
     if DISABLE_LOGGING:
         # THIS DISABLES LOGGING FOR YOLO
         logging.getLogger("ultralytics").setLevel(logging.WARNING)
+        # And our own logger
+        logging.getLogger().setLevel(logging.WARNING)
 
     # Set device for AI processing
     torch_device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     device = 0 if "cuda" in torch_device.type else "cpu"
-    if DEBUG:
-        print(f"[AI] Using device: {device} ({torch_device.type}: index {torch_device.index})")
+    logger.debug(f"Using device: {device} ({torch_device.type}: index {torch_device.index})")
 
     # Load the model from the local .pt file
-    if DEBUG:
-        print("[AI] Loading model...")
+    logger.debug("Loading model...")
     global CURRENT_MODEL
     if not os.path.exists(CURRENT_MODEL + ".pt"):
         if os.path.exists("./ai/" + CURRENT_MODEL + ".pt"):
             CURRENT_MODEL = "./ai/" + CURRENT_MODEL
         else:
-            if DEBUG:
-                print("[AI] No model found!")
+            logger.debug("No model found!")
             return
     model = YOLO(CURRENT_MODEL + ".pt")
 
     # Open a connection to the webcam
-    if DEBUG and not DISABLE_LOGGING:
-        print("[AI] Opening video capture...")
+    logger.debug("Opening video capture...")
     cap = cv2.VideoCapture(VIDEO_INPUT)
 
     # Store current path for drawing
@@ -61,22 +62,21 @@ def run_ai(camera_queue: torch.multiprocessing.JoinableQueue, path_queue: torch.
     while cap.isOpened():
         # Capture a frame from the webcam
         # if DEBUG:
-        #     print("[AI] Reading frame...")
+        #     print("Reading frame...")
         success, frame = cap.read()
 
         if not success:
-            if DEBUG:
-                print("[AI] Breaking!")
+            logger.debug("Breaking!")
             break
 
         # Send the frame to the model for prediction
         # if DEBUG:
-        #     print("[AI] Predict")
+        #     print("Predict")
         results = model.predict(frame, device=device)
 
         # Send the results to the driving algorithm
         # if DEBUG:
-        #     print("[AI] Sending event to driving algorithm")
+        #     print("Sending event to driving algorithm")
 
         # results.share_memory()
 
@@ -92,19 +92,15 @@ def run_ai(camera_queue: torch.multiprocessing.JoinableQueue, path_queue: torch.
                     camera_queue.put_nowait(shared_results)
                 except Exception as e:
                     ai_event.set()  # set the flag back
-                    if DEBUG:
-                        print("[AI] Queue full, cannot store image")
-                        print(str(e))
+                    logger.debug("Queue full, cannot store image")
+                    logger.debug(str(e))
             else:
-                if DEBUG:
-                    print("[AI] Queue full, will not store elements.")
+                logger.debug("Queue full, will not store elements.")
         else:
-            if DEBUG:
-                print("[AI] Waiting for event to get set, will not store elements.")
+            logger.debug("Waiting for event to get set, will not store elements.")
 
         # Draw bounding boxes and labels on the image
-        if DEBUG:
-            print("[AI] Drawing boxes...")
+        logger.debug("Drawing boxes...")
         # annotator = Annotator(frame)
         # for r in results:
         #     boxes = r.boxes
@@ -117,8 +113,7 @@ def run_ai(camera_queue: torch.multiprocessing.JoinableQueue, path_queue: torch.
         #     frame = annotator.result()
         frame = results[0].plot()
 
-        if DEBUG:
-            print("[AI] Getting result from path queue")
+        logger.debug("Getting result from path queue")
         if not path_queue.empty():
             try:
                 main_objects: dict = path_queue.get_nowait()
@@ -140,7 +135,7 @@ def run_ai(camera_queue: torch.multiprocessing.JoinableQueue, path_queue: torch.
         cv2.imshow('Camera Feed', frame)
 
         # Wait for processing of data
-        # print("[AI] Wait for processing of data...")
+        # print("Wait for processing of data...")
         # evt.wait()
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -148,8 +143,7 @@ def run_ai(camera_queue: torch.multiprocessing.JoinableQueue, path_queue: torch.
         # await asyncio.sleep(0)
 
     # Release the webcam when done and close window
-    if DEBUG:
-        print("[AI] Releasing!")
+    logger.debug("Releasing!")
     cap.release()
     cv2.destroyAllWindows()
 

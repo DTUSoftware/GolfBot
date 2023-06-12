@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 import time
 import traceback
@@ -13,24 +14,24 @@ from client.Utils import path_algorithm, driving_algorithm
 DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "False").lower()
 # If debugging should be enabled
 DEBUG = ("true" in os.environ.get('DEBUG', "True").lower()) and not DISABLE_LOGGING
+if DEBUG:
+    logging.getLogger().setLevel(logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 
 async def calculate_and_adjust(track: path_algorithm.Track, path_queue: multiprocessing.JoinableQueue, session: aiohttp.ClientSession):
-    if DEBUG:
-        print("Calculating path and adjusting speed")
+    logger.debug("Calculating path and adjusting speed")
 
     # Get the path to closest ball
     start_time = 0.0
     if DEBUG:
         start_time = time.time()
     await track.calculate_path()
-    if DEBUG:
-        print(f"Got all paths in {time.time() - start_time} seconds!")
+    logger.debug(f"Got all paths in {time.time() - start_time} seconds!")
     # track.draw(True)
 
     if not track.path:
-        if DEBUG:
-            print("No node to travel to, setting speed to 0!")
+        logger.debug("No node to travel to, setting speed to 0!")
         await robot_api.set_speeds(session, 0, 0)
 
         # if not path_queue.full():
@@ -50,7 +51,7 @@ async def calculate_and_adjust(track: path_algorithm.Track, path_queue: multipro
                                                session=session)
         # await driving_algorithm.adjust_speed_using_pid(track, track.last_target_path[0].node, session)
     else:
-        print("No node")
+        logger.debug("No node")
 
     # next_node = pick_target(track)
     # if next_node:
@@ -103,7 +104,7 @@ async def do_race_iteration(track: path_algorithm.Track, ai_queue: multiprocessi
         ai_queue.task_done()
         ai_event.set()
     except Exception as e:
-        print("uh oh... - " + str(e))
+        logging.error("uh oh... - " + str(e))
         traceback.print_exc()
     except:
         pass
@@ -111,8 +112,7 @@ async def do_race_iteration(track: path_algorithm.Track, ai_queue: multiprocessi
 
 async def race(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue, ai_event: Event,
                track: path_algorithm.Track, session: aiohttp.ClientSession) -> None:
-    if DEBUG:
-        print("Getting initial AI result.")
+    logger.debug("Getting initial AI result.")
     while True:
         if not ai_queue.empty():
             try:
@@ -121,25 +121,23 @@ async def race(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocess
             except:
                 pass
         await asyncio.sleep(0)
-    if DEBUG:
-        print("Got result, marking as ready.")
+    logger.debug("Got result, marking as ready.")
     ai_queue.task_done()
     ai_event.set()
-    if DEBUG:
-        print("AI thread ready.")
+    logger.debug("AI thread ready.")
 
     # input("Ready! Press Enter to start race!")
-    print("Starting race!")
+    logging.info("Starting race!")
     start_time = time.time()
     time_taken = 0
 
-    print("Toggling fans!")
+    logging.info("Toggling fans!")
     await robot_api.toggle_fans(session)
 
-    print("Racing!")
+    logging.info("Racing!")
     while time_taken <= 8 * 60:
         await do_race_iteration(track, ai_queue, path_queue, ai_event, session)
         time_taken = time.time() - start_time
         # Never remove this sleep
         await asyncio.sleep(0)
-    print("Done with race!")
+    logging.info("Done with race!")
