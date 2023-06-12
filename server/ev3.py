@@ -44,15 +44,20 @@ class Robot:
         self.stopped = False
         self.busy = False
 
-    def refresh_conn(self):
+    def refresh_conn(self) -> bool:
         """
         Refresh the connection to the robot.
-        :return: None
+        :return: True if refreshed, else False
         """
         reset_conn()
+        if not conn:
+            return False
         self.motors = get_motors()
         self.fan_motor = get_fan_motor()
         self.buttons = get_button()
+        if not self.motors or not self.fan_motor or not self.buttons:
+            return False
+        return True
 
     def forward(self) -> bool:
         """
@@ -66,7 +71,8 @@ class Robot:
                                right_speed=SpeedPercent(DRIVE_SPEED))
                 return True
         except (EOFError, ReferenceError):
-            self.refresh_conn()
+            if self.refresh_conn():
+                return self.forward()
         return False
 
     def backwards(self) -> bool:
@@ -81,7 +87,8 @@ class Robot:
                                right_speed=SpeedPercent(-DRIVE_SPEED))
                 return True
         except (EOFError, ReferenceError):
-            self.refresh_conn()
+            if self.refresh_conn():
+                return self.backwards()
         return False
 
     def turn_left(self, radians=None, busy_override=False) -> bool:
@@ -104,7 +111,8 @@ class Robot:
                                    right_speed=SpeedPercent(TURN_SPEED))
                 return True
         except (EOFError, ReferenceError):
-            self.refresh_conn()
+            if self.refresh_conn():
+                return self.turn_left(radians, busy_override)
         return False
 
     def turn_right(self, radians=None, busy_override=False) -> bool:
@@ -130,7 +138,8 @@ class Robot:
                                    right_speed=SpeedPercent(-TURN_SPEED))
                 return True
         except (EOFError, ReferenceError):
-            self.refresh_conn()
+            if self.refresh_conn():
+                return self.turn_right(radians, busy_override)
         return False
 
     def toggle_fans(self) -> bool:
@@ -148,7 +157,8 @@ class Robot:
             self.fan_state = not self.fan_state
             return True
         except (EOFError, ReferenceError):
-            self.refresh_conn()
+            if self.refresh_conn():
+                return self.toggle_fans()
         return False
 
     # This function is blocking!
@@ -195,7 +205,8 @@ class Robot:
             self.busy = False
             return status
         except (EOFError, ReferenceError):
-            self.refresh_conn()
+            if self.refresh_conn():
+                return self.turn_to_direction(direction)
         return False
 
     def set_speed(self, left_speed, right_speed) -> bool:
@@ -214,7 +225,8 @@ class Robot:
                 self.motors.right_motor.run_direct(duty_cycle_sp=right_speed)
                 return True
         except (EOFError, ReferenceError):
-            self.refresh_conn()
+            if self.refresh_conn():
+                return self.set_speed(left_speed, right_speed)
         return False
 
     def drive(self, pos: tuple) -> bool:
@@ -242,7 +254,8 @@ class Robot:
 
                 return self.forward()
         except (EOFError, ReferenceError):
-            self.refresh_conn()
+            if self.refresh_conn():
+                return self.drive(pos)
         return False
 
     def stop(self, tries=0) -> bool:
@@ -262,7 +275,7 @@ class Robot:
             except:
                 self.refresh_conn()
                 # keep trying pls, I don't care if it's recursive
-                self.stop(tries=tries+1)
+                return self.stop(tries=tries+1)
         return False
 
     def start(self) -> bool:
@@ -282,10 +295,15 @@ class Robot:
         :return: True if successful, False otherwise
         """
         # Recalibrate the direction / angle
-        dx = self.current_pos[1] - pos[1]
+        dx = self.current_pos[0] - pos[0]
         # We need the opposite of the y-axis, since we start from the top-left, and have a y-axis that goes downwards
-        dy = -self.current_pos[0] + pos[0]
-        self.set_direction(math.atan2(dy, dx))
+        dy = self.current_pos[1] - pos[1]
+
+        angle = math.atan2(dy, dx)
+        if angle < 0:
+            angle += 2 * math.pi
+
+        self.set_direction(math.atan2(dy, dx) % (2 * math.pi))
         # Update position
         self.current_pos = pos
 

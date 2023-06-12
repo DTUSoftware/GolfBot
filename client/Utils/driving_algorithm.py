@@ -6,16 +6,13 @@ import math
 import os
 from typing import Tuple
 
-from client.Utils import math_helpers, path_algorithm
-from client.Services import robot_api
+from Utils import math_helpers, path_algorithm
+from Services import robot_api
 
 # If logging should be disabled
 DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "False").lower()
 # If debugging should be enabled
 DEBUG = ("true" in os.environ.get('DEBUG', "True").lower()) and not DISABLE_LOGGING
-if DEBUG:
-    logging.getLogger().setLevel(logging.DEBUG)
-logger = logging.getLogger(__name__)
 
 # PID constants
 KP = float(os.environ.get('PID_KP', 5))  # Proportional gain  3.04
@@ -30,7 +27,11 @@ DIRECTION_TOLERANCE = float(os.environ.get('DIRECTION_TOLERANCE', 5.0))  # degre
 WHEEL_RADIUS = (float(os.environ.get('WHEEL_DIAMETER', 68.8)) / 2) / 10  # Radius of the robot's wheels in cm
 DIST_BETWEEN_WHEELS = float(
     os.environ.get('DIST_BETWEEN_WHEELS', 83.0 * 2)) / 10  # Distance between the robot's wheels in cm
-ROBOT_BASE_SPEED = float(os.environ.get('ROBOT_BASE_SPEED', 25.0))
+ROBOT_BASE_SPEED = float(os.environ.get('ROBOT_BASE_SPEED', 40.0))
+
+logger = logging.getLogger(__name__)
+if DEBUG:
+    logger.setLevel(logging.DEBUG)
 
 
 async def drive_decision(robot_position: Tuple[int, int], robot_direction: float, target_position: Tuple[int, int],

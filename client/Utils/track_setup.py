@@ -2,8 +2,8 @@ import datetime
 import json
 import os
 import cv2
-from client.Utils import path_algorithm as pathalg
-from client.Utils import opencv_helpers
+from Utils import path_algorithm as pathalg
+from Utils import opencv_helpers
 
 # The webcam to use
 VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 1))

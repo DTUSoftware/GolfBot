@@ -11,9 +11,12 @@ ROBOT_API_ENDPOINT = os.environ.get('API_ENDPOINT', "http://localhost:8069/api/v
 DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "False").lower()
 # If debugging should be enabled
 DEBUG = ("true" in os.environ.get('DEBUG', "True").lower()) and not DISABLE_LOGGING
-if DEBUG:
-    logging.getLogger().setLevel(logging.DEBUG)
+DRIVE_DELAY = 0
+TURN_DELAY = 0
+
 logger = logging.getLogger(__name__)
+if DEBUG:
+    logger.setLevel(logging.DEBUG)
 
 
 async def set_robot_start(session: aiohttp.ClientSession) -> bool:
@@ -73,9 +76,6 @@ async def set_robot_position(session: aiohttp.ClientSession, x: int, y: int) -> 
         if response.status != 200:
             logger.debug(response.status)
             return False
-        else:
-            # Let the robot drive a lil' bit
-            await asyncio.sleep(1)
     return True
 
 
@@ -94,7 +94,7 @@ async def set_robot_direction(session: aiohttp.ClientSession, direction: float) 
             return False
         else:
             # Let the robot drive a lil' bit
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(TURN_DELAY)
     return True
 
 
@@ -113,7 +113,7 @@ async def set_speeds(session: aiohttp.ClientSession, speed_left: float, speed_ri
             return False
         else:
             # Let the robot drive a lil' bit
-            await asyncio.sleep(1)
+            await asyncio.sleep(DRIVE_DELAY)
     return True
 
 

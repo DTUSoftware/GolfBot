@@ -5,7 +5,7 @@ from threading import Event
 import cv2
 import torch
 from ultralytics import YOLO
-from client.Utils.opencv_helpers import draw_object
+from Utils.opencv_helpers import draw_object
 
 # The webcam to use
 VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 1))
@@ -15,9 +15,10 @@ CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/20230601_2")  # 20230608
 DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "True").lower()
 # If debugging should be enabled
 DEBUG = ("true" in os.environ.get('DEBUG', "True").lower()) and not DISABLE_LOGGING
-if DEBUG:
-    logging.getLogger().setLevel(logging.DEBUG)
+
 logger = logging.getLogger(__name__)
+if DEBUG:
+    logger.setLevel(logging.DEBUG)
 
 
 # To be run as a thread

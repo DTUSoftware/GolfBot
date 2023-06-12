@@ -12,12 +12,10 @@ from colorama import Style
 from colorama import init as colorama_init
 from torch import multiprocessing
 
-from client.Utils import math_helpers
+from Utils import math_helpers
 
 # If debugging should be enabled
 DEBUG = "true" in os.environ.get('DEBUG', "True").lower()
-if DEBUG:
-    logging.getLogger().setLevel(logging.DEBUG)
 # The timeout for calculating a path
 TIMEOUT_GET_PATH = 5  # in seconds
 
@@ -25,7 +23,10 @@ TIMEOUT_GET_PATH = 5  # in seconds
 colorama_init()
 # Calculate the distance across a square
 distance_across = math.sqrt(1 ** 2 + 1 ** 2)
+
 logger = logging.getLogger(__name__)
+if DEBUG:
+    logger.setLevel(logging.DEBUG)
 
 
 class Node:
@@ -679,8 +680,13 @@ class Track:
         :param robot_pos: The position of the robot
         :return: None
         """
+        oldpos = self.robot_direction
         # Recalibrate the direction / angle
-        self.robot_direction = math_helpers.calculate_direction(robot_pos, self.robot_pos)
+        self.robot_direction = math_helpers.calculate_direction(position1=robot_pos, position2=self.robot_pos)
+
+        logger.debug(f"Old direction: {oldpos}, new direction: {self.robot_direction}\n"
+                     f"Old position: {self.robot_pos}, new position: {robot_pos}")
+
         # Update position
         self.robot_pos = robot_pos
 
@@ -932,20 +938,22 @@ async def check_new_path(path_queue: multiprocessing.JoinableQueue) -> bool:
         # If robot is at target, pop
         # if DEBUG:
         #     print("Checking if robot has reached target")
-        while not is_target_different(track, track.last_target_path[0].node, track.graph.get_node(track.robot_pos)):
+        while track.last_target_path and not is_target_different(track, track.last_target_path[0].node,
+                                                                 track.graph.get_node(track.robot_pos)):
             logger.debug("Robot reached target, popping")
             track.last_target_path.pop(0)
             track.last_target_node = track.graph.get_node(track.robot_pos)
         # If we passed the target, pop
-        while math_helpers.has_passed_target(track.last_target_path[0].node.get_position(),
-                                             track.graph.get_node(track.robot_pos).get_position(),
-                                             track.last_target_node.get_position()):
+        while track.last_target_path and math_helpers.has_passed_target(track.last_target_path[0].node.get_position(),
+                                                                        track.graph.get_node(
+                                                                            track.robot_pos).get_position(),
+                                                                        track.last_target_node.get_position()):
             logger.debug("Robot passed target, popping")
             track.last_target_path.pop(0)
             track.last_target_node = track.graph.get_node(track.robot_pos)
 
         logger.debug(
-                f"Current optimized path: {[(nodedata.node.x, nodedata.node.y) for nodedata in track.last_target_path]}")
+            f"Current optimized path: {[(nodedata.node.x, nodedata.node.y) for nodedata in track.last_target_path]}")
         if track.last_target_path:
             # Call adjust to adjust for error, and to clear point from list if we reach the target
             return True
@@ -969,7 +977,7 @@ async def check_new_path(path_queue: multiprocessing.JoinableQueue) -> bool:
     # "Summarize" path into good points for targets
     track.last_target_path = await simplify_path(track.path)
     logger.debug(
-            f"Current target optimized path: {[(nodedata.node.x, nodedata.node.y) for nodedata in track.last_target_path]}")
+        f"Current target optimized path: {[(nodedata.node.x, nodedata.node.y) for nodedata in track.last_target_path]}")
 
     # Adjust and go to
     if track.last_target_path:

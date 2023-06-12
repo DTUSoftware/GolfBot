@@ -1,7 +1,7 @@
 import math
 from typing import Tuple
 
-from client.Utils import path_algorithm
+from Utils import path_algorithm
 
 
 def calculate_direction(position1: Tuple[int, int], position2: Tuple[int, int]) -> float:
@@ -17,8 +17,13 @@ def calculate_direction(position1: Tuple[int, int], position2: Tuple[int, int]) 
     """
     dx = position2[0] - position1[0]
     # We need the opposite of the y-axis, since we start from the top-left, and have a y-axis that goes downwards
-    dy = -position2[1] + position1[1]
-    return math.atan2(dy, dx)
+    dy = position2[1] - position1[1]
+
+    angle = math.atan2(dy, dx)
+    if angle < 0:
+        angle += 2 * math.pi
+
+    return angle % (2 * math.pi)
 
 
 def calculate_direction_difference(from_position: Tuple[int, int], middle_position: Tuple[int, int],
@@ -98,3 +103,11 @@ def is_about_to_collide_with_obstacle(pos: Tuple[int, int], direction: float):
     for obstacle in obstacles:
         if obstacle.is_about_to_collide(pos, direction):
             return True
+
+
+if __name__ == "__main__":
+    target_position = (487, 272)
+    robot_pos = (487, 301)
+    res = calculate_direction(position1=robot_pos, position2=target_position)
+    print(res)
+    print(math.degrees(res))

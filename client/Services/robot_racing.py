@@ -7,16 +7,17 @@ from multiprocessing import Event
 import aiohttp
 from torch import multiprocessing
 
-from client.Services import robot_api, robot_ai
-from client.Utils import path_algorithm, driving_algorithm
+from Services import robot_api, robot_ai
+from Utils import path_algorithm, driving_algorithm
 
 # If logging should be disabled
 DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "False").lower()
 # If debugging should be enabled
 DEBUG = ("true" in os.environ.get('DEBUG', "True").lower()) and not DISABLE_LOGGING
-if DEBUG:
-    logging.getLogger().setLevel(logging.DEBUG)
+
 logger = logging.getLogger(__name__)
+if DEBUG:
+    logger.setLevel(logging.DEBUG)
 
 
 async def calculate_and_adjust(track: path_algorithm.Track, path_queue: multiprocessing.JoinableQueue, session: aiohttp.ClientSession):
@@ -141,3 +142,4 @@ async def race(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocess
         # Never remove this sleep
         await asyncio.sleep(0)
     logging.info("Done with race!")
+    robot_api.set_robot_stop()

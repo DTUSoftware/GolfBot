@@ -6,9 +6,9 @@ from typing import Tuple
 import aiohttp
 from torch import multiprocessing
 
-from client.Services import robot_api
-from client.Utils import path_algorithm
-from client.ai.main import run_ai
+from Services import robot_api
+from Utils import path_algorithm
+from ai.main import run_ai
 
 # If logging should be disabled
 DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "False").lower()
@@ -16,9 +16,10 @@ DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "False").lower()
 DEBUG = ("true" in os.environ.get('DEBUG', "True").lower()) and not DISABLE_LOGGING
 # The confidence gate for the robot deciding to go for a golf ball
 GOLF_BALL_CONFIDENCE_GATE = float(os.environ.get('GOLF_BALL_CONFIDENCE_GATE', 0.45))
-if DEBUG:
-    logging.getLogger().setLevel(logging.DEBUG)
+
 logger = logging.getLogger(__name__)
+if DEBUG:
+    logger.setLevel(logging.DEBUG)
 
 
 def box_confidence(box) -> float:
