@@ -6,7 +6,7 @@ from ultralytics import YOLO
 # Path to the pretrained model
 PRETRAINED_MODEL = os.environ.get("PRETRAINED_MODEL", "yolov8n.pt")
 # Path to the dataset
-DATA = os.environ.get("DATA", "datasets/RoboFlow0608-plz2-sehrgud")
+DATA = os.environ.get("DATA", "datasets/RoboFlow1206-plzfixwheel")
 # Number of epochs to train for
 EPOCHS = int(os.environ.get("EPOCHS", 750))
 # Image size
