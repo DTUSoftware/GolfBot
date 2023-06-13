@@ -162,7 +162,7 @@ class Ball:
         """
         return self.x, self.y
 
-    async def get_drive_path(self) -> List[Node]:
+    def get_drive_path(self) -> List[Node]:
         obstacle_angle_array: np.ndarray = np.array([])
         for obstacle in TRACK_GLOBAL.obstacles:
             distance_from_obstacle, obstacle_node = obstacle.get_distance(self.get_position())
@@ -270,7 +270,8 @@ class Goal:
 
         # Get points to drive to
         point_1 = (int(middle[0] + math.cos(angle) * 50), int(middle[1] + math.sin(angle) * 50))
-        point_2 = (int(middle[0] + math.cos(angle) * DELIVERY_DISTANCE), int(middle[1] + math.sin(angle) * DELIVERY_DISTANCE))
+        point_2 = (
+        int(middle[0] + math.cos(angle) * DELIVERY_DISTANCE), int(middle[1] + math.sin(angle) * DELIVERY_DISTANCE))
 
         return [point_1, point_2]
 
