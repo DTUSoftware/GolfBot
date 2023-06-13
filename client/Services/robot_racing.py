@@ -122,12 +122,12 @@ async def do_race_iteration(track: path_algorithm.Track, ai_queue: multiprocessi
         objects_to_navigate_to: List[List[Tuple[int, int]]] = []
         if track.balls and (len(seen_ball_queue) < 10 or len([seen_ball for seen_ball in seen_ball_queue if seen_ball]) >= 4):
             # Get every ball that's not golden
-            objects_to_navigate_to = [ball.get_drive_path() for ball in track.balls if not ball.golden]
+            objects_to_navigate_to = [ball.get_drive_path() for ball in track.balls if not ball.golden and ball.get_drive_path()]
             # If no balls that aren't golden
             if not objects_to_navigate_to:
                 logger.debug("Only the golden ball is left, trying to fetch it")
                 # Include the golden ball
-                objects_to_navigate_to = [ball.get_drive_path() for ball in track.balls]
+                objects_to_navigate_to = [ball.get_drive_path() for ball in track.balls if ball.get_drive_path()]
         else:
             goal_path = await track.small_goal.deliver_path()
             if goal_path:
