@@ -256,7 +256,7 @@ class Goal:
         Delivers the balls to the goal.
 
         Returns:
-            None
+            List[Tuple[int, int]]: The points to drive to.
         """
 
         # Get middle of the goal
@@ -272,8 +272,7 @@ class Goal:
         point_1 = (int(middle[0] + math.cos(angle) * 50), int(middle[1] + math.sin(angle) * 50))
         point_2 = (int(middle[0] + math.cos(angle) * DELIVERY_DISTANCE), int(middle[1] + math.sin(angle) * DELIVERY_DISTANCE))
 
-        # Drive to points
-
+        return [point_1, point_2]
 
 
 class NodeData:
@@ -766,33 +765,25 @@ class Track:
         # Update position
         self.robot_pos = robot_pos
 
-    async def calculate_path(self) -> None:
+    async def calculate_path(self, objects_to_navigate_to: List[Tuple[int, int]]) -> None:
         """
         Calculate the path to the next ball
         :return: None
         """
         # if DEBUG:
         #     print("Calculating path")
-        if not self.balls:
-            logger.debug("No balls, returning empty")
+        if not objects_to_navigate_to:
+            logger.debug("No objects, returning empty")
             self.path = []
             return
-
-        # Get every ball that's not golden
-        balls_to_catch = [ball for ball in self.balls if not ball.golden]
-        # If no balls that aren't golden
-        if not balls_to_catch:
-            logger.debug("Only the golden ball is left, trying to fetch it")
-            # Include the golden ball
-            balls_to_catch = self.balls
 
         # For every ball calculate the path, then choose the best path
         logger.debug("Calculating path for every ball")
         paths = []
-        if balls_to_catch:
+        if objects_to_navigate_to:
             robot_node = self.graph.get_node(self.robot_pos)
-            ball_nodes = [self.graph.get_node((ball.x, ball.y)) for ball in balls_to_catch]
-            tasks = [self.graph.get_path(start_node=robot_node, dst_node=ball_node) for ball_node in ball_nodes]
+            object_nodes = [self.graph.get_node(obj) for obj in objects_to_navigate_to]
+            tasks = [self.graph.get_path(start_node=robot_node, dst_node=ball_node) for ball_node in object_nodes]
             done, pending = await asyncio.wait(tasks, timeout=TIMEOUT_GET_PATH, return_when=asyncio.ALL_COMPLETED)
             logger.debug(f"Done calculating paths: {len(done)} done, {len(pending)} timed out")
             [task.cancel() for task in pending]
@@ -885,7 +876,7 @@ class Track:
         Plot the path
         :return: None
         """
-        await self.calculate_path()
+        await self.calculate_path([ball.get_position() for ball in self.balls])
         points_in_path = [[], []]
         for nodeData in self.path:
             points_in_path[0].append(nodeData.node.x)
