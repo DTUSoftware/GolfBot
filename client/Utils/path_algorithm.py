@@ -18,9 +18,10 @@ from Utils import math_helpers
 DEBUG = "true" in os.environ.get('DEBUG', "True").lower()
 # The timeout for calculating a path
 TIMEOUT_GET_PATH = 5  # in seconds
-PATH_OBSTACLE_DISTANCE = 10  # in units
-DELIVERY_DISTANCE = 10  # in units
-SAFETY_LENGTH = 10  # in units
+PATH_OBSTACLE_DISTANCE = 40  # in units
+DELIVERY_DISTANCE_FAR = 100  # in units
+DELIVERY_DISTANCE = 50  # in units
+SAFETY_LENGTH = 70  # in units
 
 # Initialize colorama
 colorama_init()
@@ -163,21 +164,32 @@ class Ball:
         return self.x, self.y
 
     def get_drive_path(self) -> List[Tuple[int, int]]:
-        obstacle_angle_array: np.ndarray = np.array([])
+        """
+        Returns the drive path of the ball as a list of (x, y) coordinates.
+        Returns:
+            List[Tuple[int, int]]: The drive path of the ball.
+        """
+        obstacle_angle_array = []
         for obstacle in TRACK_GLOBAL.obstacles:
-            distance_from_obstacle, obstacle_node = obstacle.get_distance(self.get_position())
-            if distance_from_obstacle < PATH_OBSTACLE_DISTANCE:
-                np.append(obstacle_angle_array, obstacle_node.get_heading(self.get_position()))
+            for node in obstacle.path:
+                distance = math_helpers.calculate_distance(self.get_position(), node.get_position())
+                if distance < PATH_OBSTACLE_DISTANCE:
+                    # logger.debug(f"Ball distance from obstacle: {distance}")
+                    obstacle_angle_array.append(node.get_heading(self.get_position()))
         if not obstacle_angle_array:
-            return []
+            logger.debug("Ball isn't close to an obstacle.")
+            # We need to return two points to make a line, even if it's the same
+            return [self.get_position(), self.get_position()]
+        logger.debug("Ball is close to an obstacle.")
 
         # Get the path to the balls while avoiding obstacles
         avg_angles = np.mean(obstacle_angle_array)
-        dx = math.cos(avg_angles) * SAFETY_LENGTH
-        dy = math.sin(avg_angles) * SAFETY_LENGTH
-        x1 = self.x + dx
-        y1 = self.y + dy
-        return [(x1, y1), (self.x, self.y)]
+        angle = (2 * math.pi) - avg_angles
+        dx = math.cos(angle) * SAFETY_LENGTH
+        dy = math.sin(angle) * SAFETY_LENGTH
+        x1 = int(self.x + dx)
+        y1 = int(self.y + dy)
+        return [(x1, y1), self.get_position()]
 
 
 class Obstacle:
@@ -268,9 +280,10 @@ class Goal:
             angle = math.radians(180)
 
         # Get points to drive to
-        point_1 = (int(middle[0] + math.cos(angle) * 50), int(middle[1] + math.sin(angle) * 50))
-        point_2 = (
-        int(middle[0] + math.cos(angle) * DELIVERY_DISTANCE), int(middle[1] + math.sin(angle) * DELIVERY_DISTANCE))
+        point_1 = (int(middle[0] + math.cos(angle) * DELIVERY_DISTANCE_FAR),
+                   int(middle[1] + math.sin(angle) * DELIVERY_DISTANCE_FAR))
+        point_2 = (int(middle[0] + math.cos(angle) * DELIVERY_DISTANCE),
+                   int(middle[1] + math.sin(angle) * DELIVERY_DISTANCE))
 
         return [point_1, point_2]
 
@@ -784,27 +797,28 @@ class Track:
         if objects_to_navigate_to:
             robot_node = self.graph.get_node(self.robot_pos)
             object_nodes = [self.graph.get_node(obj[0]) for obj in objects_to_navigate_to]
-            tasks = [self.graph.get_path(start_node=robot_node, dst_node=ball_node) for ball_node in object_nodes]
-            done, pending = await asyncio.wait(tasks, timeout=TIMEOUT_GET_PATH, return_when=asyncio.ALL_COMPLETED)
-            logger.debug(f"Done calculating paths: {len(done)} done, {len(pending)} timed out")
-            [task.cancel() for task in pending]
-            for task in done:
-                path_list: List[NodeData] = []
-                try:
-                    # Get path from task
-                    path_list = await task
-                except TimeoutError:
-                    pass
-                # Add path to paths
-                if path_list:
-                    # Add the last node to the path
-                    last_in_path_list = path_list[-1]
-                    target_obj = [obj[1] for obj in objects_to_navigate_to if
-                                  obj[0] == last_in_path_list.node.get_position()]
-                    path_list.append(
-                        NodeData(node=self.graph.get_node(target_obj[0]), g=last_in_path_list.g, h=last_in_path_list.h,
-                                 parent=last_in_path_list.node))
-                    paths.append(path_list)
+            tasks = [self.graph.get_path(start_node=robot_node, dst_node=ball_node) for ball_node in object_nodes if ball_node]
+            if tasks:
+                done, pending = await asyncio.wait(tasks, timeout=TIMEOUT_GET_PATH, return_when=asyncio.ALL_COMPLETED)
+                logger.debug(f"Done calculating paths: {len(done)} done, {len(pending)} timed out")
+                [task.cancel() for task in pending]
+                for task in done:
+                    path_list: List[NodeData] = []
+                    try:
+                        # Get path from task
+                        path_list = await task
+                    except TimeoutError:
+                        pass
+                    # Add path to paths
+                    if path_list:
+                        # Add the last node to the path
+                        last_in_path_list = path_list[-1]
+                        target_obj = [obj[1] for obj in objects_to_navigate_to if
+                                      obj[0] == last_in_path_list.node.get_position()]
+                        path_list.append(
+                            NodeData(node=self.graph.get_node(target_obj[0]), g=last_in_path_list.g, h=last_in_path_list.h,
+                                     parent=last_in_path_list.node))
+                        paths.append(path_list)
 
         if paths:
             # if DEBUG:
