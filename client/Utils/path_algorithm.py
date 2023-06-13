@@ -20,6 +20,7 @@ DEBUG = "true" in os.environ.get('DEBUG', "True").lower()
 TIMEOUT_GET_PATH = 5  # in seconds
 PATH_OBSTACLE_DISTANCE = 10  # in units
 DELIVERY_DISTANCE = 10  # in units
+SAFETY_LENGTH = 10  # in units
 
 # Initialize colorama
 colorama_init()
@@ -136,7 +137,7 @@ class Node:
 
 
 class Ball:
-    def __init__(self, pos: tuple, golden=False) -> None:
+    def __init__(self, pos: tuple, golden: bool = False) -> None:
         """
         Initializes a new instance of the Ball class.
 
@@ -150,6 +151,34 @@ class Ball:
         self.x = pos[0]
         self.y = pos[1]
         self.golden = golden
+        self.drivePath: List[Node] = self.get_drive_path()
+
+    def get_position(self) -> Tuple[int, int]:
+        """
+        Returns the position of the ball as a tuple of (x, y) coordinates.
+
+        Returns:
+            Tuple[int, int]: The position of the ball.
+        """
+        return self.x, self.y
+
+    async def get_drive_path(self) -> List[Node]:
+        obstacle_angle_array: np.ndarray = np.array([])
+        for obstacle in TRACK_GLOBAL.obstacles:
+            distance_from_obstacle, obstacle_node = obstacle.get_distance(self.get_position())
+            if distance_from_obstacle < PATH_OBSTACLE_DISTANCE:
+                np.append(obstacle_angle_array, obstacle_node.get_heading(self.get_position()))
+        if not obstacle_angle_array:
+            return []
+
+        # Get the path to the balls while avoiding obstacles
+        avg_angles = np.mean(obstacle_angle_array)
+        dx = math.cos(avg_angles) * SAFETY_LENGTH
+        dy = math.sin(avg_angles) * SAFETY_LENGTH
+        x1 = self.x + dx
+        y1 = self.y + dy
+        path: List[Node] = [Node((x1, y1)), Node((self.x, self.y))]
+        return path
 
 
 class Obstacle:
@@ -1076,9 +1105,9 @@ async def check_new_path(path_queue: multiprocessing.JoinableQueue) -> bool:
     logger.debug(
         f"Current target optimized path: {[(nodedata.node.x, nodedata.node.y) for nodedata in track.last_target_path]}")
 
-    track.last_target_path = await add_buffer_to_path(track.last_target_path)
-    logger.debug(
-        f"Current target optimized path, with buffer: {[(nodedata.node.x, nodedata.node.y) for nodedata in track.last_target_path]}")
+    # track.last_target_path = await add_buffer_to_path(track.last_target_path)
+    # logger.debug(
+    #     f"Current target optimized path, with buffer: {[(nodedata.node.x, nodedata.node.y) for nodedata in track.last_target_path]}")
 
     # Adjust and go to
     if track.last_target_path:
