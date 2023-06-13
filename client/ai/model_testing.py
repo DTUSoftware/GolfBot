@@ -7,9 +7,13 @@ from PIL import Image
 from ultralytics import YOLO
 
 # Which webcam to use
-VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 1))
+VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 0))
 # The model to use
+<<<<<<< Updated upstream
 CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/20231306-hackyfix")
+=======
+CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/20231306-mightwork")
+>>>>>>> Stashed changes
 # The directory to save the captured results to
 DATA = os.environ.get("DATA", "datasets/RoboFlow0506-1")
 
