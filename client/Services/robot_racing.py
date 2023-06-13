@@ -24,7 +24,18 @@ if DEBUG:
 seen_ball_queue = []
 
 
-async def calculate_and_adjust(track: path_algorithm.Track, path_queue: multiprocessing.JoinableQueue, session: aiohttp.ClientSession, objects_to_navigate_to: List[Tuple[int, int]]):
+async def calculate_and_adjust(track: path_algorithm.Track, path_queue: multiprocessing.JoinableQueue, session: aiohttp.ClientSession, objects_to_navigate_to: List[List[Tuple[int, int]]]) -> None:
+    """
+    Calculates the path and adjusts the speed
+    Args:
+        track: The track to use
+        path_queue: the queue to put the path in
+        session: the session to use
+        objects_to_navigate_to: the objects to navigate to
+
+    Returns:
+        None
+    """
     logger.debug("Calculating path and adjusting speed")
 
     # Get the path to closest ball
@@ -108,19 +119,19 @@ async def do_race_iteration(track: path_algorithm.Track, ai_queue: multiprocessi
         else:
             seen_ball_queue.append(False)
 
-        objects_to_navigate_to = []
+        objects_to_navigate_to: List[List[Tuple[int, int]]] = []
         if track.balls and (len(seen_ball_queue) < 10 or len([seen_ball for seen_ball in seen_ball_queue if seen_ball]) >= 4):
             # Get every ball that's not golden
-            objects_to_navigate_to = [ball.get_position() for ball in track.balls if not ball.golden]
+            objects_to_navigate_to = [ball.get_drive_path() for ball in track.balls if not ball.golden]
             # If no balls that aren't golden
             if not objects_to_navigate_to:
                 logger.debug("Only the golden ball is left, trying to fetch it")
                 # Include the golden ball
-                objects_to_navigate_to = [ball.get_position() for ball in track.balls]
+                objects_to_navigate_to = [ball.get_drive_path() for ball in track.balls]
         else:
             goal_path = await track.small_goal.deliver_path()
             if goal_path:
-                objects_to_navigate_to = [goal_path[0]]
+                objects_to_navigate_to = [goal_path]
         # Calculate track path and give the robot directions
         await calculate_and_adjust(track, path_queue, session, objects_to_navigate_to)
 

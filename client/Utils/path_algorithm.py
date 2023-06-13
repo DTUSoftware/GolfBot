@@ -151,7 +151,7 @@ class Ball:
         self.x = pos[0]
         self.y = pos[1]
         self.golden = golden
-        self.drivePath: List[Node] = self.get_drive_path()
+        self.drivePath: List[Tuple[int, int]] = self.get_drive_path()
 
     def get_position(self) -> Tuple[int, int]:
         """
@@ -162,7 +162,7 @@ class Ball:
         """
         return self.x, self.y
 
-    def get_drive_path(self) -> List[Node]:
+    def get_drive_path(self) -> List[Tuple[int, int]]:
         obstacle_angle_array: np.ndarray = np.array([])
         for obstacle in TRACK_GLOBAL.obstacles:
             distance_from_obstacle, obstacle_node = obstacle.get_distance(self.get_position())
@@ -177,8 +177,7 @@ class Ball:
         dy = math.sin(avg_angles) * SAFETY_LENGTH
         x1 = self.x + dx
         y1 = self.y + dy
-        path: List[Node] = [Node((x1, y1)), Node((self.x, self.y))]
-        return path
+        return [(x1, y1), (self.x, self.y)]
 
 
 class Obstacle:
@@ -766,9 +765,10 @@ class Track:
         # Update position
         self.robot_pos = robot_pos
 
-    async def calculate_path(self, objects_to_navigate_to: List[Tuple[int, int]]) -> None:
+    async def calculate_path(self, objects_to_navigate_to: List[List[Tuple[int, int]]]) -> None:
         """
         Calculate the path to the next ball
+        :param objects_to_navigate_to: The objects to navigate to
         :return: None
         """
         # if DEBUG:
@@ -780,19 +780,31 @@ class Track:
 
         # For every ball calculate the path, then choose the best path
         logger.debug("Calculating path for every ball")
-        paths = []
+        paths: List[List[NodeData]] = []
         if objects_to_navigate_to:
             robot_node = self.graph.get_node(self.robot_pos)
-            object_nodes = [self.graph.get_node(obj) for obj in objects_to_navigate_to]
+            object_nodes = [self.graph.get_node(obj[0]) for obj in objects_to_navigate_to]
             tasks = [self.graph.get_path(start_node=robot_node, dst_node=ball_node) for ball_node in object_nodes]
             done, pending = await asyncio.wait(tasks, timeout=TIMEOUT_GET_PATH, return_when=asyncio.ALL_COMPLETED)
             logger.debug(f"Done calculating paths: {len(done)} done, {len(pending)} timed out")
             [task.cancel() for task in pending]
             for task in done:
+                path_list: List[NodeData] = []
                 try:
-                    paths.append(await task)
+                    # Get path from task
+                    path_list = await task
                 except TimeoutError:
                     pass
+                # Add path to paths
+                if path_list:
+                    # Add the last node to the path
+                    last_in_path_list = path_list[-1]
+                    target_obj = [obj[1] for obj in objects_to_navigate_to if
+                                  obj[0] == last_in_path_list.node.get_position()]
+                    path_list.append(
+                        NodeData(node=self.graph.get_node(target_obj[0]), g=last_in_path_list.g, h=last_in_path_list.h,
+                                 parent=last_in_path_list.node))
+                    paths.append(path_list)
 
         if paths:
             # if DEBUG:
@@ -877,7 +889,7 @@ class Track:
         Plot the path
         :return: None
         """
-        await self.calculate_path([ball.get_position() for ball in self.balls])
+        await self.calculate_path([ball.get_drive_path() for ball in self.balls])
         points_in_path = [[], []]
         for nodeData in self.path:
             points_in_path[0].append(nodeData.node.x)
