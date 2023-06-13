@@ -19,6 +19,7 @@ DEBUG = "true" in os.environ.get('DEBUG', "True").lower()
 # The timeout for calculating a path
 TIMEOUT_GET_PATH = 5  # in seconds
 PATH_OBSTACLE_DISTANCE = 10  # in units
+DELIVERY_DISTANCE = 10  # in units
 
 # Initialize colorama
 colorama_init()
@@ -214,13 +215,40 @@ class Goal:
         Returns:
             None
         """
+        if len(points) != 2:
+            raise ValueError("Points must be a list of two tuples for a goal.")
+
         self.path: List[Node] = path
         self.small = small
         self.points: Optional[List[Tuple[int, int]]] = points
 
+    async def deliver_path(self) -> List[Tuple[int, int]]:
+        """
+        Delivers the balls to the goal.
+
+        Returns:
+            None
+        """
+
+        # Get middle of the goal
+        middle = (int((self.points[0][0] + self.points[1][0]) / 2), int((self.points[0][1] + self.points[1][1]) / 2))
+
+        # Get angle to middle of the goal
+        if middle[0] < TRACK_GLOBAL.bounds["x"] / 2:
+            angle = math.radians(0)
+        else:
+            angle = math.radians(180)
+
+        # Get points to drive to
+        point_1 = (int(middle[0] + math.cos(angle) * 50), int(middle[1] + math.sin(angle) * 50))
+        point_2 = (int(middle[0] + math.cos(angle) * DELIVERY_DISTANCE), int(middle[1] + math.sin(angle) * DELIVERY_DISTANCE))
+
+        # Drive to points
+
+
 
 class NodeData:
-    def __init__(self, node: Node, g: float, h: float, parent: Optional[Node]) -> None:
+    def __init__(self, node: Node, g: float = math.inf, h: float = math.inf, parent: Optional[Node] = None) -> None:
         """
         Initializes a new instance of the NodeData class.
 
@@ -717,7 +745,7 @@ class Track:
         # if DEBUG:
         #     print("Calculating path")
         if not self.balls:
-            logger.debug("No balls, returning empty path")
+            logger.debug("No balls, returning empty")
             self.path = []
             return
 
@@ -725,7 +753,7 @@ class Track:
         balls_to_catch = [ball for ball in self.balls if not ball.golden]
         # If no balls that aren't golden
         if not balls_to_catch:
-            logger.debug("Only the golden ball is left, fetching it")
+            logger.debug("Only the golden ball is left, trying to fetch it")
             # Include the golden ball
             balls_to_catch = self.balls
 

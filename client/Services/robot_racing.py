@@ -19,6 +19,8 @@ logger = logging.getLogger(__name__)
 if DEBUG:
     logger.setLevel(logging.DEBUG)
 
+seen_ball_queue = []
+
 
 async def calculate_and_adjust(track: path_algorithm.Track, path_queue: multiprocessing.JoinableQueue, session: aiohttp.ClientSession):
     logger.debug("Calculating path and adjusting speed")
@@ -96,8 +98,19 @@ async def do_race_iteration(track: path_algorithm.Track, ai_queue: multiprocessi
         await robot_ai.update_robot_from_ai_result(track, robot_results, session)
         await robot_ai.update_balls_from_ai_result(track, golf_ball_results, golden_ball_results)
 
-        # Calculate track path and give the robot directions
-        await calculate_and_adjust(track, path_queue, session)
+        # Update queue with results
+        if len(seen_ball_queue) == 10:
+            seen_ball_queue.pop(0)
+        if track.balls:
+            seen_ball_queue.append(True)
+        else:
+            seen_ball_queue.append(False)
+
+        if track.balls and (len(seen_ball_queue) < 10 or len([seen_ball for seen_ball in seen_ball_queue if seen_ball]) >= 4):
+            # Calculate track path and give the robot directions
+            await calculate_and_adjust(track, path_queue, session)
+        else:
+            await track.small_goal.deliver_path()
 
         # Let AI know we are done with the data
         # if DEBUG:
