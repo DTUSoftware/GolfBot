@@ -105,7 +105,7 @@ def has_passed_target(frompos: Tuple[int, int], target: Tuple[int, int], current
     return False
 
 
-def is_about_to_collide_with_obstacle(pos: Tuple[int, int], direction: float):
+def is_about_to_collide_with_obstacle(pos: Tuple[int, int], direction: float) -> bool:
     """
     Checks if you are about to collide with an obstacle.
     :param pos: your current position
@@ -116,6 +116,7 @@ def is_about_to_collide_with_obstacle(pos: Tuple[int, int], direction: float):
     for obstacle in obstacles:
         if obstacle.is_about_to_collide(pos, direction):
             return True
+    return False
 
 
 if __name__ == "__main__":

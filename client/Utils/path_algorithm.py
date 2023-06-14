@@ -19,12 +19,12 @@ DEBUG = "true" in os.environ.get('DEBUG', "True").lower()
 # The timeout for calculating a path
 TIMEOUT_GET_PATH = 5  # in seconds
 PATH_OBSTACLE_DISTANCE = 40  # in units
-DELIVERY_DISTANCE_FAR = 100  # in units
+DELIVERY_DISTANCE_FAR = 150  # in units
 DELIVERY_DISTANCE = 50  # in units
-SAFETY_LENGTH = 70  # in units
+SAFETY_LENGTH = 150  # in units
 HEADING_DIFFERENCE_DELIVERY = 10  # in degrees
 COLLISION_DISTANCE = 30  # in units (pixels)
-DIRECTION_DIFFERENCE = 5  # in degrees
+DIRECTION_DIFFERENCE = 45  # in degrees
 
 # Initialize colorama
 colorama_init()
@@ -238,8 +238,8 @@ class Obstacle:
         """
         distance, node = self.get_distance(position)
         if distance < COLLISION_DISTANCE:
-            if math_helpers.calculate_direction(position, node.get_position()) - heading < math.radians(
-                    DIRECTION_DIFFERENCE):
+            direction = math_helpers.calculate_direction(to_pos=node.get_position(), from_pos=position)
+            if abs(direction - heading) < math.radians(DIRECTION_DIFFERENCE):
                 return True
         return False
 
@@ -299,26 +299,66 @@ class Goal:
 
         return [point_1, point_2]
 
-    def is_in_delivery_position(self) -> bool:
+    def is_in_delivery_distance(self) -> bool:
         """
-        Checks whether the robot is in the delivery position.
-        :return: True if the robot is in the delivery position, False otherwise
+        Checks whether the robot is in the delivery distance.
+        :return: True if the robot is in the delivery distance, False otherwise
         """
         # Get the middle and the angle
-        middle, angle = self.get_middle_and_angle()
+        middle, _ = self.get_middle_and_angle()
 
         # Get the distance to the middle
-        distance = math_helpers.calculate_distance(TRACK_GLOBAL.get_path_position(), middle)
+        distance = math_helpers.calculate_distance(TRACK_GLOBAL.get_front_position(), middle)
 
         # Check if robot is close enough to the middle
         if distance > DELIVERY_DISTANCE:
             return False
 
+        return True
+
+    def get_angle_to_middle(self) -> float:
+        """
+        Gets the angle to the middle of the goal.
+        :return: The angle to the middle of the goal.
+        """
+        # Get the middle and the angle
+        middle, _ = self.get_middle_and_angle()
+
         # Get the angle to the middle
         angle_to_middle = math_helpers.calculate_direction(TRACK_GLOBAL.get_turn_position(), middle)
 
+        return angle_to_middle
+
+    def delivery_direction_diff(self) -> float:
+        """
+        Gets the difference between the robot's heading and the delivery direction.
+        :return: The difference between the robot's heading and the delivery direction.
+        """
+        # Get the difference between the robot's heading and the delivery direction
+        return self.get_angle_to_middle() - TRACK_GLOBAL.robot_direction
+
+    def is_in_delivery_direction(self) -> bool:
+        """
+        Checks whether the robot is in the delivery direction.
+        :return: True if the robot is in the delivery direction, False otherwise
+        """
         # Check if robot is facing the middle
-        if abs(angle_to_middle - TRACK_GLOBAL.robot_direction) > math.radians(HEADING_DIFFERENCE_DELIVERY):
+        if abs(self.delivery_direction_diff()) > math.radians(HEADING_DIFFERENCE_DELIVERY):
+            return False
+
+        return True
+
+    def is_in_delivery_position(self) -> bool:
+        """
+        Checks whether the robot is in the delivery position.
+        :return: True if the robot is in the delivery position, False otherwise
+        """
+        # Check if robot is close enough to the middle
+        if not self.is_in_delivery_distance():
+            return False
+
+        # Check if robot is facing the middle
+        if not self.is_in_delivery_direction():
             return False
 
         return True
@@ -800,7 +840,7 @@ class Track:
         """
         self.balls = []
 
-    def get_path_position(self) -> Tuple[int, int]:
+    def get_front_position(self) -> Tuple[int, int]:
         """
         Get the position to use for calculating paths (we want to use the front if possible)
         Returns:
@@ -862,7 +902,7 @@ class Track:
         logger.debug("Calculating path for every ball")
         paths: List[List[NodeData]] = []
         if objects_to_navigate_to:
-            robot_node = self.graph.get_node(self.get_path_position())
+            robot_node = self.graph.get_node(self.get_front_position())
             object_nodes = [self.graph.get_node(obj[0]) for obj in objects_to_navigate_to]
             tasks = [self.graph.get_path(start_node=robot_node, dst_node=ball_node) for ball_node in object_nodes if
                      ball_node]
@@ -1137,6 +1177,7 @@ async def check_new_path(path_queue: multiprocessing.JoinableQueue) -> bool:
     track = TRACK_GLOBAL
     if not track:
         return False
+    robot_position = track.get_turn_position()
     # if DEBUG:
     #     print(
     #         f"current last target path: {[nodedata.node.get_position() for nodedata in last_target_path] if last_target_path else []}\n"
@@ -1152,17 +1193,17 @@ async def check_new_path(path_queue: multiprocessing.JoinableQueue) -> bool:
         # if DEBUG:
         #     print("Checking if robot has reached target")
         while track.last_target_path and not is_target_different(track, track.last_target_path[0].node,
-                                                                 track.graph.get_node(track.get_path_position())):
+                                                                 track.graph.get_node(robot_position)):
             logger.debug("Robot reached target, popping")
             track.last_target_path.pop(0)
-            track.last_target_node = track.graph.get_node(track.get_path_position())
+            track.last_target_node = track.graph.get_node(robot_position)
         # If we passed the target, pop
         while track.last_target_path and math_helpers.has_passed_target(track.last_target_path[0].node.get_position(),
-                                                                        track.get_path_position(),
+                                                                        robot_position,
                                                                         track.last_target_node.get_position()):
             logger.debug("Robot passed target, popping")
             track.last_target_path.pop(0)
-            track.last_target_node = track.graph.get_node(track.get_path_position())
+            track.last_target_node = track.graph.get_node(robot_position)
 
         logger.debug(
             f"Current optimized path: {[(nodedata.node.x, nodedata.node.y) for nodedata in track.last_target_path]}")
@@ -1210,10 +1251,10 @@ async def check_new_path(path_queue: multiprocessing.JoinableQueue) -> bool:
 
         track.last_target_node = track.last_target_path[-1].node
 
-        while track.last_target_path and not is_target_different(track, track.last_target_path[0].node, track.graph.get_node(track.get_path_position())):
+        while track.last_target_path and not is_target_different(track, track.last_target_path[0].node, track.graph.get_node(robot_position)):
             logger.debug("Robot reached target, popping")
             track.last_target_path.pop(0)
-            track.last_target_node = track.graph.get_node(track.get_path_position())
+            track.last_target_node = track.graph.get_node(robot_position)
 
         return True
 

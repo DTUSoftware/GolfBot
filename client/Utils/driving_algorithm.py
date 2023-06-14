@@ -23,7 +23,7 @@ KD = float(os.environ.get('PID_KD', 0.05))  # Derivative gain - 0.05
 # Distance and direction tolerance
 DISTANCE_TOLERANCE = float(os.environ.get('DISTANCE_TOLERANCE', 1.0))  # in units
 DIRECTION_TOLERANCE = float(os.environ.get('DIRECTION_TOLERANCE', 45.0))  # degrees
-DIRECTION_TOLERANCE_NEW = float(os.environ.get('DIRECTION_TOLERANCE_NEW', 5.0))  # degrees
+DIRECTION_TOLERANCE_NEW = float(os.environ.get('DIRECTION_TOLERANCE_NEW', 15.0))  # degrees
 
 # Robot parameters
 WHEEL_RADIUS = (float(os.environ.get('WHEEL_DIAMETER', 68.8)) / 2) / 10  # Radius of the robot's wheels in cm
@@ -48,19 +48,25 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
     """
 
     track = path_algorithm.TRACK_GLOBAL
-    robot_position = track.get_path_position()
     robot_direction = track.robot_direction
 
-    logger.debug(f"Trying to get robot from {robot_position} to {target_position}. Robot currently has a direction of "
+    logger.debug(f"Trying to get robot from {track.get_front_position()} to {target_position}. Robot currently has a direction of "
                  f"{math.degrees(robot_direction)} deg ({robot_direction} rad)")
 
     # If robot position is invalid, return
-    if robot_position == (0, 0) or target_position == (0, 0):
+    if track.get_front_position() == (0, 0) or track.get_turn_position() == (0, 0) or target_position == (0, 0):
         # Stop robot
         await robot_api.set_speeds(session=session, speed_left=0, speed_right=0)
         return
 
-    if path_algorithm.TRACK_GLOBAL.small_goal.is_in_delivery_position():
+    if path_algorithm.TRACK_GLOBAL.small_goal.is_in_delivery_distance():
+        logger.debug("Robot is in delivery distance")
+
+        if not path_algorithm.TRACK_GLOBAL.small_goal.is_in_delivery_direction():
+            logger.debug("Robot is not in delivery direction, moving robot to delivery direction")
+            await robot_api.turn_robot(session=session, direction=path_algorithm.TRACK_GLOBAL.small_goal.get_angle_to_middle())
+            return
+
         logger.info("Robot is in delivery position, stopping robot and fans.")
         await robot_api.set_speeds(session=session, speed_left=0, speed_right=0)
         await robot_api.toggle_fans(session=session)
@@ -75,7 +81,7 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
         return
 
     # If the robot is about to drive into a wall or other obstacle, stop the robot
-    if math_helpers.is_about_to_collide_with_obstacle(robot_position, robot_direction):
+    if math_helpers.is_about_to_collide_with_obstacle(track.get_front_position(), robot_direction):
         logger.debug("Robot is about to collide with an obstacle, driving robot backwards")
         await robot_api.set_speeds(session=session, speed_left=-ROBOT_BASE_SPEED, speed_right=-ROBOT_BASE_SPEED)
         # TODO: evaluate this sleep
@@ -83,7 +89,9 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
         return
 
     # Get the distance between the two targets
-    distance = math_helpers.calculate_distance(position1=robot_position, position2=target_position)
+    # We use the turn position (rear) of the robot as the starting point,
+    # as that is our turning point, so we turn at that point
+    distance = math_helpers.calculate_distance(position1=track.get_turn_position(), position2=target_position)
 
     logger.debug(f"The distance between the robot and the target is {distance} units")
 
@@ -118,9 +126,11 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
             # Adjust the robot speed depending on the direction difference, adding a small offset to the speed
             # to make sure the robot is always moving towards the correct angle
 
-            speed_correction_multiplier = 0.75
-            speed_correction = direction_diff * speed_correction_multiplier
-            
+            # We make the direction diff (which can be at max math.pi * 2) into a value between 0 and 1
+            # and multiply it by a multiplier to get a speed correction value between 0 and speed_correction_multiplier
+            speed_correction_multiplier = 100
+            speed_correction = (direction_diff / (math.pi * 2)) * speed_correction_multiplier
+
             if robot_direction < new_direction:
                 # If the robot is to the left of the target, turn right by decreasing the left wheel speed
                 robot_speed_left = ROBOT_BASE_SPEED - speed_correction

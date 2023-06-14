@@ -10,7 +10,7 @@ from Utils.opencv_helpers import draw_object
 # The webcam to use
 VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 1))
 # The model to use
-CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/20231406-pt_2")
+CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/32026041-tnorfdnaraer")
 # If logging should be disabled
 DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "True").lower()
 # If debugging should be enabled

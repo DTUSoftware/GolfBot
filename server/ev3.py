@@ -10,7 +10,7 @@ from ev3dev2.motor import MoveTank, SpeedPercent, Motor
 # Variables
 DRIVE_SPEED = 20  # Speed in percent
 TURN_SPEED = 20  # Speed in percent
-FAN_TOGGLE_SPEED = 100  # Speed in percent
+FAN_TOGGLE_SPEED = 50  # Speed in percent
 FULL_TURN_TIME = 1.2  # Time it takes to spin 360 degrees, in seconds
 FAN_MOTOR_DEGREES = 80  # Degrees for turning fans off and on (off, on)
 ROBOT_TURN_RATIO = 2.2
