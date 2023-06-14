@@ -1180,7 +1180,7 @@ async def check_new_path(path_queue: multiprocessing.JoinableQueue) -> bool:
 
         track.last_target_node = track.last_target_path[-1].node
 
-        while not is_target_different(track, track.last_target_path[0].node, track.graph.get_node(track.robot_pos)):
+        while track.last_target_path and not is_target_different(track, track.last_target_path[0].node, track.graph.get_node(track.robot_pos)):
             logger.debug("Robot reached target, popping")
             track.last_target_path.pop(0)
             track.last_target_node = track.graph.get_node(track.robot_pos)
