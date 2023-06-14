@@ -21,9 +21,9 @@ KI = float(os.environ.get('PID_KI', 0.1))  # Integral gain - 0.1
 KD = float(os.environ.get('PID_KD', 0.05))  # Derivative gain - 0.05
 
 # Distance and direction tolerance
-DISTANCE_TOLERANCE = float(os.environ.get('DISTANCE_TOLERANCE', 10.0))
+DISTANCE_TOLERANCE = float(os.environ.get('DISTANCE_TOLERANCE', 1.0))  # in units
 DIRECTION_TOLERANCE = float(os.environ.get('DIRECTION_TOLERANCE', 45.0))  # degrees
-DIRECTION_TOLERANCE_NEW = float(os.environ.get('DIRECTION_TOLERANCE', 5.0))  # degrees
+DIRECTION_TOLERANCE_NEW = float(os.environ.get('DIRECTION_TOLERANCE_NEW', 5.0))  # degrees
 
 # Robot parameters
 WHEEL_RADIUS = (float(os.environ.get('WHEEL_DIAMETER', 68.8)) / 2) / 10  # Radius of the robot's wheels in cm
@@ -77,18 +77,21 @@ async def drive_decision(robot_position: Tuple[int, int], robot_direction: float
     if math_helpers.is_about_to_collide_with_obstacle(robot_position, robot_direction):
         logger.debug("Robot is about to collide with an obstacle, driving robot backwards")
         await robot_api.set_speeds(session=session, speed_left=-ROBOT_BASE_SPEED, speed_right=-ROBOT_BASE_SPEED)
+        # TODO: evaluate this sleep
+        await asyncio.sleep(0.75)
         return
 
     # Get the distance between the two targets
     distance = math_helpers.calculate_distance(position1=robot_position, position2=target_position)
+
+    logger.debug(f"The distance between the robot and the target is {distance} units")
 
     # If the distance is above distance tolerance
     if distance >= DISTANCE_TOLERANCE:
         # Get difference in direction, if any
         new_direction = math_helpers.calculate_direction(position1=target_position, position2=robot_position)
 
-        logger.debug(f"The distance between the robot and the target is {distance} units, and the angle from robot to "
-                     f"target is {math.degrees(new_direction)} deg ({new_direction} rad)\n"
+        logger.debug(f"The angle from robot to target is {math.degrees(new_direction)} deg ({new_direction} rad). "
                      f"The adjustment in direction needed is {math.degrees(new_direction - robot_direction)} deg "
                      f"({new_direction - robot_direction} rad)")
 
@@ -99,15 +102,37 @@ async def drive_decision(robot_position: Tuple[int, int], robot_direction: float
             current_target_pos = target_position
             direction_tolerance = DIRECTION_TOLERANCE_NEW
 
-        if abs(robot_direction - new_direction) >= math.radians(direction_tolerance):
-            logger.debug("Turning robot")
-            await robot_api.set_robot_direction(session=session, direction=new_direction)
+        direction_diff = abs(robot_direction - new_direction)
+        robot_speed_left = ROBOT_BASE_SPEED
+        robot_speed_right = ROBOT_BASE_SPEED
+        if direction_diff >= math.radians(direction_tolerance):
+            # Since the turning point is the middle of the robot, and we calculate the heading from the front of the
+            # robot we need to adjust for this
+            front_to_middle_diff_multiplier = 0.5
+            if robot_direction < new_direction:
+                direction = robot_direction + (direction_diff * front_to_middle_diff_multiplier)
+            else:
+                direction = robot_direction - (direction_diff * front_to_middle_diff_multiplier)
+
+            logger.debug(f"Turning robot {math.degrees(direction)} deg ({direction} rad) - Originally wanted to "
+                         f"turn to {math.degrees(new_direction)} deg ({new_direction} rad), with diff being "
+                         f"{math.degrees(direction_diff)} deg ({direction_diff} rad)")
+            await robot_api.set_robot_direction(session=session, direction=direction)
         else:
-            logger.debug("Robot is in the correct heading (within tolerance), will not turn.")
+            logger.debug("Robot is in the correct heading (within tolerance), will not stop-turn.")
+            # Adjust the robot speed depending on the direction difference, adding a small offset to the speed
+            # to make sure the robot is always moving towards the correct angle
+            # todo: bring me back daddy
+            # speed_multiplier = 0.25
+            # direction_diff_multiplier = 10
+            # robot_speed_left = max(min(ROBOT_BASE_SPEED + ((direction_diff/360*direction_diff_multiplier) * speed_multiplier), 0), 100)
+            # robot_speed_right = max(min(ROBOT_BASE_SPEED - ((direction_diff/360*direction_diff_multiplier) * speed_multiplier), 0), 100)
 
         logger.debug("Driving robot forward.")
         # Drive forward with base speed
-        await robot_api.set_speeds(session=session, speed_left=ROBOT_BASE_SPEED, speed_right=ROBOT_BASE_SPEED)
+        await robot_api.set_speeds(session=session, speed_left=robot_speed_left, speed_right=robot_speed_right)
+        # TODO: evaluate if this can be removed
+        await asyncio.sleep(0.5)
     else:
         logger.debug("Robot has reached the target (within tolerance), stopping robot.")
         # Stop robot

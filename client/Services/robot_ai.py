@@ -60,6 +60,7 @@ async def parse_ai_results(ai_results) -> Tuple[list, list, list]:
     """
     # if DEBUG:
     #     print("Parsing AI results")
+    robot_front_results = []
     robot_results = []
     golf_ball_results = []
     golden_ball_results = []
@@ -68,13 +69,19 @@ async def parse_ai_results(ai_results) -> Tuple[list, list, list]:
         boxes = result.boxes
         for box in boxes:
             class_name = result.names[int(box.cls)]
-            if "robot" in class_name:
+            if all(x in class_name for x in ["robot", "front"]):
+                robot_front_results.append(box)
+            elif "robot" in class_name:
                 robot_results.append(box)
             elif "orange" in class_name:
                 golden_ball_results.append(box)
             elif "white" in class_name:
                 golf_ball_results.append(box)
 
+    if robot_front_results:
+        robot_results = robot_front_results
+
+    # Sort results by confidence
     robot_results.sort(key=box_confidence)
     golf_ball_results.sort(key=box_confidence)
     golden_ball_results.sort(key=box_confidence)
