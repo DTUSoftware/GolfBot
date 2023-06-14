@@ -1,13 +1,13 @@
 import logging
 import os
 from threading import Event
-from typing import Tuple
+from typing import Tuple, Dict
 
 import aiohttp
 from torch import multiprocessing
 
 from Services import robot_api
-from Utils import path_algorithm
+from Utils import path_algorithm, math_helpers
 from ai.main import run_ai
 
 # If logging should be disabled
@@ -52,7 +52,7 @@ def start_ai(camera_queue: multiprocessing.JoinableQueue, path_queue: multiproce
     run_ai(camera_queue, path_queue, ai_event)
 
 
-async def parse_ai_results(ai_results) -> Tuple[list, list, list]:
+async def parse_ai_results(ai_results) -> Tuple[Dict[str, list], list, list]:
     """
     Parse the AI results
     :param ai_results: The results to parse
@@ -60,6 +60,7 @@ async def parse_ai_results(ai_results) -> Tuple[list, list, list]:
     """
     # if DEBUG:
     #     print("Parsing AI results")
+    robot_rear_results = []
     robot_front_results = []
     robot_results = []
     golf_ball_results = []
@@ -71,6 +72,8 @@ async def parse_ai_results(ai_results) -> Tuple[list, list, list]:
             class_name = result.names[int(box.cls)]
             if all(x in class_name for x in ["robot", "front"]):
                 robot_front_results.append(box)
+            elif all(x in class_name for x in ["robot", "rear"]):
+                robot_rear_results.append(box)
             elif "robot" in class_name:
                 robot_results.append(box)
             elif "orange" in class_name:
@@ -78,20 +81,19 @@ async def parse_ai_results(ai_results) -> Tuple[list, list, list]:
             elif "white" in class_name:
                 golf_ball_results.append(box)
 
-    if robot_front_results:
-        robot_results = robot_front_results
-
     # Sort results by confidence
+    robot_rear_results.sort(key=box_confidence)
+    robot_front_results.sort(key=box_confidence)
     robot_results.sort(key=box_confidence)
     golf_ball_results.sort(key=box_confidence)
     golden_ball_results.sort(key=box_confidence)
 
     # if DEBUG:
     #     print("Done parsing AI results.")
-    return robot_results, golf_ball_results, golden_ball_results
+    return {"robot": robot_results, "front": robot_front_results, "rear": robot_rear_results}, golf_ball_results, golden_ball_results
 
 
-async def update_robot_from_ai_result(track: path_algorithm.Track, robot_results,
+async def update_robot_from_ai_result(track: path_algorithm.Track, robot_results: Dict[str, list],
                                       session: aiohttp.ClientSession) -> None:
     """
     Update the robot from the AI results
@@ -104,12 +106,43 @@ async def update_robot_from_ai_result(track: path_algorithm.Track, robot_results
     #     print("Updating robot from AI results")
     # Get current robot position and update track robot position
     if robot_results:
-        robot_box = robot_results[0]
-        current_pos = box_to_pos(robot_box)
-        logger.debug(
-            f"Using robot with confidence {box_confidence(robot_box):.2f} at position ({current_pos[0]}, {current_pos[1]})")
-        track.set_robot_pos(current_pos)
-        await robot_api.set_robot_position(session, x=current_pos[0], y=current_pos[1])
+        robot_pos = (0, 0)
+        robot_direction = 0.0
+        robot_front_pos = None
+        robot_rear_pos = None
+        # Extract values
+        if robot_results["robot"]:
+            robot_box = robot_results["robot"][0]
+            robot_pos = box_to_pos(robot_box)
+            # Calculate direction using past position and new position
+            robot_direction = math_helpers.calculate_direction(to_pos=robot_pos, from_pos=track.robot_pos)
+            # logger.debug(f"Using robot with confidence {box_confidence(robot_box):.2f} at position ({robot_pos[0]}, {robot_pos[1]})")
+        if robot_results["front"]:
+            robot_front_box = robot_results["front"][0]
+            robot_front_pos = box_to_pos(robot_front_box)
+        if robot_results["rear"]:
+            robot_rear_box = robot_results["rear"][0]
+            robot_rear_pos = box_to_pos(robot_rear_box)
+
+        # Update robot position and direction
+        if robot_front_pos and robot_rear_pos:
+            robot_pos = math_helpers.get_middle_between_two_points(robot_front_pos, robot_rear_pos)
+            robot_direction = math_helpers.calculate_direction(to_pos=robot_front_pos, from_pos=robot_rear_pos)
+        elif robot_front_pos and robot_pos != (0, 0):
+            robot_pos = math_helpers.get_middle_between_two_points(robot_front_pos, robot_pos)
+            robot_direction = math_helpers.calculate_direction(to_pos=robot_front_pos, from_pos=robot_pos)
+        elif robot_rear_pos and robot_pos != (0, 0):
+            robot_pos = math_helpers.get_middle_between_two_points(robot_pos, robot_rear_pos)
+            robot_direction = math_helpers.calculate_direction(to_pos=robot_pos, from_pos=robot_rear_pos)
+
+        # Update values
+        if robot_pos != (0, 0):
+            track.set_robot_pos(middle=robot_pos, front=robot_front_pos, rear=robot_rear_pos)
+            await robot_api.set_robot_position(session, x=robot_pos[0], y=robot_pos[1])
+            track.set_robot_direction(robot_direction)
+            await robot_api.set_robot_direction(session, direction=robot_direction)
+        else:
+            logger.debug("Couldn't set position and direction???")
     else:
         logger.debug("No robot on track!")
 

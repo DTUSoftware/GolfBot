@@ -38,17 +38,18 @@ if DEBUG:
 current_target_pos = (0, 0)
 
 
-async def drive_decision(robot_position: Tuple[int, int], robot_direction: float, target_position: Tuple[int, int],
-                         session: aiohttp.ClientSession) -> None:
+async def drive_decision(target_position: Tuple[int, int], session: aiohttp.ClientSession) -> None:
     """
     The main decision-tree model for the driving of the robot.
 
-    :param robot_position: The robot's current position.
-    :param robot_direction: The robot's current direction.
     :param target_position: The target position of the robot.
     :param session: The AIOHTTP session used to send requests.
     :return: None
     """
+
+    track = path_algorithm.TRACK_GLOBAL
+    robot_position = track.get_path_position()
+    robot_direction = track.robot_direction
 
     logger.debug(f"Trying to get robot from {robot_position} to {target_position}. Robot currently has a direction of "
                  f"{math.degrees(robot_direction)} deg ({robot_direction} rad)")
@@ -89,7 +90,7 @@ async def drive_decision(robot_position: Tuple[int, int], robot_direction: float
     # If the distance is above distance tolerance
     if distance >= DISTANCE_TOLERANCE:
         # Get difference in direction, if any
-        new_direction = math_helpers.calculate_direction(position1=target_position, position2=robot_position)
+        new_direction = math_helpers.calculate_direction(to_pos=target_position, from_pos=track.get_turn_position())
 
         logger.debug(f"The angle from robot to target is {math.degrees(new_direction)} deg ({new_direction} rad). "
                      f"The adjustment in direction needed is {math.degrees(new_direction - robot_direction)} deg "
@@ -117,7 +118,7 @@ async def drive_decision(robot_position: Tuple[int, int], robot_direction: float
             logger.debug(f"Turning robot {math.degrees(direction)} deg ({direction} rad) - Originally wanted to "
                          f"turn to {math.degrees(new_direction)} deg ({new_direction} rad), with diff being "
                          f"{math.degrees(direction_diff)} deg ({direction_diff} rad)")
-            await robot_api.set_robot_direction(session=session, direction=direction)
+            await robot_api.turn_robot(session=session, direction=direction)
         else:
             logger.debug("Robot is in the correct heading (within tolerance), will not stop-turn.")
             # Adjust the robot speed depending on the direction difference, adding a small offset to the speed
@@ -159,7 +160,7 @@ async def adjust_speed_using_pid(track: path_algorithm.Track, target_node: path_
     :return: None
     """
     # Get current robot position
-    current_position = track.robot_pos
+    current_position = track.get_turn_position()
 
     if (current_position[0] == 0 and current_position[1] == 0) or not target_node:
         logger.debug("Current position is (0,0), stopping speed adjustment")
@@ -216,8 +217,8 @@ async def adjust_speed_using_pid(track: path_algorithm.Track, target_node: path_
     # Calculate wheel speeds based on PID output
     # speed_left = (2 * output * DIST_BETWEEN_WHEELS + error) / (2 * WHEEL_RADIUS)
     # speed_right = (2 * output * DIST_BETWEEN_WHEELS - error) / (2 * WHEEL_RADIUS)
-    speed_left = max(min(-output + ROBOT_BASE_SPEED, 100), -100)
-    speed_right = max(min(output + ROBOT_BASE_SPEED, 100), -100)
+    speed_left = max(min(-output + ROBOT_BASE_SPEED, -100), 100)
+    speed_right = max(min(output + ROBOT_BASE_SPEED, -100), 100)
 
     logger.debug(f"Speed: L:{speed_left} R:{speed_right}")
 

@@ -81,6 +81,24 @@ async def set_robot_position(session: aiohttp.ClientSession, x: int, y: int) -> 
 
 async def set_robot_direction(session: aiohttp.ClientSession, direction: float) -> bool:
     """
+    Sets the robot direction.
+    NEEDS TO BE CALLED AFTER THE POSITION GETS SET!!!
+
+    :param session: the session
+    :param direction: The direction
+    :return: True if the robot direction was set, False otherwise
+    """
+    logger.debug("Setting robot position")
+    async with session.post(f"{ROBOT_API_ENDPOINT}/direction?radians={direction}") as response:
+        logger.debug(await response.text())
+        if response.status != 200:
+            logger.debug(response.status)
+            return False
+    return True
+
+
+async def turn_robot(session: aiohttp.ClientSession, direction: float) -> bool:
+    """
     Turns the robot.
     THIS CALL IS BLOCKING UNTIL THE ROBOT HAS FULLY TURNED!
     :param session:  the session

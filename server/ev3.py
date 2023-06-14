@@ -315,7 +315,7 @@ class Robot:
         :param direction: the direction to set
         :return: True if successful, False otherwise
         """
-        self.direction = direction
+        self.direction = direction % (2 * math.pi)
         return True
 
     def buttons_pressed(self) -> bool:

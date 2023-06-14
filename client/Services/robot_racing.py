@@ -64,8 +64,7 @@ async def calculate_and_adjust(track: path_algorithm.Track, path_queue: multipro
             isinstance(track.last_target_path, list):
         # Tell the robot to drive towards the node
         # await drive_to_coordinates(next_node.node, session)
-        await driving_algorithm.drive_decision(robot_position=track.robot_pos, robot_direction=track.robot_direction,
-                                               target_position=track.last_target_path[0].node.get_position(),
+        await driving_algorithm.drive_decision(target_position=track.last_target_path[0].node.get_position(),
                                                session=session)
         # await driving_algorithm.adjust_speed_using_pid(track, track.last_target_path[0].node, session)
     else:

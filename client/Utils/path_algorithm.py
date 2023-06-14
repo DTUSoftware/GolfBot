@@ -271,7 +271,7 @@ class Goal:
             Tuple[Tuple[int, int], float]: The middle of the goal and the angle to it.
         """
         # Get middle of the goal
-        middle = (int((self.points[0][0] + self.points[1][0]) / 2), int((self.points[0][1] + self.points[1][1]) / 2))
+        middle = math_helpers.get_middle_between_two_points(self.points[0], self.points[1])
 
         # Get angle to middle of the goal
         if middle[0] < TRACK_GLOBAL.bounds["x"] / 2:
@@ -308,14 +308,14 @@ class Goal:
         middle, angle = self.get_middle_and_angle()
 
         # Get the distance to the middle
-        distance = math_helpers.calculate_distance(TRACK_GLOBAL.robot_pos, middle)
+        distance = math_helpers.calculate_distance(TRACK_GLOBAL.get_path_position(), middle)
 
         # Check if robot is close enough to the middle
         if distance > DELIVERY_DISTANCE:
             return False
 
         # Get the angle to the middle
-        angle_to_middle = math_helpers.calculate_direction(TRACK_GLOBAL.robot_pos, middle)
+        angle_to_middle = math_helpers.calculate_direction(TRACK_GLOBAL.get_turn_position(), middle)
 
         # Check if robot is facing the middle
         if abs(angle_to_middle - TRACK_GLOBAL.robot_direction) > math.radians(HEADING_DIFFERENCE_DELIVERY):
@@ -773,6 +773,8 @@ class Track:
         self.small_goal: Optional[Goal] = None
         self.big_goal: Optional[Goal] = None
         self.robot_pos: Tuple[int, int] = (0, 0)
+        self.robot_front_pos: Tuple[int, int] = (0, 0)
+        self.robot_rear_pos: Tuple[int, int] = (0, 0)
         self.robot_direction: float = 0.0
         self.path: List[NodeData] = []
 
@@ -798,21 +800,50 @@ class Track:
         """
         self.balls = []
 
-    def set_robot_pos(self, robot_pos: tuple) -> None:
+    def get_path_position(self) -> Tuple[int, int]:
         """
-        Set the position of the robot
-        :param robot_pos: The position of the robot
+        Get the position to use for calculating paths (we want to use the front if possible)
+        Returns:
+            The position to use for calculating paths
+        """
+        if self.robot_front_pos:
+            return self.robot_front_pos
+        return self.robot_pos
+
+    def get_turn_position(self) -> Tuple[int, int]:
+        """
+        Get the position to use for calculating angles
+        Returns:
+            The position to use for calculating angles
+        """
+        if self.robot_rear_pos:
+            return self.robot_rear_pos
+        return self.robot_pos
+
+    def set_robot_direction(self, robot_direction: float) -> None:
+        """
+        Set the direction of the robot
+        :param robot_direction: The direction of the robot
         :return: None
         """
-        oldpos = self.robot_direction
-        # Recalibrate the direction / angle
-        self.robot_direction = math_helpers.calculate_direction(position1=robot_pos, position2=self.robot_pos)
+        logger.debug(f"Old direction: {self.robot_direction}, new direction: {robot_direction}")
 
-        logger.debug(f"Old direction: {oldpos}, new direction: {self.robot_direction}\n"
-                     f"Old position: {self.robot_pos}, new position: {robot_pos}")
+        self.robot_direction = robot_direction % (2 * math.pi)
+
+    def set_robot_pos(self, middle: Tuple[int, int], front: Optional[Tuple[int, int]] = None, rear: Optional[Tuple[int, int]] = None) -> None:
+        """
+        Set the position of the robot
+        :param middle: The middle position of the robot
+        :param front: The front position of the robot
+        :param rear: The rear position of the robot
+        :return: None
+        """
+        logger.debug(f"Old position: {self.robot_pos}, new position: {middle}")
 
         # Update position
-        self.robot_pos = robot_pos
+        self.robot_pos = middle
+        self.robot_front_pos = front
+        self.robot_rear_pos = rear
 
     async def calculate_path(self, objects_to_navigate_to: List[List[Tuple[int, int]]]) -> None:
         """
@@ -831,7 +862,7 @@ class Track:
         logger.debug("Calculating path for every ball")
         paths: List[List[NodeData]] = []
         if objects_to_navigate_to:
-            robot_node = self.graph.get_node(self.robot_pos)
+            robot_node = self.graph.get_node(self.get_path_position())
             object_nodes = [self.graph.get_node(obj[0]) for obj in objects_to_navigate_to]
             tasks = [self.graph.get_path(start_node=robot_node, dst_node=ball_node) for ball_node in object_nodes if
                      ball_node]
@@ -1121,18 +1152,17 @@ async def check_new_path(path_queue: multiprocessing.JoinableQueue) -> bool:
         # if DEBUG:
         #     print("Checking if robot has reached target")
         while track.last_target_path and not is_target_different(track, track.last_target_path[0].node,
-                                                                 track.graph.get_node(track.robot_pos)):
+                                                                 track.graph.get_node(track.get_path_position())):
             logger.debug("Robot reached target, popping")
             track.last_target_path.pop(0)
-            track.last_target_node = track.graph.get_node(track.robot_pos)
+            track.last_target_node = track.graph.get_node(track.get_path_position())
         # If we passed the target, pop
         while track.last_target_path and math_helpers.has_passed_target(track.last_target_path[0].node.get_position(),
-                                                                        track.graph.get_node(
-                                                                            track.robot_pos).get_position(),
+                                                                        track.get_path_position(),
                                                                         track.last_target_node.get_position()):
             logger.debug("Robot passed target, popping")
             track.last_target_path.pop(0)
-            track.last_target_node = track.graph.get_node(track.robot_pos)
+            track.last_target_node = track.graph.get_node(track.get_path_position())
 
         logger.debug(
             f"Current optimized path: {[(nodedata.node.x, nodedata.node.y) for nodedata in track.last_target_path]}")
@@ -1180,10 +1210,10 @@ async def check_new_path(path_queue: multiprocessing.JoinableQueue) -> bool:
 
         track.last_target_node = track.last_target_path[-1].node
 
-        while track.last_target_path and not is_target_different(track, track.last_target_path[0].node, track.graph.get_node(track.robot_pos)):
+        while track.last_target_path and not is_target_different(track, track.last_target_path[0].node, track.graph.get_node(track.get_path_position())):
             logger.debug("Robot reached target, popping")
             track.last_target_path.pop(0)
-            track.last_target_node = track.graph.get_node(track.robot_pos)
+            track.last_target_node = track.graph.get_node(track.get_path_position())
 
         return True
 
@@ -1206,7 +1236,7 @@ def is_target_different(track: Track, target_node: Node, other_node: Node) -> bo
     # Calculate the position difference
     position_diff = math_helpers.calculate_distance(target_node.get_position(), other_node.get_position())
     # Calculate the direction difference
-    direction_diff = abs(target_node.get_heading(track.robot_pos) - other_node.get_heading(track.robot_pos))
+    direction_diff = abs(target_node.get_heading(track.get_turn_position()) - other_node.get_heading(track.get_turn_position()))
 
     # Check if target is significantly different from the last target
     if position_diff > position_threshold or direction_diff > math.pi / 4:
