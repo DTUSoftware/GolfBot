@@ -22,8 +22,8 @@ PATH_OBSTACLE_DISTANCE = 40  # in units
 DELIVERY_DISTANCE_FAR = 100  # in units
 DELIVERY_DISTANCE = 50  # in units
 SAFETY_LENGTH = 70  # in units
-HEADING_DIFFERENCE_DELIVERY = 5  # in degrees
-COLLISION_DISTANCE = 10  # in units (pixels)
+HEADING_DIFFERENCE_DELIVERY = 10  # in degrees
+COLLISION_DISTANCE = 30  # in units (pixels)
 DIRECTION_DIFFERENCE = 5  # in degrees
 
 # Initialize colorama
