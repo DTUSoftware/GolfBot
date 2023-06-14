@@ -24,7 +24,9 @@ if DEBUG:
 seen_ball_queue = []
 
 
-async def calculate_and_adjust(track: path_algorithm.Track, path_queue: multiprocessing.JoinableQueue, session: aiohttp.ClientSession, objects_to_navigate_to: List[List[Tuple[int, int]]]) -> None:
+async def calculate_and_adjust(track: path_algorithm.Track, path_queue: multiprocessing.JoinableQueue,
+                               session: aiohttp.ClientSession,
+                               objects_to_navigate_to: List[List[Tuple[int, int]]]) -> None:
     """
     Calculates the path and adjusts the speed
     Args:
@@ -120,20 +122,26 @@ async def do_race_iteration(track: path_algorithm.Track, ai_queue: multiprocessi
             seen_ball_queue.append(False)
 
         objects_to_navigate_to: List[List[Tuple[int, int]]] = []
-        if track.balls and (len(seen_ball_queue) < 10 or len([seen_ball for seen_ball in seen_ball_queue if seen_ball]) >= 4):
+        if track.balls and (
+                len(seen_ball_queue) < 10 or len([seen_ball for seen_ball in seen_ball_queue if seen_ball]) >= 4):
             # Get every ball that's not golden
-            objects_to_navigate_to = [ball.get_drive_path() for ball in track.balls if not ball.golden and ball.get_drive_path()]
+            objects_to_navigate_to = [ball.get_drive_path() for ball in track.balls if
+                                      not ball.golden and ball.get_drive_path()]
             # If no balls that aren't golden
             if not objects_to_navigate_to:
-                logger.debug("Only the golden ball is left, trying to fetch it")
+                logger.debug("Couldn't get a drive path for any white balls, trying the golden ball")
                 # Include the golden ball
                 objects_to_navigate_to = [ball.get_drive_path() for ball in track.balls if ball.get_drive_path()]
         else:
             goal_path = await track.small_goal.deliver_path()
             if goal_path:
                 objects_to_navigate_to = [goal_path]
-        # Calculate track path and give the robot directions
-        await calculate_and_adjust(track, path_queue, session, objects_to_navigate_to)
+
+        if objects_to_navigate_to:
+            # Calculate track path and give the robot directions
+            await calculate_and_adjust(track, path_queue, session, objects_to_navigate_to)
+        else:
+            logger.debug("No objects to navigate to")
 
         # Let AI know we are done with the data
         # if DEBUG:

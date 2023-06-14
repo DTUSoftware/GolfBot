@@ -84,7 +84,8 @@ async def parse_ai_results(ai_results) -> Tuple[list, list, list]:
     return robot_results, golf_ball_results, golden_ball_results
 
 
-async def update_robot_from_ai_result(track: path_algorithm.Track, robot_results, session: aiohttp.ClientSession) -> None:
+async def update_robot_from_ai_result(track: path_algorithm.Track, robot_results,
+                                      session: aiohttp.ClientSession) -> None:
     """
     Update the robot from the AI results
     :param track: the track to update the robot on
@@ -98,7 +99,8 @@ async def update_robot_from_ai_result(track: path_algorithm.Track, robot_results
     if robot_results:
         robot_box = robot_results[0]
         current_pos = box_to_pos(robot_box)
-        logger.debug(f"Using robot with confidence {box_confidence(robot_box):.2f} at position ({current_pos[0]}, {current_pos[1]})")
+        logger.debug(
+            f"Using robot with confidence {box_confidence(robot_box):.2f} at position ({current_pos[0]}, {current_pos[1]})")
         track.set_robot_pos(current_pos)
         await robot_api.set_robot_position(session, x=current_pos[0], y=current_pos[1])
     else:

@@ -20,7 +20,8 @@ if DEBUG:
     logging.getLogger().setLevel(logging.DEBUG)
 
 
-async def main(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue, ai_event: Event, track):
+async def main(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue, ai_event: Event,
+               track):
     """
     The main function
     :param ai_queue:  The queue to get the AI results from AI to robot
@@ -53,7 +54,8 @@ async def main(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocess
         logging.error("Failed to connect to robot. Is the API on?")
 
 
-def main_entrypoint(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue, ai_event: Event):
+def main_entrypoint(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue,
+                    ai_event: Event):
     """
     The main entrypoint
     :param ai_queue: The queue to get the AI results from AI to robot
