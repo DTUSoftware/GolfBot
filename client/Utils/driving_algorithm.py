@@ -5,6 +5,8 @@ import math
 import os
 from typing import Tuple
 
+import asyncio
+
 from Utils import math_helpers, path_algorithm
 from Services import robot_api
 
@@ -20,7 +22,8 @@ KD = float(os.environ.get('PID_KD', 0.05))  # Derivative gain - 0.05
 
 # Distance and direction tolerance
 DISTANCE_TOLERANCE = float(os.environ.get('DISTANCE_TOLERANCE', 10.0))
-DIRECTION_TOLERANCE = float(os.environ.get('DIRECTION_TOLERANCE', 5.0))  # degrees
+DIRECTION_TOLERANCE = float(os.environ.get('DIRECTION_TOLERANCE', 45.0))  # degrees
+DIRECTION_TOLERANCE_NEW = float(os.environ.get('DIRECTION_TOLERANCE', 5.0))  # degrees
 
 # Robot parameters
 WHEEL_RADIUS = (float(os.environ.get('WHEEL_DIAMETER', 68.8)) / 2) / 10  # Radius of the robot's wheels in cm
@@ -31,6 +34,8 @@ ROBOT_BASE_SPEED = float(os.environ.get('ROBOT_BASE_SPEED', 40.0))
 logger = logging.getLogger(__name__)
 if DEBUG:
     logger.setLevel(logging.DEBUG)
+
+current_target_pos = (0, 0)
 
 
 async def drive_decision(robot_position: Tuple[int, int], robot_direction: float, target_position: Tuple[int, int],
@@ -46,20 +51,33 @@ async def drive_decision(robot_position: Tuple[int, int], robot_direction: float
     """
 
     logger.debug(f"Trying to get robot from {robot_position} to {target_position}. Robot currently has a direction of "
-                  f"{math.degrees(robot_direction)} deg ({robot_direction} rad)")
+                 f"{math.degrees(robot_direction)} deg ({robot_direction} rad)")
 
     # If robot position is invalid, return
-    if robot_position == (0, 0):
+    if robot_position == (0, 0) or target_position == (0, 0):
         # Stop robot
         await robot_api.set_speeds(session=session, speed_left=0, speed_right=0)
         return
 
+    if path_algorithm.TRACK_GLOBAL.small_goal.is_in_delivery_position():
+        logger.info("Robot is in delivery position, stopping robot and fans.")
+        await robot_api.set_speeds(session=session, speed_left=0, speed_right=0)
+        await robot_api.toggle_fans(session=session)
+        logger.debug("Sleeping for 15 seconds to finish delivery")
+        await asyncio.sleep(15)
+        logger.debug("Done sleeping, driving backwards and starting fans again in case there are more balls")
+        # Start fans again after driving backwards for 1 second
+        await robot_api.set_speeds(session=session, speed_left=-ROBOT_BASE_SPEED, speed_right=-ROBOT_BASE_SPEED)
+        await asyncio.sleep(1)
+        await robot_api.set_speeds(session=session, speed_left=0, speed_right=0)
+        await robot_api.toggle_fans(session=session)
+        return
+
     # If the robot is about to drive into a wall or other obstacle, stop the robot
-    # if math_helpers.is_about_to_collide_with_obstacle(robot_position, robot_direction):
-    #     if DEBUG:
-    #         print("Robot is about to collide with an obstacle, driving robot backwards")
-    #     await robot_api.set_speeds(session=session, speed_left=-ROBOT_BASE_SPEED, speed_right=-ROBOT_BASE_SPEED)
-    #     return
+    if math_helpers.is_about_to_collide_with_obstacle(robot_position, robot_direction):
+        logger.debug("Robot is about to collide with an obstacle, driving robot backwards")
+        await robot_api.set_speeds(session=session, speed_left=-ROBOT_BASE_SPEED, speed_right=-ROBOT_BASE_SPEED)
+        return
 
     # Get the distance between the two targets
     distance = math_helpers.calculate_distance(position1=robot_position, position2=target_position)
@@ -70,12 +88,18 @@ async def drive_decision(robot_position: Tuple[int, int], robot_direction: float
         new_direction = math_helpers.calculate_direction(position1=target_position, position2=robot_position)
 
         logger.debug(f"The distance between the robot and the target is {distance} units, and the angle from robot to "
-                      f"target is {math.degrees(new_direction)} deg ({new_direction} rad)\n"
-                      f"The adjustment in direction needed is {math.degrees(new_direction - robot_direction)} deg "
-                      f"({new_direction - robot_direction} rad)")
+                     f"target is {math.degrees(new_direction)} deg ({new_direction} rad)\n"
+                     f"The adjustment in direction needed is {math.degrees(new_direction - robot_direction)} deg "
+                     f"({new_direction - robot_direction} rad)")
 
         # Turn if needed
-        if abs(robot_direction - new_direction) >= math.radians(DIRECTION_TOLERANCE):
+        global current_target_pos
+        direction_tolerance = DIRECTION_TOLERANCE
+        if target_position != current_target_pos:
+            current_target_pos = target_position
+            direction_tolerance = DIRECTION_TOLERANCE_NEW
+
+        if abs(robot_direction - new_direction) >= math.radians(direction_tolerance):
             logger.debug("Turning robot")
             await robot_api.set_robot_direction(session=session, direction=new_direction)
         else:
@@ -149,17 +173,17 @@ async def adjust_speed_using_pid(track: path_algorithm.Track, target_node: path_
     # DEBUG Testing of finding good variables
     KI += 0.0001
     logger.debug(f"=============================================================\n"
-                  f"USING A KI VALUE OF {KI}\n"
-                  f"=============================================================")
+                 f"USING A KI VALUE OF {KI}\n"
+                 f"=============================================================")
 
     # Calculate PID output
     output = KP * error + KI * integral + KD * derivative
 
     logger.debug(f"PID Output:\n"
-                  f"- Output: {output}\n"
-                  f"- Error: {error} (previous error {track.previous_error}) - Pi: {KP}\n"
-                  f"- Integral: {integral} - KI: {KI}\n"
-                  f"- Derivative: {derivative} - KD: {KD}")
+                 f"- Output: {output}\n"
+                 f"- Error: {error} (previous error {track.previous_error}) - Pi: {KP}\n"
+                 f"- Integral: {integral} - KI: {KI}\n"
+                 f"- Derivative: {derivative} - KD: {KD}")
 
     # Update previous error
     track.previous_error = error

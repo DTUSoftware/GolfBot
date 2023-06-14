@@ -22,6 +22,9 @@ PATH_OBSTACLE_DISTANCE = 40  # in units
 DELIVERY_DISTANCE_FAR = 100  # in units
 DELIVERY_DISTANCE = 50  # in units
 SAFETY_LENGTH = 70  # in units
+HEADING_DIFFERENCE_DELIVERY = 5  # in degrees
+COLLISION_DISTANCE = 10  # in units (pixels)
+DIRECTION_DIFFERENCE = 5  # in degrees
 
 # Initialize colorama
 colorama_init()
@@ -233,11 +236,10 @@ class Obstacle:
         :param heading: the heading of the robot
         :return: True if the robot is about to collide with the obstacle, False otherwise
         """
-        COLLOSION_DISTANCE = 10  # in units (pixels)
-        DIRECTION_DIFFERENCE = 0.1  # in radians
         distance, node = self.get_distance(position)
-        if distance < COLLOSION_DISTANCE:
-            if math_helpers.calculate_direction(position, node.get_position()) - heading < DIRECTION_DIFFERENCE:
+        if distance < COLLISION_DISTANCE:
+            if math_helpers.calculate_direction(position, node.get_position()) - heading < math.radians(
+                    DIRECTION_DIFFERENCE):
                 return True
         return False
 
@@ -262,14 +264,12 @@ class Goal:
         self.small = small
         self.points: Optional[List[Tuple[int, int]]] = points
 
-    async def deliver_path(self) -> List[Tuple[int, int]]:
+    def get_middle_and_angle(self) -> Tuple[Tuple[int, int], float]:
         """
-        Delivers the balls to the goal.
-
+        Gets the middle of the goal and the angle to it.
         Returns:
-            List[Tuple[int, int]]: The points to drive to.
+            Tuple[Tuple[int, int], float]: The middle of the goal and the angle to it.
         """
-
         # Get middle of the goal
         middle = (int((self.points[0][0] + self.points[1][0]) / 2), int((self.points[0][1] + self.points[1][1]) / 2))
 
@@ -279,6 +279,18 @@ class Goal:
         else:
             angle = math.radians(180)
 
+        return middle, angle
+
+    async def deliver_path(self) -> List[Tuple[int, int]]:
+        """
+        Delivers the balls to the goal.
+
+        Returns:
+            List[Tuple[int, int]]: The points to drive to.
+        """
+        # Get the middle and the angle
+        middle, angle = self.get_middle_and_angle()
+
         # Get points to drive to
         point_1 = (int(middle[0] + math.cos(angle) * DELIVERY_DISTANCE_FAR),
                    int(middle[1] + math.sin(angle) * DELIVERY_DISTANCE_FAR))
@@ -286,6 +298,30 @@ class Goal:
                    int(middle[1] + math.sin(angle) * DELIVERY_DISTANCE))
 
         return [point_1, point_2]
+
+    def is_in_delivery_position(self) -> bool:
+        """
+        Checks whether the robot is in the delivery position.
+        :return: True if the robot is in the delivery position, False otherwise
+        """
+        # Get the middle and the angle
+        middle, angle = self.get_middle_and_angle()
+
+        # Get the distance to the middle
+        distance = math_helpers.calculate_distance(TRACK_GLOBAL.robot_pos, middle)
+
+        # Check if robot is close enough to the middle
+        if distance > DELIVERY_DISTANCE:
+            return False
+
+        # Get the angle to the middle
+        angle_to_middle = math_helpers.calculate_direction(TRACK_GLOBAL.robot_pos, middle)
+
+        # Check if robot is facing the middle
+        if abs(angle_to_middle - TRACK_GLOBAL.robot_direction) > math.radians(HEADING_DIFFERENCE_DELIVERY):
+            return False
+
+        return True
 
 
 class NodeData:
@@ -797,7 +833,8 @@ class Track:
         if objects_to_navigate_to:
             robot_node = self.graph.get_node(self.robot_pos)
             object_nodes = [self.graph.get_node(obj[0]) for obj in objects_to_navigate_to]
-            tasks = [self.graph.get_path(start_node=robot_node, dst_node=ball_node) for ball_node in object_nodes if ball_node]
+            tasks = [self.graph.get_path(start_node=robot_node, dst_node=ball_node) for ball_node in object_nodes if
+                     ball_node]
             if tasks:
                 done, pending = await asyncio.wait(tasks, timeout=TIMEOUT_GET_PATH, return_when=asyncio.ALL_COMPLETED)
                 logger.debug(f"Done calculating paths: {len(done)} done, {len(pending)} timed out")
@@ -816,7 +853,8 @@ class Track:
                         target_obj = [obj[1] for obj in objects_to_navigate_to if
                                       obj[0] == last_in_path_list.node.get_position()]
                         path_list.append(
-                            NodeData(node=self.graph.get_node(target_obj[0]), g=last_in_path_list.g, h=last_in_path_list.h,
+                            NodeData(node=self.graph.get_node(target_obj[0]), g=last_in_path_list.g,
+                                     h=last_in_path_list.h,
                                      parent=last_in_path_list.node))
                         paths.append(path_list)
 
