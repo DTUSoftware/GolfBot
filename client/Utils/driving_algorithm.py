@@ -107,13 +107,7 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
         robot_speed_left = ROBOT_BASE_SPEED
         robot_speed_right = ROBOT_BASE_SPEED
         if direction_diff >= math.radians(direction_tolerance):
-            # Since the turning point is the middle of the robot, and we calculate the heading from the front of the
-            # robot we need to adjust for this
-            front_to_middle_diff_multiplier = 0.5
-            if robot_direction < new_direction:
-                direction = robot_direction + (direction_diff * front_to_middle_diff_multiplier)
-            else:
-                direction = robot_direction - (direction_diff * front_to_middle_diff_multiplier)
+            direction = new_direction
 
             logger.debug(f"Turning robot {math.degrees(direction)} deg ({direction} rad) - Originally wanted to "
                          f"turn to {math.degrees(new_direction)} deg ({new_direction} rad), with diff being "
@@ -123,11 +117,16 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
             logger.debug("Robot is in the correct heading (within tolerance), will not stop-turn.")
             # Adjust the robot speed depending on the direction difference, adding a small offset to the speed
             # to make sure the robot is always moving towards the correct angle
-            # todo: bring me back daddy
-            # speed_multiplier = 0.25
-            # direction_diff_multiplier = 10
-            # robot_speed_left = max(min(ROBOT_BASE_SPEED + ((direction_diff/360*direction_diff_multiplier) * speed_multiplier), 0), 100)
-            # robot_speed_right = max(min(ROBOT_BASE_SPEED - ((direction_diff/360*direction_diff_multiplier) * speed_multiplier), 0), 100)
+
+            speed_correction_multiplier = 0.75
+            speed_correction = direction_diff * speed_correction_multiplier
+            
+            if robot_direction < new_direction:
+                # If the robot is to the left of the target, turn right by decreasing the left wheel speed
+                robot_speed_left = ROBOT_BASE_SPEED - speed_correction
+            else:
+                # If the robot is to the right of the target, turn left by decreasing the right wheel speed
+                robot_speed_right = ROBOT_BASE_SPEED - speed_correction
 
         logger.debug("Driving robot forward.")
         # Drive forward with base speed
@@ -217,8 +216,8 @@ async def adjust_speed_using_pid(track: path_algorithm.Track, target_node: path_
     # Calculate wheel speeds based on PID output
     # speed_left = (2 * output * DIST_BETWEEN_WHEELS + error) / (2 * WHEEL_RADIUS)
     # speed_right = (2 * output * DIST_BETWEEN_WHEELS - error) / (2 * WHEEL_RADIUS)
-    speed_left = max(min(-output + ROBOT_BASE_SPEED, -100), 100)
-    speed_right = max(min(output + ROBOT_BASE_SPEED, -100), 100)
+    speed_left = -output + ROBOT_BASE_SPEED
+    speed_right = output + ROBOT_BASE_SPEED
 
     logger.debug(f"Speed: L:{speed_left} R:{speed_right}")
 

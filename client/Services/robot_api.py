@@ -1,4 +1,5 @@
 import asyncio
+import math
 import os
 import aiohttp
 import requests
@@ -88,8 +89,8 @@ async def set_robot_direction(session: aiohttp.ClientSession, direction: float) 
     :param direction: The direction
     :return: True if the robot direction was set, False otherwise
     """
-    logger.debug("Setting robot position")
-    async with session.post(f"{ROBOT_API_ENDPOINT}/direction?radians={direction}") as response:
+    logger.debug("Setting robot direction")
+    async with session.post(f"{ROBOT_API_ENDPOINT}/direction?radians={(direction % (math.pi * 2))}") as response:
         logger.debug(await response.text())
         if response.status != 200:
             logger.debug(response.status)
@@ -125,7 +126,7 @@ async def set_speeds(session: aiohttp.ClientSession, speed_left: float, speed_ri
     :return: True if the speed was adjusted, False otherwise
     """
     async with session.post(
-            f"{ROBOT_API_ENDPOINT}/drive?speed_left={speed_left}&speed_right={speed_right}") as response:
+            f"{ROBOT_API_ENDPOINT}/drive?speed_left={max(min(speed_left, 100), -100)}&speed_right={max(min(speed_right, 100), -100)}") as response:
         if response.status != 200:
             logger.debug(f"Error on adjusting speed: {response.status}")
             return False
