@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 from threading import Event
 from typing import Tuple, Dict
 
@@ -8,7 +9,7 @@ from torch import multiprocessing
 
 from Services import robot_api
 from Utils import path_algorithm, math_helpers
-from ai.main import run_ai
+import ai
 
 # If logging should be disabled
 DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "False").lower()
@@ -18,6 +19,7 @@ DEBUG = ("true" in os.environ.get('DEBUG', "True").lower()) and not DISABLE_LOGG
 GOLF_BALL_CONFIDENCE_GATE = float(os.environ.get('GOLF_BALL_CONFIDENCE_GATE', 0.45))
 
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.StreamHandler(sys.stdout))
 if DEBUG:
     logger.setLevel(logging.DEBUG)
 
@@ -49,7 +51,7 @@ def start_ai(camera_queue: multiprocessing.JoinableQueue, path_queue: multiproce
     :param ai_event: The event to let the AI know that the robot has processed the results
     :return: None
     """
-    run_ai(camera_queue, path_queue, ai_event)
+    ai.run_ai(camera_queue, path_queue, ai_event)
 
 
 async def parse_ai_results(ai_results) -> Tuple[Dict[str, list], list, list]:

@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import sys
 import time
 import traceback
 from multiprocessing import Event
@@ -18,6 +19,7 @@ DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "False").lower()
 DEBUG = ("true" in os.environ.get('DEBUG', "True").lower()) and not DISABLE_LOGGING
 
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.StreamHandler(sys.stdout))
 if DEBUG:
     logger.setLevel(logging.DEBUG)
 

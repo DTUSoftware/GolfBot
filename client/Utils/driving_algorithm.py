@@ -1,4 +1,5 @@
 import logging
+import sys
 
 import aiohttp
 import math
@@ -32,6 +33,7 @@ DIST_BETWEEN_WHEELS = float(
 ROBOT_BASE_SPEED = float(os.environ.get('ROBOT_BASE_SPEED', 40.0))
 
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.StreamHandler(sys.stdout))
 if DEBUG:
     logger.setLevel(logging.DEBUG)
 

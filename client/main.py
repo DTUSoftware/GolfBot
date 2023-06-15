@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import asyncio
 import os
+import sys
 from threading import Event
 import aiohttp
 import logging
@@ -15,9 +16,9 @@ DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "False").lower()
 DEBUG = ("true" in os.environ.get('DEBUG', "True").lower()) and not DISABLE_LOGGING
 
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.StreamHandler(sys.stdout))
 if DEBUG:
     logger.setLevel(logging.DEBUG)
-    logging.getLogger().setLevel(logging.DEBUG)
 
 
 async def main(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue, ai_event: Event,
@@ -78,6 +79,8 @@ def main_entrypoint(ai_queue: multiprocessing.JoinableQueue, path_queue: multipr
 
 
 if __name__ == '__main__':
+    ai_producer = None
+    main_consumer = None
     try:
         logger.info("Preparing the robot and AI... Please wait!")
 
@@ -118,4 +121,12 @@ if __name__ == '__main__':
         logger.debug("AI producer joined!? Stopping race!")
     except KeyboardInterrupt:
         pass
+
+    logger.debug("Killing processes.")
+    if main_consumer:
+        main_consumer.terminate()
+    if ai_producer:
+        main_consumer.terminate()
+
+    logger.debug("Stopping robot.")
     robot_api.set_robot_stop()

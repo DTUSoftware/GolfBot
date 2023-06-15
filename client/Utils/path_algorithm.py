@@ -3,6 +3,7 @@ import heapq
 import logging
 import math
 import os
+import sys
 from typing import Any, Optional, List, Tuple, Set, Dict, Union
 
 import matplotlib.pyplot as plt
@@ -32,6 +33,7 @@ colorama_init()
 distance_across = math.sqrt(1 ** 2 + 1 ** 2)
 
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.StreamHandler(sys.stdout))
 if DEBUG:
     logger.setLevel(logging.DEBUG)
 

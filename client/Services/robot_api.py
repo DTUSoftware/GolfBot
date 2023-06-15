@@ -1,6 +1,8 @@
 import asyncio
 import math
 import os
+import sys
+
 import aiohttp
 import requests
 import logging
@@ -16,6 +18,7 @@ DRIVE_DELAY = 0
 TURN_DELAY = 0
 
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.StreamHandler(sys.stdout))
 if DEBUG:
     logger.setLevel(logging.DEBUG)
 

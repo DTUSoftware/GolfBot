@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 from threading import Event
 
 import cv2
@@ -17,6 +18,7 @@ DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "True").lower()
 DEBUG = ("true" in os.environ.get('DEBUG', "True").lower()) and not DISABLE_LOGGING
 
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.StreamHandler(sys.stdout))
 if DEBUG:
     logger.setLevel(logging.DEBUG)
 
