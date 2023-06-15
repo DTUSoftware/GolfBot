@@ -123,9 +123,9 @@ if __name__ == '__main__':
         pass
 
     logger.debug("Killing processes.")
-    if main_consumer:
+    if main_consumer and main_consumer.is_alive():
         main_consumer.terminate()
-    if ai_producer:
+    if ai_producer and ai_producer.is_alive():
         ai_producer.terminate()
 
     logger.debug("Stopping robot.")

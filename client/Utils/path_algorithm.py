@@ -157,7 +157,7 @@ class Ball:
         self.x = pos[0]
         self.y = pos[1]
         self.golden = golden
-        self.drivePath: List[Tuple[int, int]] = self.get_drive_path()
+        self.drivePath: List[Tuple[int, int]] = []
 
     def get_position(self) -> Tuple[int, int]:
         """
@@ -175,18 +175,34 @@ class Ball:
             List[Tuple[int, int]]: The drive path of the ball.
         """
         obstacle_angle_array = []
+        found_x, found_y = (False, False)
+        self_pos = self.get_position()
         for obstacle in TRACK_GLOBAL.obstacles:
             for node in obstacle.path:
-                distance = math_helpers.calculate_distance(self.get_position(), node.get_position())
+                node_pos = node.get_position()
+                if (node_pos[0] != self_pos[0] and node_pos[1] != self_pos[1]) or node_pos == self_pos:
+                    continue
+
+                if node_pos[0] == self_pos[0] and found_x:
+                    continue
+                if node_pos[1] == self_pos[1] and found_y:
+                    continue
+
+                distance = math_helpers.calculate_distance(self_pos, node_pos)
                 if distance < PATH_OBSTACLE_DISTANCE:
-                    direction = math_helpers.calculate_direction(from_pos=self.get_position(), to_pos=node.get_position())
+                    if node_pos[0] == self_pos[0]:
+                        found_x = True
+                    if node_pos[1] == self_pos[1]:
+                        found_y = True
+
+                    direction = math_helpers.calculate_direction(from_pos=node_pos, to_pos=self_pos)
                     obstacle_angle_array.append(direction)
 
-                    logger.debug(f"Ball distance from obstacle node {node.get_position()} is {distance} with direction {math.degrees(direction)} deg")
+                    logger.debug(f"Ball distance from obstacle node {node_pos} is {distance} with direction {math.degrees(direction)} deg")
         if not obstacle_angle_array:
             logger.debug("Ball isn't close to an obstacle.")
             # We need to return two points to make a line, even if it's the same
-            return [self.get_position(), self.get_position()]
+            return [self_pos, self_pos]
         logger.debug("Ball is close to an obstacle.")
 
         # Get the path to the balls while avoiding obstacles
@@ -194,9 +210,9 @@ class Ball:
         angle = avg_angles % (2 * math.pi)
         dx = math.cos(angle) * SAFETY_LENGTH
         dy = math.sin(angle) * SAFETY_LENGTH
-        x1 = int(self.x + dx)
-        y1 = int(self.y + dy)
-        self.drivePath = [(x1, y1), self.get_position()]
+        x1 = int(self_pos[0] + dx)
+        y1 = int(self_pos[1] + dy)
+        self.drivePath = [(x1, y1), self_pos]
         logger.debug(f"Ball drive path: {self.drivePath} - angle is {math.degrees(angle)} deg")
         return self.drivePath
 
@@ -912,7 +928,7 @@ class Track:
         paths: List[List[NodeData]] = []
         if objects_to_navigate_to:
             robot_node = self.graph.get_node(self.get_front_position())
-            object_nodes = [self.graph.get_node(obj[0]) for obj in objects_to_navigate_to]
+            object_nodes = [self.graph.get_node(obj[0]) for obj in objects_to_navigate_to if obj]
             tasks = [self.graph.get_path(start_node=robot_node, dst_node=ball_node) for ball_node in object_nodes if
                      ball_node]
             if tasks:
