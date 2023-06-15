@@ -199,13 +199,15 @@ def setup_track() -> pathalg.Track:
 
     # Setup the track / driving algorithm with given parameters
     track = pathalg.setup({"x": width, "y": height})
+    opencv_helpers.FRAME_SIZE = (width, height)
 
     # Add objects
     for obj in objects:
         object_type = obj["object_type"]
-        path = [opencv_helpers.opencv_position_to_graph_position(point, (width, height)) for point in obj["path"]]
+        path = [opencv_helpers.opencv_position_to_graph_position(point) for point in obj["path"]]
         if object_type == "obstacle":
             # print(f"Adding obstacle path {obj['path']} to track")
+            # print(f"Adding obstacle path {path} to track")
             nodes_in_path = track.graph.get_nodes_in_path(path)
             # print(f"Nodes in obstacle path: {[(node.x, node.y) for node in nodes_in_path]}")
             obstacle = pathalg.Obstacle(nodes_in_path, path)

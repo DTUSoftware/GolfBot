@@ -43,7 +43,7 @@ async def main(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocess
                     await robot_api.set_robot_start(session)
                     break
                 except Exception as e:
-                    logging.error(f"Failed to start robot with exception {e}.\nRetrying in 5 seconds...")
+                    logger.error(f"Failed to start robot with exception {e}.\nRetrying in 5 seconds...")
                     await asyncio.sleep(5)
 
             # Do the race
@@ -52,7 +52,7 @@ async def main(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocess
         robot_api.set_robot_stop()
         raise KeyboardInterrupt()
     except ConnectionError:
-        logging.error("Failed to connect to robot. Is the API on?")
+        logger.error("Failed to connect to robot. Is the API on?")
 
 
 def main_entrypoint(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue,

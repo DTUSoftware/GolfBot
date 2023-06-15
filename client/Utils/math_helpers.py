@@ -11,14 +11,14 @@ def calculate_direction(to_pos: Tuple[int, int], from_pos: Tuple[int, int]) -> f
     Calculates the heading between two points.
 
     Args:
-        to_pos (Tuple[int, int]): The first position.
-        from_pos (Tuple[int, int]): The second position.
+        to_pos (Tuple[int, int]): The target position.
+        from_pos (Tuple[int, int]): The home position.
 
     Returns:
         float: The heading in radians.
     """
-    dx = from_pos[0] - to_pos[0]
-    dy = from_pos[1] - to_pos[1]
+    dx = to_pos[0] - from_pos[0]
+    dy = to_pos[1] - from_pos[1]
 
     angle = math.atan2(dy, dx)
     if angle < 0:

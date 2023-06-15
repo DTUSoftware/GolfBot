@@ -1,5 +1,5 @@
-import logging
 import os
+import logging
 import sys
 from threading import Event
 
@@ -7,6 +7,7 @@ import cv2
 import torch
 from ultralytics import YOLO
 from Utils.opencv_helpers import draw_object
+# from Utils.logging import get_logger
 
 # The webcam to use
 VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 0))
@@ -36,8 +37,6 @@ def run_ai(camera_queue: torch.multiprocessing.JoinableQueue, path_queue: torch.
     if DISABLE_LOGGING:
         # THIS DISABLES LOGGING FOR YOLO
         logging.getLogger("ultralytics").setLevel(logging.WARNING)
-        # And our own logger
-        logging.getLogger().setLevel(logging.WARNING)
 
     # Set device for AI processing
     torch_device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')

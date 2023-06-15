@@ -13,7 +13,7 @@ from colorama import Style
 from colorama import init as colorama_init
 from torch import multiprocessing
 
-from Utils import math_helpers
+from Utils import math_helpers, opencv_helpers
 
 # If debugging should be enabled
 DEBUG = "true" in os.environ.get('DEBUG', "True").lower()
@@ -33,7 +33,7 @@ colorama_init()
 distance_across = math.sqrt(1 ** 2 + 1 ** 2)
 
 logger = logging.getLogger(__name__)
-# logger.addHandler(logging.StreamHandler(sys.stdout))
+logger.addHandler(logging.StreamHandler(sys.stdout))
 if DEBUG:
     logger.setLevel(logging.DEBUG)
 
@@ -512,6 +512,7 @@ class Graph:
         if 0 <= pos[0] < len(self.nodes[0]) and 0 <= pos[1] < len(self.nodes):
             return self.nodes[pos[1]][pos[0]]
         else:
+            logger.debug(f"Node not found, not within x and y bounds = ({len(self.nodes[0])}, {len(self.nodes)})")
             return None
 
     def get_nodes_in_path(self, path: list) -> list:
@@ -872,6 +873,7 @@ class Track:
             The position to use for calculating paths
         """
         if self.robot_front_pos:
+            logger.debug(f"Front pos: {self.robot_front_pos}")
             return self.robot_front_pos
         return self.robot_pos
 
@@ -928,6 +930,10 @@ class Track:
         paths: List[List[NodeData]] = []
         if objects_to_navigate_to:
             robot_node = self.graph.get_node(self.get_front_position())
+            if not robot_node:
+                logger.debug("No robot node, returning empty")
+                self.path = []
+                return
             object_nodes = [self.graph.get_node(obj[0]) for obj in objects_to_navigate_to if obj]
             tasks = [self.graph.get_path(start_node=robot_node, dst_node=ball_node) for ball_node in object_nodes if
                      ball_node]
@@ -1265,14 +1271,14 @@ async def check_new_path(path_queue: multiprocessing.JoinableQueue) -> bool:
 
     # Adjust and go to
     if track.last_target_path:
-        full_path = [nodedata.node.get_position() for nodedata in track.last_target_path]
+        full_path = [opencv_helpers.graph_position_to_opencv_position(nodedata.node.get_position()) for nodedata in track.last_target_path]
 
         if not path_queue.full():
             try:
-                path_queue.put({"path": full_path if full_path else [], "obstacles": [obstacle.points for obstacle in
+                path_queue.put({"path": full_path if full_path else [], "obstacles": [[opencv_helpers.graph_position_to_opencv_position(point) for point in obstacle.points] for obstacle in
                                                                                       track.obstacles] if track.obstacles else [],
-                                "small_goal": track.small_goal.points if track.small_goal else [],
-                                "big_goal": track.big_goal.points if track.big_goal else []})
+                                "small_goal": [opencv_helpers.graph_position_to_opencv_position(point) for point in track.small_goal.points] if track.small_goal else [],
+                                "big_goal": [opencv_helpers.graph_position_to_opencv_position(point) for point in track.big_goal.points] if track.big_goal else []})
             except:
                 pass
 
