@@ -127,6 +127,30 @@ def start_robot():
     return "Failed to start the robot. Is it already started?", 500
 
 
+@server.route("/direction", methods=['GET', 'POST'])
+def robot_direction():
+    """
+    Gets or sets the direction of the robot.
+    :return: The response
+    """
+    if request.method == "GET":
+        return str(robot.direction), 200
+    elif request.method == "POST":
+        radians = request.args.get("radians")
+        degrees = request.args.get("degrees")
+        if radians or degrees:
+            if radians:
+                if robot.set_direction(float(radians)):
+                    return "Set direction to " + radians, 200
+                return "Failed to set direction to " + radians, 500
+            elif degrees:
+                radians = math.radians(float(degrees))
+                if robot.set_direction(radians):
+                    return "Set direction to " + degrees + " (" + str(radians) + " radians)", 200
+                return "Failed to set direction to " + degrees + " (" + str(radians) + " radians).", 500
+        return "Please provide either 'radians' or 'degrees'.", 400
+    return "Invalid method.", 500
+
 @server.route("/position", methods=['GET', 'POST'])
 def robot_position():
     """

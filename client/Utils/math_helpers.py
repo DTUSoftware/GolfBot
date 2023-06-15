@@ -4,26 +4,39 @@ from typing import Tuple
 from Utils import path_algorithm
 
 
-def calculate_direction(position1: Tuple[int, int], position2: Tuple[int, int]) -> float:
+def calculate_direction(to_pos: Tuple[int, int], from_pos: Tuple[int, int]) -> float:
     """
     Calculates the heading between two points.
 
     Args:
-        position1 (Tuple[int, int]): The first position.
-        position2 (Tuple[int, int]): The second position.
+        to_pos (Tuple[int, int]): The first position.
+        from_pos (Tuple[int, int]): The second position.
 
     Returns:
         float: The heading in radians.
     """
-    dx = position2[0] - position1[0]
+    dx = from_pos[0] - to_pos[0]
     # We need the opposite of the y-axis, since we start from the top-left, and have a y-axis that goes downwards
-    dy = position2[1] - position1[1]
+    dy = from_pos[1] - to_pos[1]
 
     angle = math.atan2(dy, dx)
     if angle < 0:
         angle += 2 * math.pi
 
     return angle % (2 * math.pi)
+
+
+def get_middle_between_two_points(position1: Tuple[int, int], position2: Tuple[int, int]) -> Tuple[int, int]:
+    """
+    Calculates the middle position between two points.
+    Args:
+        position1: the first position
+        position2: the second position
+
+    Returns:
+        Tuple[int, int]: the middle position
+    """
+    return math.ceil((position1[0] + position2[0]) / 2), math.ceil((position1[1] + position2[1]) / 2)
 
 
 def calculate_direction_difference(from_position: Tuple[int, int], middle_position: Tuple[int, int],
@@ -92,7 +105,7 @@ def has_passed_target(frompos: Tuple[int, int], target: Tuple[int, int], current
     return False
 
 
-def is_about_to_collide_with_obstacle(pos: Tuple[int, int], direction: float):
+def is_about_to_collide_with_obstacle(pos: Tuple[int, int], direction: float) -> bool:
     """
     Checks if you are about to collide with an obstacle.
     :param pos: your current position
@@ -103,11 +116,12 @@ def is_about_to_collide_with_obstacle(pos: Tuple[int, int], direction: float):
     for obstacle in obstacles:
         if obstacle.is_about_to_collide(pos, direction):
             return True
+    return False
 
 
 if __name__ == "__main__":
     target_position = (487, 272)
     robot_pos = (487, 301)
-    res = calculate_direction(position1=robot_pos, position2=target_position)
+    res = calculate_direction(to_pos=robot_pos, from_pos=target_position)
     print(res)
     print(math.degrees(res))
