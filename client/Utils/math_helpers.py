@@ -85,9 +85,12 @@ def calculate_shortest_turn(start_angle: float, end_angle: float) -> float:
     absolute_difference = abs(end_angle - start_angle)
 
     if absolute_difference <= math.pi:
-        shortest_turn = absolute_difference
+        shortest_turn = end_angle - start_angle
     else:
-        shortest_turn = 2 * math.pi - absolute_difference
+        if start_angle < end_angle:
+            shortest_turn = (end_angle - start_angle) - 2 * math.pi
+        else:
+            shortest_turn = (end_angle - start_angle) + 2 * math.pi
 
     return shortest_turn
 
@@ -99,14 +102,7 @@ def calculate_longest_turn(start_angle: float, end_angle: float) -> float:
     :param end_angle:
     :return the longest turn between two angles:
     """
-    absolute_difference = abs(end_angle - start_angle)
-
-    if absolute_difference <= math.pi:
-        longest_turn = 2 * math.pi - absolute_difference
-    else:
-        longest_turn = absolute_difference
-
-    return longest_turn
+    return (calculate_shortest_turn(end_angle, start_angle) + math.pi * 2) * -1
 
 
 def is_on_same_line(position1: Tuple[int, int], position2: Tuple[int, int]) -> bool:
