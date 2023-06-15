@@ -126,7 +126,7 @@ if __name__ == '__main__':
     if main_consumer:
         main_consumer.terminate()
     if ai_producer:
-        main_consumer.terminate()
+        ai_producer.terminate()
 
     logger.debug("Stopping robot.")
     robot_api.set_robot_stop()

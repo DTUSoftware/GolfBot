@@ -19,7 +19,7 @@ DEBUG = ("true" in os.environ.get('DEBUG', "True").lower()) and not DISABLE_LOGG
 GOLF_BALL_CONFIDENCE_GATE = float(os.environ.get('GOLF_BALL_CONFIDENCE_GATE', 0.45))
 
 logger = logging.getLogger(__name__)
-logger.addHandler(logging.StreamHandler(sys.stdout))
+# logger.addHandler(logging.StreamHandler(sys.stdout))
 if DEBUG:
     logger.setLevel(logging.DEBUG)
 

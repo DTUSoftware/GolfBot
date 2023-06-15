@@ -30,14 +30,72 @@ DIRECTION_TOLERANCE_NEW = float(os.environ.get('DIRECTION_TOLERANCE_NEW', 15.0))
 WHEEL_RADIUS = (float(os.environ.get('WHEEL_DIAMETER', 68.8)) / 2) / 10  # Radius of the robot's wheels in cm
 DIST_BETWEEN_WHEELS = float(
     os.environ.get('DIST_BETWEEN_WHEELS', 83.0 * 2)) / 10  # Distance between the robot's wheels in cm
-ROBOT_BASE_SPEED = float(os.environ.get('ROBOT_BASE_SPEED', 40.0))
+ROBOT_BASE_SPEED = float(os.environ.get('ROBOT_BASE_SPEED', 25.0))
 
 logger = logging.getLogger(__name__)
-logger.addHandler(logging.StreamHandler(sys.stdout))
+# logger.addHandler(logging.StreamHandler(sys.stdout))
 if DEBUG:
     logger.setLevel(logging.DEBUG)
 
 current_target_pos = (0, 0)
+
+
+def do_smooth_turn(current_direction: float, new_direction: float, reverse=False) -> Tuple[float, float]:
+    """
+    Smoothly turns the robot to the new direction
+    Args:
+        current_direction: the current direction of the robot
+        new_direction: the new direction of the robot
+        reverse: if the robot should turn in reverse
+
+    Returns:
+        the new speed, first right then left
+    """
+    if reverse:
+        robot_speed_right, robot_speed_left = (-ROBOT_BASE_SPEED, -ROBOT_BASE_SPEED)
+    else:
+        robot_speed_right, robot_speed_left = (ROBOT_BASE_SPEED, ROBOT_BASE_SPEED)
+
+    current_direction = current_direction % (2 * math.pi)
+    new_direction = new_direction % (2 * math.pi)
+
+    # Adjust the robot speed depending on the direction difference, adding a small offset to the speed
+    # to make sure the robot is always moving towards the correct angle
+
+    # We make the direction diff (which can be at max math.pi * 2) into a value between 0 and 1
+    # and multiply it by a multiplier to get a speed correction value between 0 and speed_correction_multiplier
+    speed_correction_multiplier = 100
+
+    # If the robot is to the left of the target, turn right by decreasing the right wheel speed
+    # If the robot is to the right of the target, turn left by decreasing the left wheel speed
+
+    right = True
+
+    if current_direction < new_direction:
+        if (new_direction - current_direction) > math.pi:
+            diff_in_angle = abs((new_direction - 2 * math.pi) - current_direction)
+            right = False
+        else:
+            diff_in_angle = abs(new_direction - current_direction)
+            right = True
+    else:
+        if (current_direction - new_direction) > math.pi:
+            diff_in_angle = abs((current_direction - 2 * math.pi) - new_direction)
+            right = True
+        else:
+            diff_in_angle = abs(current_direction - new_direction)
+            right = False
+
+    speed_correction = (diff_in_angle / (math.pi * 2)) * speed_correction_multiplier
+    if not reverse:
+        speed_correction = -speed_correction
+
+    if right:
+        robot_speed_right = robot_speed_right + speed_correction
+    else:
+        robot_speed_left = robot_speed_right + speed_correction
+
+    return robot_speed_right, robot_speed_left
 
 
 async def drive_decision(target_position: Tuple[int, int], session: aiohttp.ClientSession) -> None:
@@ -52,8 +110,11 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
     track = path_algorithm.TRACK_GLOBAL
     robot_direction = track.robot_direction
 
-    logger.debug(f"Trying to get robot from {track.get_front_position()} to {target_position}. Robot currently has a direction of "
-                 f"{math.degrees(robot_direction)} deg ({robot_direction} rad)")
+    robot_speed_left = ROBOT_BASE_SPEED
+    robot_speed_right = ROBOT_BASE_SPEED
+
+    logger.debug(f"Trying to get robot from {track.get_front_position()} to {target_position}. "
+                 f"Robot currently has a direction of {math.degrees(robot_direction)} deg ({robot_direction} rad)")
 
     # If robot position is invalid, return
     if track.get_front_position() == (0, 0) or track.get_middle_position() == (0, 0) or target_position == (0, 0):
@@ -83,68 +144,66 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
         return
 
     # If the robot is about to drive into a wall or other obstacle, stop the robot
-    if math_helpers.is_about_to_collide_with_obstacle(track.get_front_position(), robot_direction):
-        logger.debug("Robot is about to collide with an obstacle, driving robot backwards")
+    if await math_helpers.is_about_to_collide_with_obstacle(track.get_front_position(), robot_direction):
+        logger.debug("Robot is about to collide with an obstacle in front, driving robot backwards")
         await robot_api.set_speeds(session=session, speed_left=-ROBOT_BASE_SPEED, speed_right=-ROBOT_BASE_SPEED)
         # TODO: evaluate this sleep
-        await asyncio.sleep(0.75)
+        await asyncio.sleep(0.4)
+        return
+
+    # If the robot is about to drive into a wall or other obstacle, stop the robot
+    if await math_helpers.is_about_to_collide_with_obstacle(track.get_middle_position(), (robot_direction + math.pi) % (2 * math.pi)):
+        logger.debug("Robot is about to collide with an obstacle behind, driving robot forward")
+        await robot_api.set_speeds(session=session, speed_left=ROBOT_BASE_SPEED, speed_right=ROBOT_BASE_SPEED)
+        # TODO: evaluate this sleep
+        await asyncio.sleep(0.4)
         return
 
     # Get the distance between the two targets
     # We use the turn position (rear) of the robot as the starting point,
     # as that is our turning point, so we turn at that point
-    distance = math_helpers.calculate_distance(position1=track.get_middle_position(), position2=target_position)
+    distance = math_helpers.calculate_distance(position1=track.get_front_position(), position2=target_position)
 
     logger.debug(f"The distance between the robot and the target is {distance} units")
 
     # If the distance is above distance tolerance
     if distance >= DISTANCE_TOLERANCE:
         # Get difference in direction, if any
-        new_direction = math_helpers.calculate_direction(to_pos=target_position, from_pos=track.get_middle_position())
+        new_direction = math_helpers.calculate_direction(to_pos=target_position, from_pos=track.get_front_position())
 
+        direction_diff = abs(robot_direction - new_direction)
         logger.debug(f"The angle from robot to target is {math.degrees(new_direction)} deg ({new_direction} rad). "
-                     f"The adjustment in direction needed is {math.degrees(new_direction - robot_direction)} deg "
-                     f"({new_direction - robot_direction} rad)")
+                     f"The adjustment in direction needed is {direction_diff} deg ({direction_diff} rad)")
 
         # Turn if needed
         global current_target_pos
         direction_tolerance = DIRECTION_TOLERANCE
         if target_position != current_target_pos:
             current_target_pos = target_position
-            direction_tolerance = DIRECTION_TOLERANCE_NEW
+        #     direction_tolerance = DIRECTION_TOLERANCE_NEW
+        #
+        #
+        # if direction_diff >= math.radians(direction_tolerance):
+        #     direction = new_direction
+        #
+        #     logger.debug(f"Turning robot {math.degrees(direction)} deg ({direction} rad) - Originally wanted to "
+        #                  f"turn to {math.degrees(new_direction)} deg ({new_direction} rad), with diff being "
+        #                  f"{math.degrees(direction_diff)} deg ({direction_diff} rad)")
+        #     await robot_api.turn_robot(session=session, direction=direction)
+        # else:
+        #     logger.debug("Robot is in the correct heading (within tolerance), will not stop-turn.")
 
-        direction_diff = abs(robot_direction - new_direction)
-        robot_speed_left = ROBOT_BASE_SPEED
-        robot_speed_right = ROBOT_BASE_SPEED
-        if direction_diff >= math.radians(direction_tolerance):
-            direction = new_direction
-
-            logger.debug(f"Turning robot {math.degrees(direction)} deg ({direction} rad) - Originally wanted to "
-                         f"turn to {math.degrees(new_direction)} deg ({new_direction} rad), with diff being "
-                         f"{math.degrees(direction_diff)} deg ({direction_diff} rad)")
-            await robot_api.turn_robot(session=session, direction=direction)
+        # If we go backwards, go back
+        if abs(direction_diff - math.radians(180)) < math.radians(45):
+            robot_speed_right, robot_speed_left = do_smooth_turn((robot_direction + math.pi) % (2 * math.pi), new_direction, reverse=True)
         else:
-            logger.debug("Robot is in the correct heading (within tolerance), will not stop-turn.")
             # Adjust the robot speed depending on the direction difference, adding a small offset to the speed
             # to make sure the robot is always moving towards the correct angle
-
-            # We make the direction diff (which can be at max math.pi * 2) into a value between 0 and 1
-            # and multiply it by a multiplier to get a speed correction value between 0 and speed_correction_multiplier
-            speed_correction_multiplier = 100
-            speed_correction = (direction_diff / (math.pi * 2)) * speed_correction_multiplier
-
-            if robot_direction < new_direction:
-                # If the robot is to the left of the target, turn right by decreasing the left wheel speed
-                robot_speed_left = ROBOT_BASE_SPEED - speed_correction
-            else:
-                # If the robot is to the right of the target, turn left by decreasing the right wheel speed
-                robot_speed_right = ROBOT_BASE_SPEED - speed_correction
+            robot_speed_right, robot_speed_left = do_smooth_turn(robot_direction, new_direction)
 
         logger.debug("Driving robot forward.")
         # Drive forward with base speed
         await robot_api.set_speeds(session=session, speed_left=robot_speed_left, speed_right=robot_speed_right)
-        # TODO: evaluate if this can be removed
-        await asyncio.sleep(0.5)
     else:
         logger.debug("Robot has reached the target (within tolerance), stopping robot.")
         # Stop robot

@@ -1,6 +1,8 @@
 import math
 from typing import Tuple
 
+import asyncio
+
 from Utils import path_algorithm
 
 
@@ -72,7 +74,7 @@ def calculate_distance(position1: Tuple[int, int], position2: Tuple[int, int]) -
     Returns:
         float: The distance between the two points.
     """
-    return math.sqrt(pow(position1[0] - position2[0], 2) + pow(position1[1] - position2[1], 2))
+    return abs(math.sqrt(pow(position1[0] - position2[0], 2) + pow(position1[1] - position2[1], 2)))
 
 
 def is_on_same_line(position1: Tuple[int, int], position2: Tuple[int, int]) -> bool:
@@ -105,7 +107,7 @@ def has_passed_target(frompos: Tuple[int, int], target: Tuple[int, int], current
     return False
 
 
-def is_about_to_collide_with_obstacle(pos: Tuple[int, int], direction: float) -> bool:
+async def is_about_to_collide_with_obstacle(pos: Tuple[int, int], direction: float) -> bool:
     """
     Checks if you are about to collide with an obstacle.
     :param pos: your current position
@@ -114,8 +116,9 @@ def is_about_to_collide_with_obstacle(pos: Tuple[int, int], direction: float) ->
     """
     obstacles = path_algorithm.TRACK_GLOBAL.obstacles
     for obstacle in obstacles:
-        if obstacle.is_about_to_collide(pos, direction):
+        if await obstacle.is_about_to_collide(pos, direction):
             return True
+        await asyncio.sleep(0)
     return False
 
 

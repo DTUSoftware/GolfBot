@@ -25,7 +25,7 @@ DELIVERY_DISTANCE = 50  # in units
 SAFETY_LENGTH = 150  # in units
 HEADING_DIFFERENCE_DELIVERY = 10  # in degrees
 COLLISION_DISTANCE = 30  # in units (pixels)
-DIRECTION_DIFFERENCE = 45  # in degrees
+DIRECTION_DIFFERENCE = 250  # in degrees
 
 # Initialize colorama
 colorama_init()
@@ -33,7 +33,7 @@ colorama_init()
 distance_across = math.sqrt(1 ** 2 + 1 ** 2)
 
 logger = logging.getLogger(__name__)
-logger.addHandler(logging.StreamHandler(sys.stdout))
+# logger.addHandler(logging.StreamHandler(sys.stdout))
 if DEBUG:
     logger.setLevel(logging.DEBUG)
 
@@ -179,9 +179,10 @@ class Ball:
             for node in obstacle.path:
                 distance = math_helpers.calculate_distance(self.get_position(), node.get_position())
                 if distance < PATH_OBSTACLE_DISTANCE:
-                    # logger.debug(f"Ball distance from obstacle: {distance}")
-                    obstacle_angle_array.append(math_helpers.calculate_direction(from_pos=self.get_position(),
-                                                                                 to_pos=node.get_position()))
+                    direction = math_helpers.calculate_direction(from_pos=self.get_position(), to_pos=node.get_position())
+                    obstacle_angle_array.append(direction)
+
+                    logger.debug(f"Ball distance from obstacle node {node.get_position()} is {distance} with direction {math.degrees(direction)} deg")
         if not obstacle_angle_array:
             logger.debug("Ball isn't close to an obstacle.")
             # We need to return two points to make a line, even if it's the same
@@ -195,7 +196,9 @@ class Ball:
         dy = math.sin(angle) * SAFETY_LENGTH
         x1 = int(self.x + dx)
         y1 = int(self.y + dy)
-        return [(x1, y1), self.get_position()]
+        self.drivePath = [(x1, y1), self.get_position()]
+        logger.debug(f"Ball drive path: {self.drivePath} - angle is {math.degrees(angle)} deg")
+        return self.drivePath
 
 
 class Obstacle:
@@ -213,7 +216,7 @@ class Obstacle:
         self.path: List[Node] = path
         self.points: Optional[List[Tuple[int, int]]] = points
 
-    def get_distance(self, position: Tuple[int, int]) -> Tuple[float, Node]:
+    async def get_distance(self, position: Tuple[int, int]) -> Tuple[float, Node]:
         """
         Returns the distance from the given position to the obstacle.
 
@@ -230,19 +233,22 @@ class Obstacle:
             if distance < min_distance:
                 min_distance = distance
                 closest_node = node
+            await asyncio.sleep(0)
         return min_distance, closest_node
 
-    def is_about_to_collide(self, position: Tuple[int, int], heading: float) -> bool:
+    async def is_about_to_collide(self, position: Tuple[int, int], heading: float) -> bool:
         """
         Checks whether the robot is about to collide with the obstacle.
         :param position: the position of the robot
         :param heading: the heading of the robot
         :return: True if the robot is about to collide with the obstacle, False otherwise
         """
-        distance, node = self.get_distance(position)
+        distance, node = await self.get_distance(position)
         if distance < COLLISION_DISTANCE:
+            logger.debug("Robot is within collision distance of obstacle.")
             direction = math_helpers.calculate_direction(to_pos=node.get_position(), from_pos=position)
             if abs(direction - heading) < math.radians(DIRECTION_DIFFERENCE):
+                logger.debug("Robot is about to collide with obstacle.")
                 return True
         return False
 
@@ -905,7 +911,7 @@ class Track:
         logger.debug("Calculating path for every ball")
         paths: List[List[NodeData]] = []
         if objects_to_navigate_to:
-            robot_node = self.graph.get_node(self.get_middle_position())
+            robot_node = self.graph.get_node(self.get_front_position())
             object_nodes = [self.graph.get_node(obj[0]) for obj in objects_to_navigate_to]
             tasks = [self.graph.get_path(start_node=robot_node, dst_node=ball_node) for ball_node in object_nodes if
                      ball_node]
@@ -1015,7 +1021,7 @@ class Track:
         Plot the path
         :return: None
         """
-        await self.calculate_path([ball.get_drive_path() for ball in self.balls])
+        await self.calculate_path([ball.drivePath for ball in self.balls if ball.get_drive_path()])
         points_in_path = [[], []]
         for nodeData in self.path:
             points_in_path[0].append(nodeData.node.x)
@@ -1143,7 +1149,7 @@ async def add_buffer_to_path(path: List[NodeData]) -> List[NodeData]:
 
         # Check if the current node is in an obstacle
         for obstacle in TRACK_GLOBAL.obstacles:
-            distance_from_obstacle, obstacle_node = obstacle.get_distance(current_node.node.get_position())
+            distance_from_obstacle, obstacle_node = await obstacle.get_distance(current_node.node.get_position())
             if distance_from_obstacle < PATH_OBSTACLE_DISTANCE:
                 # If the node is in an obstacle, move it away from the obstacle
                 node_x = current_node.node.x
@@ -1180,7 +1186,7 @@ async def check_new_path(path_queue: multiprocessing.JoinableQueue) -> bool:
     track = TRACK_GLOBAL
     if not track:
         return False
-    robot_position = track.get_middle_position()
+    robot_position = track.get_front_position()
     # if DEBUG:
     #     print(
     #         f"current last target path: {[nodedata.node.get_position() for nodedata in last_target_path] if last_target_path else []}\n"
@@ -1200,13 +1206,15 @@ async def check_new_path(path_queue: multiprocessing.JoinableQueue) -> bool:
             logger.debug("Robot reached target, popping")
             track.last_target_path.pop(0)
             track.last_target_node = track.graph.get_node(robot_position)
+            await asyncio.sleep(0)
         # If we passed the target, pop
-        while track.last_target_path and math_helpers.has_passed_target(track.last_target_path[0].node.get_position(),
-                                                                        robot_position,
-                                                                        track.last_target_node.get_position()):
-            logger.debug("Robot passed target, popping")
-            track.last_target_path.pop(0)
-            track.last_target_node = track.graph.get_node(robot_position)
+        # while track.last_target_path and math_helpers.has_passed_target(track.last_target_path[0].node.get_position(),
+        #                                                                 robot_position,
+        #                                                                 track.last_target_node.get_position()):
+        #     logger.debug("Robot passed target, popping")
+        #     track.last_target_path.pop(0)
+        #     track.last_target_node = track.graph.get_node(robot_position)
+        #     await asyncio.sleep(0)
 
         logger.debug(
             f"Current optimized path: {[(nodedata.node.x, nodedata.node.y) for nodedata in track.last_target_path]}")
@@ -1258,6 +1266,7 @@ async def check_new_path(path_queue: multiprocessing.JoinableQueue) -> bool:
             logger.debug("Robot reached target, popping")
             track.last_target_path.pop(0)
             track.last_target_node = track.graph.get_node(robot_position)
+            await asyncio.sleep(0)
 
         return True
 

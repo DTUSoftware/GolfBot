@@ -1,7 +1,5 @@
-import asyncio
 import math
 import os
-import sys
 
 import aiohttp
 import requests
@@ -14,11 +12,9 @@ ROBOT_API_ENDPOINT = os.environ.get('API_ENDPOINT', "http://localhost:8069/api/v
 DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "False").lower()
 # If debugging should be enabled
 DEBUG = ("true" in os.environ.get('DEBUG', "True").lower()) and not DISABLE_LOGGING
-DRIVE_DELAY = 0
-TURN_DELAY = 0
 
 logger = logging.getLogger(__name__)
-logger.addHandler(logging.StreamHandler(sys.stdout))
+# logger.addHandler(logging.StreamHandler(sys.stdout))
 if DEBUG:
     logger.setLevel(logging.DEBUG)
 
@@ -31,10 +27,11 @@ async def set_robot_start(session: aiohttp.ClientSession) -> bool:
     """
     logger.debug("Setting robot start")
     async with session.post(f"{ROBOT_API_ENDPOINT}/start") as response:
-        logger.debug(await response.text())
+        res = await response.text()
         if response.status != 200:
-            logger.debug(response.status)
+            logger.debug(f"Robot failed to start with response {res}, code {response.status}")
             return False
+        logger.debug(f"Robot started with response {res}")
     return True
 
 
@@ -44,10 +41,11 @@ def set_robot_stop() -> bool:
     :return: True if the robot stopped, False otherwise
     """
     response = requests.post(f"{ROBOT_API_ENDPOINT}/stop")
-    logger.debug(response.text)
+    res = response.text
     if response.status_code != 200:
-        logger.debug(response.status_code)
+        logger.debug(f"Robot failed to stop with response {res}, code {response.status_code}")
         return False
+    logger.debug(f"Robot stopped with response {res}")
     return True
 
 
@@ -59,10 +57,11 @@ async def get_robot_status(session: aiohttp.ClientSession) -> bool:
     """
     logger.debug("Getting robot status")
     async with session.get(f"{ROBOT_API_ENDPOINT}/status") as response:
+        res = await response.text()
         if response.status != 200:
-            logger.debug(response.status)
+            logger.debug(f"Robot failed to get status with response {res}, code {response.status}")
             return False
-        logger.debug(await response.text())
+        logger.debug(f"Robot status is {res}")
     return True
 
 
@@ -76,10 +75,11 @@ async def set_robot_position(session: aiohttp.ClientSession, x: int, y: int) -> 
     """
     logger.debug("Setting robot position")
     async with session.post(f"{ROBOT_API_ENDPOINT}/position?x={x}&y={y}") as response:
-        logger.debug(await response.text())
+        res = await response.text()
         if response.status != 200:
-            logger.debug(response.status)
+            logger.debug(f"Robot failed to set position with response {res}, code {response.status}")
             return False
+        logger.debug(f"Robot position set with response {res}")
     return True
 
 
@@ -94,10 +94,11 @@ async def set_robot_direction(session: aiohttp.ClientSession, direction: float) 
     """
     logger.debug("Setting robot direction")
     async with session.post(f"{ROBOT_API_ENDPOINT}/direction?radians={(direction % (math.pi * 2))}") as response:
-        logger.debug(await response.text())
+        res = await response.text()
         if response.status != 200:
-            logger.debug(response.status)
+            logger.debug(f"Robot failed to set direction with response {res}, code {response.status}")
             return False
+        logger.debug(f"Robot direction set with response {res}")
     return True
 
 
@@ -110,13 +111,11 @@ async def turn_robot(session: aiohttp.ClientSession, direction: float) -> bool:
     :return: None
     """
     async with session.post(f"{ROBOT_API_ENDPOINT}/turn?radians={direction}") as response:
-        logger.debug(await response.text())
+        res = await response.text()
         if response.status != 200:
-            logger.debug(response.status)
+            logger.debug(f"Robot failed to turn with response {res}, code {response.status}")
             return False
-        else:
-            # Let the robot drive a lil' bit
-            await asyncio.sleep(TURN_DELAY)
+        logger.debug(f"Robot turned with response {res}")
     return True
 
 
@@ -130,12 +129,11 @@ async def set_speeds(session: aiohttp.ClientSession, speed_left: float, speed_ri
     """
     async with session.post(
             f"{ROBOT_API_ENDPOINT}/drive?speed_left={max(min(speed_left, 100), -100)}&speed_right={max(min(speed_right, 100), -100)}") as response:
+        res = await response.text()
         if response.status != 200:
-            logger.debug(f"Error on adjusting speed: {response.status}")
+            logger.debug(f"Robot failed to set speed with response {res}, code {response.status}")
             return False
-        else:
-            # Let the robot drive a lil' bit
-            await asyncio.sleep(DRIVE_DELAY)
+        logger.debug(f"Robot speed set with response {res}")
     return True
 
 
@@ -147,7 +145,9 @@ async def toggle_fans(session: aiohttp.ClientSession) -> bool:
     """
     async with session.post(
             f"{ROBOT_API_ENDPOINT}/toggle_fans") as response:
+        res = await response.text()
         if response.status != 200:
-            logger.debug(f"Error on toggling fans: {response.status}")
+            logger.debug(f"Robot failed to toggle fans with response {res}, code {response.status}")
             return False
+        logger.debug(f"Robot fans toggled with response {res}")
     return True

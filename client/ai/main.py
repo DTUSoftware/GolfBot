@@ -11,14 +11,14 @@ from Utils.opencv_helpers import draw_object
 # The webcam to use
 VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 0))
 # The model to use
-CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/32026041-tnorfdnaraer")
+CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/20231506-hereugo")
 # If logging should be disabled
 DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "True").lower()
 # If debugging should be enabled
 DEBUG = ("true" in os.environ.get('DEBUG', "True").lower()) and not DISABLE_LOGGING
 
 logger = logging.getLogger(__name__)
-logger.addHandler(logging.StreamHandler(sys.stdout))
+# logger.addHandler(logging.StreamHandler(sys.stdout))
 if DEBUG:
     logger.setLevel(logging.DEBUG)
 
