@@ -139,7 +139,7 @@ class Node:
         Returns:
             float: The heading in radians.
         """
-        return math_helpers.calculate_direction(from_position, self.get_position())
+        return math_helpers.calculate_direction(from_pos=from_position, to_pos=self.get_position())
 
 
 class Ball:
@@ -180,7 +180,8 @@ class Ball:
                 distance = math_helpers.calculate_distance(self.get_position(), node.get_position())
                 if distance < PATH_OBSTACLE_DISTANCE:
                     # logger.debug(f"Ball distance from obstacle: {distance}")
-                    obstacle_angle_array.append(node.get_heading(self.get_position()))
+                    obstacle_angle_array.append(math_helpers.calculate_direction(from_pos=self.get_position(),
+                                                                                 to_pos=node.get_position()))
         if not obstacle_angle_array:
             logger.debug("Ball isn't close to an obstacle.")
             # We need to return two points to make a line, even if it's the same
@@ -189,7 +190,7 @@ class Ball:
 
         # Get the path to the balls while avoiding obstacles
         avg_angles = np.mean(obstacle_angle_array)
-        angle = (2 * math.pi) - avg_angles
+        angle = avg_angles % (2 * math.pi)
         dx = math.cos(angle) * SAFETY_LENGTH
         dy = math.sin(angle) * SAFETY_LENGTH
         x1 = int(self.x + dx)
@@ -327,7 +328,7 @@ class Goal:
         middle, _ = self.get_middle_and_angle()
 
         # Get the angle to the middle
-        angle_to_middle = math_helpers.calculate_direction(TRACK_GLOBAL.get_turn_position(), middle)
+        angle_to_middle = math_helpers.calculate_direction(TRACK_GLOBAL.get_middle_position(), middle)
 
         return angle_to_middle
 
@@ -852,7 +853,7 @@ class Track:
             return self.robot_front_pos
         return self.robot_pos
 
-    def get_turn_position(self) -> Tuple[int, int]:
+    def get_middle_position(self) -> Tuple[int, int]:
         """
         Get the position to use for calculating angles
         Returns:
@@ -904,7 +905,7 @@ class Track:
         logger.debug("Calculating path for every ball")
         paths: List[List[NodeData]] = []
         if objects_to_navigate_to:
-            robot_node = self.graph.get_node(self.get_front_position())
+            robot_node = self.graph.get_node(self.get_middle_position())
             object_nodes = [self.graph.get_node(obj[0]) for obj in objects_to_navigate_to]
             tasks = [self.graph.get_path(start_node=robot_node, dst_node=ball_node) for ball_node in object_nodes if
                      ball_node]
@@ -1179,7 +1180,7 @@ async def check_new_path(path_queue: multiprocessing.JoinableQueue) -> bool:
     track = TRACK_GLOBAL
     if not track:
         return False
-    robot_position = track.get_turn_position()
+    robot_position = track.get_middle_position()
     # if DEBUG:
     #     print(
     #         f"current last target path: {[nodedata.node.get_position() for nodedata in last_target_path] if last_target_path else []}\n"
@@ -1279,7 +1280,7 @@ def is_target_different(track: Track, target_node: Node, other_node: Node) -> bo
     # Calculate the position difference
     position_diff = math_helpers.calculate_distance(target_node.get_position(), other_node.get_position())
     # Calculate the direction difference
-    direction_diff = abs(target_node.get_heading(track.get_turn_position()) - other_node.get_heading(track.get_turn_position()))
+    direction_diff = abs(target_node.get_heading(track.get_middle_position()) - other_node.get_heading(track.get_middle_position()))
 
     # Check if target is significantly different from the last target
     if position_diff > position_threshold or direction_diff > math.pi / 4:

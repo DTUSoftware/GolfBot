@@ -6,7 +6,7 @@ from Utils import path_algorithm as pathalg
 from Utils import opencv_helpers
 
 # The webcam to use
-VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 1))
+VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 0))
 # The track preset to use
 TRACK_PRESET = os.environ.get('TRACK_PRESET', "track.json")
 

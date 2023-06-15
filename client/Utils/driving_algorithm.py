@@ -56,7 +56,7 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
                  f"{math.degrees(robot_direction)} deg ({robot_direction} rad)")
 
     # If robot position is invalid, return
-    if track.get_front_position() == (0, 0) or track.get_turn_position() == (0, 0) or target_position == (0, 0):
+    if track.get_front_position() == (0, 0) or track.get_middle_position() == (0, 0) or target_position == (0, 0):
         # Stop robot
         await robot_api.set_speeds(session=session, speed_left=0, speed_right=0)
         return
@@ -93,14 +93,14 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
     # Get the distance between the two targets
     # We use the turn position (rear) of the robot as the starting point,
     # as that is our turning point, so we turn at that point
-    distance = math_helpers.calculate_distance(position1=track.get_turn_position(), position2=target_position)
+    distance = math_helpers.calculate_distance(position1=track.get_middle_position(), position2=target_position)
 
     logger.debug(f"The distance between the robot and the target is {distance} units")
 
     # If the distance is above distance tolerance
     if distance >= DISTANCE_TOLERANCE:
         # Get difference in direction, if any
-        new_direction = math_helpers.calculate_direction(to_pos=target_position, from_pos=track.get_turn_position())
+        new_direction = math_helpers.calculate_direction(to_pos=target_position, from_pos=track.get_middle_position())
 
         logger.debug(f"The angle from robot to target is {math.degrees(new_direction)} deg ({new_direction} rad). "
                      f"The adjustment in direction needed is {math.degrees(new_direction - robot_direction)} deg "
@@ -171,7 +171,7 @@ async def adjust_speed_using_pid(track: path_algorithm.Track, target_node: path_
     :return: None
     """
     # Get current robot position
-    current_position = track.get_turn_position()
+    current_position = track.get_middle_position()
 
     if (current_position[0] == 0 and current_position[1] == 0) or not target_node:
         logger.debug("Current position is (0,0), stopping speed adjustment")
