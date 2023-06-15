@@ -1,5 +1,5 @@
 import math
-from typing import Tuple
+from typing import Tuple, List
 
 from Utils import path_algorithm
 
@@ -75,6 +75,40 @@ def calculate_distance(position1: Tuple[int, int], position2: Tuple[int, int]) -
     return math.sqrt(pow(position1[0] - position2[0], 2) + pow(position1[1] - position2[1], 2))
 
 
+def calculate_shortest_turn(start_angle: float, end_angle: float) -> float:
+    """
+    Calculates the shortest turn between two angles.
+    :param start_angle:
+    :param end_angle:
+    :return the shortest turn between two angles:
+    """
+    absolute_difference = abs(end_angle - start_angle)
+
+    if absolute_difference <= math.pi:
+        shortest_turn = absolute_difference
+    else:
+        shortest_turn = 2 * math.pi - absolute_difference
+
+    return shortest_turn
+
+
+def calculate_longest_turn(start_angle: float, end_angle: float) -> float:
+    """
+    Calculates the longest turn between two angles.
+    :param start_angle:
+    :param end_angle:
+    :return the longest turn between two angles:
+    """
+    absolute_difference = abs(end_angle - start_angle)
+
+    if absolute_difference <= math.pi:
+        longest_turn = 2 * math.pi - absolute_difference
+    else:
+        longest_turn = absolute_difference
+
+    return longest_turn
+
+
 def is_on_same_line(position1: Tuple[int, int], position2: Tuple[int, int]) -> bool:
     """
     Checks if two nodes are on the same line, either horizontally or vertically.
@@ -117,6 +151,85 @@ def is_about_to_collide_with_obstacle(pos: Tuple[int, int], direction: float) ->
         if obstacle.is_about_to_collide(pos, direction):
             return True
     return False
+
+
+def is_same_positions_as_obstacle(pos: Tuple[int, int]) -> bool:
+    """
+    Checks if you are on the same position as an obstacle.
+    :param pos: your current position
+    :return: True if you are on the same position, else False
+    """
+    obstacles = path_algorithm.TRACK_GLOBAL.obstacles
+    for obstacle in obstacles:
+        if obstacle.is_same_position(pos):
+            return True
+    return False
+
+
+def calculate_xn_and_yn(radius: float, angle: float, pos: Tuple[int, int]) -> Tuple[int, int]:
+    """
+    Calculates the x and y position of a point on a circle.
+    :param radius: the radius of the circle
+    :param angle: the angle of the point on the circle
+    :param pos: the center position of the circle
+    :return: the x and y position of the point on the circle
+    """
+    xn = math.ceil(pos[0] + radius * math.cos(angle))
+    yn = math.ceil(pos[1] + radius * math.sin(angle))
+    return xn, yn
+
+
+def calculate_angle_to_turn(radius: float, current_angle: float, angle_to_turn: float,
+                            post: Tuple[int, int], ) -> float:
+    """
+    Calculates the angle to turn.
+    :param radius:
+    :param current_angle:
+    :param angle_to_turn:
+    :param post:
+    :return the angle to turn returns 0 if the turn is not possible:
+    """
+    angle_array1: List[float]
+    angle_array2: List[float]
+    if current_angle < angle_to_turn:
+        angle_array1 = [x for x in range(current_angle, angle_to_turn, math.pi / 18)]
+        angle_array2 = [x for x in range(angle_to_turn, current_angle, -math.pi / 18)]
+    else:
+        angle_array1 = [x for x in range(current_angle, angle_to_turn, -math.pi / 18)]
+        angle_array2 = [x for x in range(angle_to_turn, current_angle, math.pi / 18)]
+    short_angle_array: List[float]
+    long_angle_array: List[float]
+    if len(angle_array1) > len(angle_array2):
+        short_angle_array = angle_array2
+        long_angle_array = angle_array1
+    else:
+        short_angle_array = angle_array1
+        long_angle_array = angle_array2
+    distance_array: List[int] = [x for x in range(1, radius, 1)]
+    break_flag: bool = False
+    for angle in short_angle_array:
+        for distance in distance_array:
+            xn, yn = calculate_xn_and_yn(distance, angle, post)
+            if is_same_positions_as_obstacle((xn, yn)):
+                break_flag = True
+                break
+        if break_flag:
+            break
+    else:
+        # something here i haven't figured out yet
+        return calculate_shortest_turn(current_angle, angle_to_turn)
+    break_flag = False
+    for angle in long_angle_array:
+        for distance in distance_array:
+            xn, yn = calculate_xn_and_yn(distance, angle, post)
+            if is_same_positions_as_obstacle((xn, yn)):
+                break_flag = True
+                break
+        if break_flag:
+            break
+    else:
+        return calculate_longest_turn(current_angle, angle_to_turn)
+    return 0
 
 
 if __name__ == "__main__":

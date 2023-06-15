@@ -243,6 +243,18 @@ class Obstacle:
                 return True
         return False
 
+    def is_same_position(self, pos : Tuple[int, int]) -> bool:
+        """
+        Checks whether the given position is the same as the obstacle's position.
+
+        Args:
+            pos (tuple): The position as a tuple of (x, y) coordinates.
+
+        Returns:
+            bool: True if the position is the same as the obstacle's position, False otherwise.
+        """
+        return self.path[0].get_position() == pos
+
 
 class Goal:
     def __init__(self, path: List[Node], points: Optional[List[Tuple[int, int]]] = None, small=False) -> None:
