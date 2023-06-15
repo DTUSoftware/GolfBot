@@ -350,7 +350,7 @@ class Goal:
         middle, _ = self.get_middle_and_angle()
 
         # Get the angle to the middle
-        angle_to_middle = math_helpers.calculate_direction(TRACK_GLOBAL.get_middle_position(), middle)
+        angle_to_middle = math_helpers.calculate_direction(to_pos=middle, from_pos=TRACK_GLOBAL.get_middle_position())
 
         return angle_to_middle
 

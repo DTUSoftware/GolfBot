@@ -108,11 +108,11 @@ async def do_race_iteration(track: path_algorithm.Track, ai_queue: multiprocessi
         #     get_robot_status()
 
         # Parse the results
-        robot_results, golf_ball_results, golden_ball_results = await robot_ai.parse_ai_results(ai_results)
+        frame_size, robot_results, golf_ball_results, golden_ball_results = await robot_ai.parse_ai_results(ai_results)
 
         # Update robot and balls
-        await robot_ai.update_robot_from_ai_result(track, robot_results, session)
-        await robot_ai.update_balls_from_ai_result(track, golf_ball_results, golden_ball_results)
+        await robot_ai.update_robot_from_ai_result(track, robot_results, frame_size, session)
+        await robot_ai.update_balls_from_ai_result(track, golf_ball_results, golden_ball_results, frame_size)
 
         # Update queue with results
         if len(seen_ball_queue) == 10:

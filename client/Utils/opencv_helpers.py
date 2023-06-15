@@ -1,3 +1,5 @@
+from typing import Tuple
+
 import cv2
 
 
@@ -26,3 +28,13 @@ def draw_object(img, object_type, path):
         # Add a line
         if i >= 1:
             cv2.line(img, path[i - 1], point, color)
+
+
+def opencv_position_to_graph_position(position: Tuple[int, int], frame_size: Tuple[int, int]) -> Tuple[int, int]:
+    """
+    Converts a position from OpenCV's coordinate system to the graph's coordinate system.
+    :param position: The position to convert.
+    :param frame_size: The size of the frame.
+    :return: The converted position.
+    """
+    return int(position[0]), int(frame_size[1] - position[1])
