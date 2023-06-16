@@ -33,7 +33,7 @@ colorama_init()
 distance_across = math.sqrt(1 ** 2 + 1 ** 2)
 
 logger = logging.getLogger(__name__)
-logger.addHandler(logging.StreamHandler(sys.stdout))
+# logger.addHandler(logging.StreamHandler(sys.stdout))
 if DEBUG:
     logger.setLevel(logging.DEBUG)
 
@@ -299,10 +299,11 @@ class Obstacle:
         distance, node = await self.get_distance(position)
         if distance < COLLISION_DISTANCE:
             logger.debug("Robot is within collision distance of obstacle.")
-            direction = math_helpers.calculate_direction(to_pos=node.get_position(), from_pos=position)
-            if abs(direction - heading) < math.radians(DIRECTION_DIFFERENCE):
-                logger.debug("Robot is about to collide with obstacle.")
-                return True
+            return True
+            # direction = math_helpers.calculate_direction(to_pos=node.get_position(), from_pos=position)
+            # if abs(direction - heading) < math.radians(DIRECTION_DIFFERENCE):
+            #     logger.debug("Robot is about to collide with obstacle.")
+            #     return True
         return False
 
     def is_same_position(self, pos : Tuple[int, int]) -> bool:
@@ -922,7 +923,7 @@ class Track:
             The position to use for calculating paths
         """
         if self.robot_front_pos:
-            logger.debug(f"Front pos: {self.robot_front_pos}")
+            # logger.debug(f"Front pos: {self.robot_front_pos}")
             return self.robot_front_pos
         return self.robot_pos
 
@@ -942,7 +943,7 @@ class Track:
         :param robot_direction: The direction of the robot
         :return: None
         """
-        logger.debug(f"Old direction: {self.robot_direction}, new direction: {robot_direction}")
+        logger.debug(f"Old direction: {math.degrees(self.robot_direction)} deg, new direction: {math.degrees(robot_direction)} deg")
 
         self.robot_direction = robot_direction % (2 * math.pi)
 
@@ -978,7 +979,7 @@ class Track:
         logger.debug("Calculating path for every ball")
         paths: List[List[NodeData]] = []
         if objects_to_navigate_to:
-            robot_node = self.graph.get_node(self.get_front_position())
+            robot_node = self.graph.get_node(self.get_middle_position())
             if not robot_node:
                 logger.debug("No robot node, returning empty")
                 self.path = []
@@ -1257,7 +1258,7 @@ async def check_new_path(path_queue: multiprocessing.JoinableQueue) -> bool:
     track = TRACK_GLOBAL
     if not track:
         return False
-    robot_position = track.get_front_position()
+    robot_position = track.get_middle_position()
     # if DEBUG:
     #     print(
     #         f"current last target path: {[nodedata.node.get_position() for nodedata in last_target_path] if last_target_path else []}\n"
