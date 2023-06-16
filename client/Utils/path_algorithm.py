@@ -19,10 +19,11 @@ from Utils import math_helpers, opencv_helpers
 DEBUG = "true" in os.environ.get('DEBUG', "True").lower()
 # The timeout for calculating a path
 TIMEOUT_GET_PATH = 5  # in seconds
-PATH_OBSTACLE_DISTANCE = 40  # in units
+PATH_OBSTACLE_DISTANCE = 70  # in units, this is where the balls should max be from the borders for robot width
 DELIVERY_DISTANCE_FAR = 150  # in units
-DELIVERY_DISTANCE = 50  # in units
+DELIVERY_DISTANCE = 130  # in units, this is where the middle of the robot is when delivering (241 - 113)
 SAFETY_LENGTH = 150  # in units
+SAFETY_LENGTH_CORNER = 200  # in units
 HEADING_DIFFERENCE_DELIVERY = 10  # in degrees
 COLLISION_DISTANCE = 30  # in units (pixels)
 DIRECTION_DIFFERENCE = 250  # in degrees
@@ -215,8 +216,11 @@ class Ball:
         # avg_angles = np.mean([elem[0] for elem in obstacle_angle_array])
         # angle = avg_angles % (2 * math.pi)
 
+        safety_length = SAFETY_LENGTH
+
         # We get the angle of the ball to the obstacle
         if x_node[0] != (0, 0) and y_node[0] != (0, 0):
+            safety_length = SAFETY_LENGTH_CORNER
             if x_node[0][0] < self_pos[0] and y_node[0][1] < self_pos[1]:
                 # bottom left
                 angle = math.radians(45)
@@ -245,8 +249,8 @@ class Ball:
                 angle = math.radians(270)
 
         # We get the angle of the ball to the obstacle
-        dx = math.cos(angle) * SAFETY_LENGTH
-        dy = math.sin(angle) * SAFETY_LENGTH
+        dx = math.cos(angle) * safety_length
+        dy = math.sin(angle) * safety_length
         x1 = int(self_pos[0] + dx)
         y1 = int(self_pos[1] + dy)
         self.drivePath = [(x1, y1), self_pos]
@@ -383,7 +387,7 @@ class Goal:
         middle, _ = self.get_middle_and_angle()
 
         # Get the distance to the middle
-        distance = math_helpers.calculate_distance(TRACK_GLOBAL.get_front_position(), middle)
+        distance = math_helpers.calculate_distance(TRACK_GLOBAL.get_middle_position(), middle)
 
         # Check if robot is close enough to the middle
         if distance > DELIVERY_DISTANCE:

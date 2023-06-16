@@ -1,7 +1,9 @@
 import math
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 
 import asyncio
+
+import numpy as np
 
 from Utils import path_algorithm
 
@@ -99,8 +101,8 @@ def calculate_shortest_turn(start_angle: float, end_angle: float) -> float:
 def calculate_longest_turn(start_angle: float, end_angle: float) -> float:
     """
     Calculates the longest turn between two angles.
-    :param start_angle:
-    :param end_angle:
+    :param start_angle: the start angle
+    :param end_angle: the end angle
     :return the longest turn between two angles:
     """
     return (calculate_shortest_turn(end_angle, start_angle) + math.pi * 2) * -1
@@ -178,36 +180,36 @@ def calculate_xn_and_yn(radius: float, angle: float, pos: Tuple[int, int]) -> Tu
 
 
 def calculate_angle_to_turn(radius: float, current_angle: float, angle_to_turn: float,
-                            post: Tuple[int, int], ) -> float:
+                            pos: Tuple[int, int], ) -> Optional[float]:
     """
     Calculates the angle to turn.
-    :param radius:
-    :param current_angle:
-    :param angle_to_turn:
-    :param post:
+    :param radius: the radius of the circle
+    :param current_angle: your current angle
+    :param angle_to_turn: the angle you want to turn
+    :param pos: your current position
     :return the angle to turn returns 0 if the turn is not possible:
     """
-    angle_array1: List[float]
-    angle_array2: List[float]
+    angle_array1: np.ndarray
+    angle_array2: np.ndarray
     if current_angle < angle_to_turn:
-        angle_array1 = [x for x in range(current_angle, angle_to_turn, math.pi / 18)]
-        angle_array2 = [x for x in range(angle_to_turn, current_angle, -math.pi / 18)]
+        angle_array1 = np.arange(current_angle, angle_to_turn, math.pi / 18)
+        angle_array2 = np.arange(angle_to_turn, current_angle, -math.pi / 18)
     else:
-        angle_array1 = [x for x in range(current_angle, angle_to_turn, -math.pi / 18)]
-        angle_array2 = [x for x in range(angle_to_turn, current_angle, math.pi / 18)]
-    short_angle_array: List[float]
-    long_angle_array: List[float]
+        angle_array1 = np.arange(current_angle, angle_to_turn, -math.pi / 18)
+        angle_array2 = np.arange(angle_to_turn, current_angle, math.pi / 18)
+    short_angle_array: np.ndarray
+    long_angle_array: np.ndarray
     if len(angle_array1) > len(angle_array2):
         short_angle_array = angle_array2
         long_angle_array = angle_array1
     else:
         short_angle_array = angle_array1
         long_angle_array = angle_array2
-    distance_array: List[int] = [x for x in range(1, radius, 1)]
+    distance_array: np.ndarray = np.arange(1, radius, 1)
     break_flag: bool = False
     for angle in short_angle_array:
         for distance in distance_array:
-            xn, yn = calculate_xn_and_yn(distance, angle, post)
+            xn, yn = calculate_xn_and_yn(distance, angle, pos)
             if is_same_positions_as_obstacle((xn, yn)):
                 break_flag = True
                 break
@@ -216,10 +218,13 @@ def calculate_angle_to_turn(radius: float, current_angle: float, angle_to_turn: 
     else:
         # something here i haven't figured out yet
         return calculate_shortest_turn(current_angle, angle_to_turn)
+
+    # if the short angle array is empty, then the long angle array is also empty
+    # and the turn is not possible
     break_flag = False
     for angle in long_angle_array:
         for distance in distance_array:
-            xn, yn = calculate_xn_and_yn(distance, angle, post)
+            xn, yn = calculate_xn_and_yn(distance, angle, pos)
             if is_same_positions_as_obstacle((xn, yn)):
                 break_flag = True
                 break
@@ -227,7 +232,7 @@ def calculate_angle_to_turn(radius: float, current_angle: float, angle_to_turn: 
             break
     else:
         return calculate_longest_turn(current_angle, angle_to_turn)
-    return 0
+    return None
 
 
 if __name__ == "__main__":

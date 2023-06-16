@@ -9,7 +9,7 @@ from ultralytics import YOLO
 # Which webcam to use
 VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 0))
 # The model to use
-CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/32026041-tnorfdnaraer")
+CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/20231606-deepfry")
 # The directory to save the captured results to
 DATA = os.environ.get("DATA", "datasets/RoboFlow20230614")
 

@@ -171,11 +171,20 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
 
         # If the direction difference is above the tolerance, turn the robot
         if direction_diff >= math.radians(direction_tolerance):
-            direction = new_direction
+            direction = math_helpers.calculate_angle_to_turn(
+                radius=(math_helpers.calculate_distance(track.get_middle_position(), track.get_front_position())),
+                current_angle=robot_direction,
+                angle_to_turn=new_direction,
+                pos=track.get_middle_position()
+            )
 
-            logger.debug(f"Turning robot to {math.degrees(direction)} deg ({direction} rad), with diff being "
-                         f"{math.degrees(direction_diff)} deg ({direction_diff} rad)")
-            await robot_api.turn_robot(session=session, direction=direction)
+            if direction is not None:
+                logger.debug(f"Turning robot to {math.degrees(direction)} deg ({direction} rad), with diff being "
+                             f"{math.degrees(direction_diff)} deg ({direction_diff} rad)")
+                await robot_api.turn_robot(session=session, direction=direction)
+            else:
+                logger.debug("Direction is None, robot backwards.")
+                robot_speed_right, robot_speed_left = do_smooth_turn(robot_direction, new_direction, reverse=True)
         else:
             logger.debug("Robot is in the correct heading (within tolerance), will not stop-turn.")
             # Adjust the robot speed depending on the direction difference, adding a small offset to the speed
