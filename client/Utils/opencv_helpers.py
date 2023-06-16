@@ -1,8 +1,7 @@
 from typing import Tuple
-
 import cv2
 
-FRAME_SIZE = (0, 0)
+from Utils import path_algorithm
 
 
 def draw_object(img, object_type, path):
@@ -32,14 +31,24 @@ def draw_object(img, object_type, path):
             cv2.line(img, path[i - 1], point, color)
 
 
+def get_frame_size() -> Tuple[int, int]:
+    """
+    Gets the size of the frame.
+    :return: The size of the frame.
+    """
+    return len(path_algorithm.TRACK_GLOBAL.graph.nodes[0]), len(path_algorithm.TRACK_GLOBAL.graph.nodes)
+
+
 def opencv_position_to_graph_position(position: Tuple[int, int]) -> Tuple[int, int]:
     """
     Converts a position from OpenCV's coordinate system to the graph's coordinate system.
     :param position: The position to convert.
     :return: The converted position.
     """
-    print(f"Converting {position} to graph position with frame size {FRAME_SIZE}")
-    return int(position[0]), int(FRAME_SIZE[1] - position[1])
+    frame_size = get_frame_size()
+    pos = int(position[0]), int(frame_size[1] - position[1])
+    print(f"Converting {position} to graph position with frame size {frame_size}. Output: {pos}")
+    return pos
 
 
 def graph_position_to_opencv_position(position: Tuple[int, int]) -> Tuple[int, int]:
@@ -48,5 +57,6 @@ def graph_position_to_opencv_position(position: Tuple[int, int]) -> Tuple[int, i
     :param position: The position to convert.
     :return: The converted position.
     """
+    frame_size = get_frame_size()
     # yes, it's the same conversion
-    return int(position[0]), int(FRAME_SIZE[1] - position[1])
+    return int(position[0]), int(frame_size[1] - position[1])

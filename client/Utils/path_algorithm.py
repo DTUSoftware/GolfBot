@@ -143,7 +143,7 @@ class Node:
 
 
 class Ball:
-    def __init__(self, pos: tuple, golden: bool = False) -> None:
+    def __init__(self, pos: Tuple[int, int], golden: bool = False) -> None:
         """
         Initializes a new instance of the Ball class.
 
@@ -174,8 +174,9 @@ class Ball:
         Returns:
             List[Tuple[int, int]]: The drive path of the ball.
         """
-        obstacle_angle_array = []
-        found_x, found_y = (False, False)
+        # obstacle_angle_array = []
+        x_node: Tuple[Tuple[int, int], float, float] = ((0, 0), math.inf, 0)
+        y_node: Tuple[Tuple[int, int], float, float] = ((0, 0), math.inf, 0)
         self_pos = self.get_position()
         for obstacle in TRACK_GLOBAL.obstacles:
             for node in obstacle.path:
@@ -183,31 +184,63 @@ class Ball:
                 if (node_pos[0] != self_pos[0] and node_pos[1] != self_pos[1]) or node_pos == self_pos:
                     continue
 
-                if node_pos[0] == self_pos[0] and found_x:
-                    continue
-                if node_pos[1] == self_pos[1] and found_y:
-                    continue
-
                 distance = math_helpers.calculate_distance(self_pos, node_pos)
                 if distance < PATH_OBSTACLE_DISTANCE:
-                    if node_pos[0] == self_pos[0]:
-                        found_x = True
-                    if node_pos[1] == self_pos[1]:
-                        found_y = True
-
                     direction = math_helpers.calculate_direction(from_pos=node_pos, to_pos=self_pos)
-                    obstacle_angle_array.append(direction)
+
+                    # If same x, then it's a vertical line, so we want the closest node
+                    if node_pos[0] == self_pos[0]:
+                        if distance < y_node[1]:
+                            y_node = (node_pos, distance, direction)
+                            # obstacle_angle_array.append((direction, node_pos))
+                    # If same y, then it's a horizontal line, so we want the closest node
+                    if node_pos[1] == self_pos[1]:
+                        if distance < x_node[1]:
+                            x_node = (node_pos, distance, direction)
+                            # obstacle_angle_array.append((direction, node_pos))
 
                     logger.debug(f"Ball distance from obstacle node {node_pos} is {distance} with direction {math.degrees(direction)} deg")
-        if not obstacle_angle_array:
+        if x_node[0] == (0, 0) and y_node[0] == (0, 0):
             logger.debug("Ball isn't close to an obstacle.")
             # We need to return two points to make a line, even if it's the same
-            return [self_pos, self_pos]
+            self.drivePath = [self_pos, self_pos]
+            return self.drivePath
         logger.debug("Ball is close to an obstacle.")
 
         # Get the path to the balls while avoiding obstacles
-        avg_angles = np.mean(obstacle_angle_array)
-        angle = avg_angles % (2 * math.pi)
+
+        angle = 0.0
+        # avg_angles = np.mean([elem[0] for elem in obstacle_angle_array])
+        # angle = avg_angles % (2 * math.pi)
+
+        if x_node[0] != (0, 0) and y_node[0] != (0, 0):
+            if x_node[0][0] < self_pos[0] and y_node[0][1] < self_pos[1]:
+                # bottom left
+                angle = math.radians(45)
+            elif x_node[0][0] < self_pos[0] and y_node[0][1] > self_pos[1]:
+                # top left
+                angle = math.radians(315)
+            elif x_node[0][0] > self_pos[0] and y_node[0][1] < self_pos[1]:
+                # bottom right
+                angle = math.radians(135)
+            elif x_node[0][0] > self_pos[0] and y_node[0][1] > self_pos[1]:
+                # top right
+                angle = math.radians(225)
+        elif x_node[0] != (0, 0):
+            if x_node[0][0] < self_pos[0]:
+                # left
+                angle = math.radians(0)
+            elif x_node[0][0] > self_pos[0]:
+                # right
+                angle = math.radians(180)
+        elif y_node[0] != (0, 0):
+            if y_node[0][1] < self_pos[1]:
+                # bottom
+                angle = math.radians(90)
+            elif y_node[0][1] > self_pos[1]:
+                # top
+                angle = math.radians(270)
+        
         dx = math.cos(angle) * SAFETY_LENGTH
         dy = math.sin(angle) * SAFETY_LENGTH
         x1 = int(self_pos[0] + dx)
@@ -524,7 +557,7 @@ class Graph:
         if 0 <= pos[0] < len(self.nodes[0]) and 0 <= pos[1] < len(self.nodes):
             return self.nodes[pos[1]][pos[0]]
         else:
-            logger.debug(f"Node not found, not within x and y bounds = ({len(self.nodes[0])}, {len(self.nodes)})")
+            logger.debug(f"Node with position {pos} not found, not within x and y bounds = ({len(self.nodes[0])}, {len(self.nodes)})")
             return None
 
     def get_nodes_in_path(self, path: list) -> list:

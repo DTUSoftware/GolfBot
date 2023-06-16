@@ -40,11 +40,19 @@ def box_to_pos(box) -> Tuple[int, int]:
     :return: The position of the box
     """
     # x1, y1, x2, y2 = box.xyxy[0]  # get box coordinates in (top, left, bottom, right) format
-    # return opencv_helpers.opencv_position_to_graph_position(((x1 + x2) / 2, (y1 + y2) / 2))
 
-    x, y, _, _ = box.xywhn[0]
+    # x = (x1 + x2) / 2
+    # y = (y1 + y2) / 2
 
-    return int(x * len(path_algorithm.TRACK_GLOBAL.graph.nodes[0])), int(y * len(path_algorithm.TRACK_GLOBAL.graph.nodes))
+    # We get the normalized values for the center
+    x_norm, y_norm, _, _ = box.xywhn[0]
+
+    # We multiply the normalized values by the size of the graph
+    frame_size = opencv_helpers.get_frame_size()
+    x = x_norm * frame_size[0]
+    y = y_norm * frame_size[1]
+
+    return opencv_helpers.opencv_position_to_graph_position((x, y))
 
 
 def start_ai(camera_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue, ai_event: Event):

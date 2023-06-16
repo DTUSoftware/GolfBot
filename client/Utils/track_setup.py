@@ -199,7 +199,7 @@ def setup_track() -> pathalg.Track:
 
     # Setup the track / driving algorithm with given parameters
     track = pathalg.setup({"x": width, "y": height})
-    opencv_helpers.FRAME_SIZE = (width, height)
+    # opencv_helpers.FRAME_SIZE = (width, height)
 
     # Add objects
     for obj in objects:
