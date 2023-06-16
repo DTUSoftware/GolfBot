@@ -47,7 +47,7 @@ def opencv_position_to_graph_position(position: Tuple[int, int]) -> Tuple[int, i
     """
     frame_size = get_frame_size()
     pos = int(position[0]), int(frame_size[1] - position[1])
-    print(f"Converting {position} to graph position with frame size {frame_size}. Output: {pos}")
+    # print(f"Converting {position} to graph position with frame size {frame_size}. Output: {pos}")
     return pos
 
 

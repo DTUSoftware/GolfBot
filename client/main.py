@@ -129,4 +129,9 @@ if __name__ == '__main__':
         ai_producer.terminate()
 
     logger.debug("Stopping robot.")
-    robot_api.set_robot_stop()
+    while True:
+        try:
+            robot_api.set_robot_stop()
+            break
+        except:
+            pass

@@ -7,6 +7,7 @@ import cv2
 import torch
 from ultralytics import YOLO
 from Utils.opencv_helpers import draw_object
+from ai.model_testing import save_result
 # from Utils.logging import get_logger
 
 # The webcam to use
@@ -152,8 +153,11 @@ def run_ai(camera_queue: torch.multiprocessing.JoinableQueue, path_queue: torch.
         # print("Wait for processing of data...")
         # evt.wait()
 
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord('q'):
             break
+        elif key == ord('s'):
+            save_result(results, frame)
         # await asyncio.sleep(0)
 
     # Release the webcam when done and close window
