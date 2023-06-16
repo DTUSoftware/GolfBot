@@ -76,8 +76,19 @@ def test_model():
     # Load the model from the local .pt file
     model = YOLO(CURRENT_MODEL + ".pt")
 
-    # Open a connection to the webcam
-    cap = cv2.VideoCapture(VIDEO_INPUT)
+    # Open the video stream from camera using DirectShow
+    cap = cv2.VideoCapture(VIDEO_INPUT, cv2.CAP_DSHOW)
+
+    # Set FPS to 60
+    cap.set(cv2.CAP_PROP_FPS, 60)
+
+    # Default width and height
+    width = 1080.0
+    height = 720.0
+
+    # Set width and height of video stream
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
     while True:
         # Capture a frame from the webcam

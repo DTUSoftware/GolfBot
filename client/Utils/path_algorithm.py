@@ -178,12 +178,14 @@ class Ball:
         x_node: Tuple[Tuple[int, int], float, float] = ((0, 0), math.inf, 0)
         y_node: Tuple[Tuple[int, int], float, float] = ((0, 0), math.inf, 0)
         self_pos = self.get_position()
+        # for each obstacle in the track we want to find the closest node to the ball
         for obstacle in TRACK_GLOBAL.obstacles:
             for node in obstacle.path:
                 node_pos = node.get_position()
                 if (node_pos[0] != self_pos[0] and node_pos[1] != self_pos[1]) or node_pos == self_pos:
                     continue
 
+                # Get the distance and direction to the node
                 distance = math_helpers.calculate_distance(self_pos, node_pos)
                 if distance < PATH_OBSTACLE_DISTANCE:
                     direction = math_helpers.calculate_direction(from_pos=node_pos, to_pos=self_pos)
@@ -213,6 +215,7 @@ class Ball:
         # avg_angles = np.mean([elem[0] for elem in obstacle_angle_array])
         # angle = avg_angles % (2 * math.pi)
 
+        # We get the angle of the ball to the obstacle
         if x_node[0] != (0, 0) and y_node[0] != (0, 0):
             if x_node[0][0] < self_pos[0] and y_node[0][1] < self_pos[1]:
                 # bottom left
@@ -240,7 +243,8 @@ class Ball:
             elif y_node[0][1] > self_pos[1]:
                 # top
                 angle = math.radians(270)
-        
+
+        # We get the angle of the ball to the obstacle
         dx = math.cos(angle) * SAFETY_LENGTH
         dy = math.sin(angle) * SAFETY_LENGTH
         x1 = int(self_pos[0] + dx)

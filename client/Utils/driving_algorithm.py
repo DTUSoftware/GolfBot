@@ -29,7 +29,7 @@ DIRECTION_TOLERANCE_NEW = float(os.environ.get('DIRECTION_TOLERANCE_NEW', 15.0))
 WHEEL_RADIUS = (float(os.environ.get('WHEEL_DIAMETER', 68.8)) / 2) / 10  # Radius of the robot's wheels in cm
 DIST_BETWEEN_WHEELS = float(
     os.environ.get('DIST_BETWEEN_WHEELS', 83.0 * 2)) / 10  # Distance between the robot's wheels in cm
-ROBOT_BASE_SPEED = float(os.environ.get('ROBOT_BASE_SPEED', 25.0))
+ROBOT_BASE_SPEED = float(os.environ.get('ROBOT_BASE_SPEED', 35.0))
 
 logger = logging.getLogger(__name__)
 # logger.addHandler(logging.StreamHandler(sys.stdout))
@@ -70,20 +70,10 @@ def do_smooth_turn(current_direction: float, new_direction: float, reverse=False
 
     right = True
 
-    if current_direction < new_direction:
-        if (new_direction - current_direction) > math.pi:
-            diff_in_angle = abs((new_direction - 2 * math.pi) - current_direction)
-            right = False
-        else:
-            diff_in_angle = abs(new_direction - current_direction)
-            right = True
-    else:
-        if (current_direction - new_direction) > math.pi:
-            diff_in_angle = abs((current_direction - 2 * math.pi) - new_direction)
-            right = True
-        else:
-            diff_in_angle = abs(current_direction - new_direction)
-            right = False
+    diff_in_angle = abs(new_direction - current_direction)
+    diff_in_angle = min(diff_in_angle, 2 * math.pi - diff_in_angle)
+
+    right = new_direction > current_direction
 
     speed_correction = (diff_in_angle / (math.pi * 2)) * speed_correction_multiplier
     if not reverse:

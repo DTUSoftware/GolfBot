@@ -98,12 +98,19 @@ def setup_track() -> pathalg.Track:
     cv2.namedWindow("Track Setup")
     cv2.setMouseCallback("Track Setup", setup_track_mouse_input)
 
-    # Open the video stream from camera
-    cap = cv2.VideoCapture(VIDEO_INPUT)
+    # Open the video stream from camera using DirectShow
+    cap = cv2.VideoCapture(VIDEO_INPUT, cv2.CAP_DSHOW)
+
+    # Set FPS to 60
+    cap.set(cv2.CAP_PROP_FPS, 60)
 
     # Default width and height
-    width = 1920.0
-    height = 1080.0
+    width = 1080.0
+    height = 720.0
+
+    # Set width and height of video stream
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
     # Get variables from video stream
     global track_setup_mode

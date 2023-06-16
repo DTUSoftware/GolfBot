@@ -56,7 +56,19 @@ def run_ai(camera_queue: torch.multiprocessing.JoinableQueue, path_queue: torch.
 
     # Open a connection to the webcam
     logger.debug("Opening video capture...")
-    cap = cv2.VideoCapture(VIDEO_INPUT)
+    # Open the video stream from camera using DirectShow
+    cap = cv2.VideoCapture(VIDEO_INPUT, cv2.CAP_DSHOW)
+
+    # Set FPS to 60
+    cap.set(cv2.CAP_PROP_FPS, 60)
+
+    # Default width and height
+    width = 1080.0
+    height = 720.0
+
+    # Set width and height of video stream
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
     # Store current path for drawing
     current_objects = []
