@@ -1,6 +1,5 @@
 import os
 from datetime import datetime
-
 import cv2
 import torch
 from PIL import Image

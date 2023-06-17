@@ -10,8 +10,8 @@ from typing import Tuple, List
 import aiohttp
 from torch import multiprocessing
 
-from Services import robot_api, robot_ai
-from Utils import path_algorithm, driving_algorithm
+from ..Services import robot_api, robot_ai
+from ..Utils import path_algorithm, driving_algorithm
 
 # If logging should be disabled
 DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "False").lower()

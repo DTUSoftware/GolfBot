@@ -13,7 +13,7 @@ from colorama import Style
 from colorama import init as colorama_init
 from torch import multiprocessing
 
-from Utils import math_helpers, opencv_helpers
+from ..Utils import math_helpers, opencv_helpers
 
 # If debugging should be enabled
 DEBUG = "true" in os.environ.get('DEBUG', "True").lower()

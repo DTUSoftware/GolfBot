@@ -1,6 +1,5 @@
 import math
 import os
-
 import aiohttp
 import requests
 import logging

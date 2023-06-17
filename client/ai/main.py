@@ -2,13 +2,12 @@ import os
 import logging
 import sys
 from threading import Event
-
 import cv2
 import torch
 from ultralytics import YOLO
-from Utils.opencv_helpers import draw_object
-from ai.model_testing import save_result
-# from Utils.logging import get_logger
+
+from ..Utils.opencv_helpers import draw_object
+from ..ai.model_testing import save_result
 
 # The webcam to use
 VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 0))

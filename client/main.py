@@ -7,8 +7,8 @@ import aiohttp
 import logging
 from torch import multiprocessing
 
-from Services import robot_api, robot_ai, robot_racing
-from Utils import path_algorithm, track_setup
+from .Services import robot_api, robot_ai, robot_racing
+from .Utils import path_algorithm, track_setup
 
 # If logging should be disabled
 DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "False").lower()

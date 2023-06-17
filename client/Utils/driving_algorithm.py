@@ -4,11 +4,10 @@ import aiohttp
 import math
 import os
 from typing import Tuple
-
 import asyncio
 
-from Utils import math_helpers, path_algorithm
-from Services import robot_api
+from ..Utils import math_helpers, path_algorithm
+from ..Services import robot_api
 
 # If logging should be disabled
 DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "False").lower()

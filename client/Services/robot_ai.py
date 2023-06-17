@@ -7,9 +7,9 @@ from typing import Tuple, Dict
 import aiohttp
 from torch import multiprocessing
 
-from Services import robot_api
-from Utils import path_algorithm, math_helpers, opencv_helpers
-import ai
+from ..Services import robot_api
+from ..Utils import path_algorithm, math_helpers, opencv_helpers
+from ..ai import run_ai
 
 # If logging should be disabled
 DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "False").lower()
@@ -63,7 +63,7 @@ def start_ai(camera_queue: multiprocessing.JoinableQueue, path_queue: multiproce
     :param ai_event: The event to let the AI know that the robot has processed the results
     :return: None
     """
-    ai.run_ai(camera_queue, path_queue, ai_event)
+    run_ai(camera_queue, path_queue, ai_event)
 
 
 async def parse_ai_results(ai_results) -> Tuple[Dict[str, list], list, list]:

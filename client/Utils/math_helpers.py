@@ -1,11 +1,9 @@
 import math
 from typing import Tuple, List, Optional
-
 import asyncio
-
 import numpy as np
 
-from Utils import path_algorithm
+from ..Utils import path_algorithm
 
 
 def calculate_direction(to_pos: Tuple[int, int], from_pos: Tuple[int, int]) -> float:
