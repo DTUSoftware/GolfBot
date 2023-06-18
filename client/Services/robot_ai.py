@@ -1,14 +1,13 @@
 import logging
 import os
-import sys
 from threading import Event
 from typing import Tuple, Dict
-
 import aiohttp
 from torch import multiprocessing
 
 from ..Services import robot_api
-from ..Utils import path_algorithm, math_helpers, opencv_helpers
+from ..Utils import math_helpers, opencv_helpers
+from ..core import path_algorithm
 from ..ai import run_ai
 
 # If logging should be disabled

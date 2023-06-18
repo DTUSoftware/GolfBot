@@ -1,7 +1,7 @@
 from typing import Tuple
 import cv2
 
-from ..Utils import path_algorithm
+from ..core import path_algorithm
 
 
 def draw_object(img, object_type, path):

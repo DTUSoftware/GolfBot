@@ -1,12 +1,12 @@
 import logging
-import sys
 import aiohttp
 import math
 import os
 from typing import Tuple
 import asyncio
 
-from ..Utils import math_helpers, path_algorithm
+from ..Utils import math_helpers
+from ..core import path_algorithm
 from ..Services import robot_api
 
 # If logging should be disabled

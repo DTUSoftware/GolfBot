@@ -1,6 +1,5 @@
 import os
 import logging
-import sys
 from threading import Event
 import cv2
 import torch
