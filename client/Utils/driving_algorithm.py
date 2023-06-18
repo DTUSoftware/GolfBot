@@ -111,9 +111,12 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
     if path_algorithm.TRACK_GLOBAL.small_goal.is_in_delivery_distance():
         logger.debug("Robot is in delivery distance")
 
-        if not path_algorithm.TRACK_GLOBAL.small_goal.is_in_delivery_direction():
+        while not path_algorithm.TRACK_GLOBAL.small_goal.is_in_delivery_direction() and path_algorithm.TRACK_GLOBAL.small_goal.is_in_delivery_distance():
             logger.debug("Robot is not in delivery direction, moving robot to delivery direction")
             await robot_api.turn_robot(session=session, direction=path_algorithm.TRACK_GLOBAL.small_goal.get_angle_to_middle())
+
+        if not path_algorithm.TRACK_GLOBAL.small_goal.is_in_delivery_distance():
+            logger.debug("Robot is not in delivery distance anymore, returning!")
             return
 
         logger.info("Robot is in delivery position, stopping robot and fans.")
