@@ -121,16 +121,17 @@ async def set_robot_direction(session: aiohttp.ClientSession, direction: float) 
         return False
 
 
-async def turn_robot(session: aiohttp.ClientSession, direction: float) -> bool:
+async def turn_robot(session: aiohttp.ClientSession, direction: float, relative=False) -> bool:
     """
     Turns the robot.
     THIS CALL IS BLOCKING UNTIL THE ROBOT HAS FULLY TURNED!
     :param session:  the session
     :param direction: the wanted direction
+    :param relative: if the direction is relative to the current direction
     :return: None
     """
     try:
-        async with session.post(f"{ROBOT_API_ENDPOINT}/turn?radians={direction}") as response:
+        async with session.post(f"{ROBOT_API_ENDPOINT}/turn?radians={direction}&relative={relative}") as response:
             res = await response.text()
             if response.status != 200:
                 logger.debug(f"Robot failed to turn with response {res}, code {response.status}")

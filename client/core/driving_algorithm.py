@@ -186,7 +186,7 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
             if direction is not None:
                 logger.debug(f"Turning robot to {math.degrees(direction)} deg ({direction} rad), with diff being "
                              f"{math.degrees(direction_diff)} deg ({direction_diff} rad)")
-                await robot_api.turn_robot(session=session, direction=direction)
+                await robot_api.turn_robot(session=session, direction=direction, relative=True)
             else:
                 logger.debug("Direction is None, robot backwards.")
                 robot_speed_right, robot_speed_left = do_smooth_turn(robot_direction, new_direction, reverse=True)
