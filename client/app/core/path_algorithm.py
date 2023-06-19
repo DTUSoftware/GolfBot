@@ -20,6 +20,7 @@ TIMEOUT_GET_PATH = 5  # in seconds
 PATH_OBSTACLE_DISTANCE = 100  # in units, this is where the balls should max be from the borders for robot width
 DELIVERY_DISTANCE_FAR = 150  # in units
 DELIVERY_DISTANCE = 130  # in units, this is where the middle of the robot is when delivering (241 - 113)
+DELIVERY_DISTANCE_Y = 10  # in units
 SAFETY_LENGTH = 150  # in units
 SAFETY_LENGTH_CORNER = 200  # in units
 HEADING_DIFFERENCE_DELIVERY = 5  # in degrees
@@ -427,6 +428,16 @@ class Goal:
 
         return True
 
+    def is_in_delivery_height(self) -> bool:
+        # Get the middle
+        middle_y, _ = self.get_middle_and_angle()[1]
+        robot_pos_y = TRACK_GLOBAL.robot_front_pos[1]
+
+        if abs(middle_y - robot_pos_y) > DELIVERY_DISTANCE_Y:
+            return False
+
+        return True
+
     def is_in_delivery_position(self) -> bool:
         """
         Checks whether the robot is in the delivery position.
@@ -438,6 +449,10 @@ class Goal:
 
         # Check if robot is facing the middle
         if not self.is_in_delivery_direction():
+            return False
+
+        # Check if robot is on the correct y-coordinate
+        if not self.is_in_delivery_height():
             return False
 
         return True

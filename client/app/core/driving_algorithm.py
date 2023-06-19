@@ -117,23 +117,28 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
     if not path_algorithm.TRACK_GLOBAL.balls and path_algorithm.TRACK_GLOBAL.small_goal.is_in_delivery_distance():
         logger.debug("Robot is in delivery distance and no balls")
 
-        if not path_algorithm.TRACK_GLOBAL.small_goal.is_in_delivery_direction() and path_algorithm.TRACK_GLOBAL.small_goal.is_in_delivery_distance():
-            logger.debug("Robot is not in delivery direction, moving robot to delivery direction")
-            await robot_api.turn_robot(session=session, direction=path_algorithm.TRACK_GLOBAL.small_goal.get_angle_to_middle())
-            return
+        if path_algorithm.TRACK_GLOBAL.small_goal.is_in_delivery_height():
+            logger.debug("Robot is in the correct delivery height.")
 
-        logger.info("Robot is in delivery position, stopping robot and fans.")
-        await robot_api.set_speeds(session=session, speed_left=0, speed_right=0)
-        await robot_api.toggle_fans(session=session)
-        logger.debug("Sleeping for 15 seconds to finish delivery")
-        await asyncio.sleep(15)
-        logger.debug("Done sleeping, driving backwards and starting fans again in case there are more balls")
-        # Start fans again after driving backwards for 1 second
-        await robot_api.set_speeds(session=session, speed_left=-ROBOT_BASE_SPEED, speed_right=-ROBOT_BASE_SPEED)
-        await asyncio.sleep(1)
-        await robot_api.set_speeds(session=session, speed_left=0, speed_right=0)
-        await robot_api.toggle_fans(session=session)
-        return
+            if not path_algorithm.TRACK_GLOBAL.small_goal.is_in_delivery_direction():
+                logger.debug("Robot is not in delivery direction, moving robot to delivery direction")
+                await robot_api.turn_robot(session=session, direction=path_algorithm.TRACK_GLOBAL.small_goal.get_angle_to_middle())
+                return
+
+            logger.info("Robot is in delivery position, stopping robot and fans.")
+            await robot_api.set_speeds(session=session, speed_left=0, speed_right=0)
+            await robot_api.toggle_fans(session=session)
+            logger.debug("Sleeping for 15 seconds to finish delivery")
+            await asyncio.sleep(15)
+            logger.debug("Done sleeping, driving backwards and starting fans again in case there are more balls")
+            # Start fans again after driving backwards for 1 second
+            await robot_api.set_speeds(session=session, speed_left=-ROBOT_BASE_SPEED, speed_right=-ROBOT_BASE_SPEED)
+            await asyncio.sleep(1)
+            await robot_api.set_speeds(session=session, speed_left=0, speed_right=0)
+            await robot_api.toggle_fans(session=session)
+            return
+        else:
+            logger.debug("Robot is NOT in the correct delivery height, continue pursuing target...")
 
     # If the robot is about to drive into a wall or other obstacle, stop the robot
     if await math_helpers.is_about_to_collide_with_obstacle(track.get_front_position(), robot_direction):
