@@ -6,7 +6,7 @@ from typing import Tuple
 import asyncio
 
 from ..Utils import math_helpers
-from ..core import path_algorithm
+from . import path_algorithm
 from ..Services import robot_api
 
 # If logging should be disabled

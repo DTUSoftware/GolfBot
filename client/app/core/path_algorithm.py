@@ -1327,7 +1327,8 @@ async def check_new_path(path_queue: multiprocessing.JoinableQueue) -> bool:
 
         if not path_queue.full():
             try:
-                path_queue.put({"path": full_path if full_path else [], "obstacles": [[opencv_helpers.graph_position_to_opencv_position(point) for point in obstacle.points] for obstacle in
+                path_queue.put({"path": full_path if full_path else [], "obstacles": [[
+                                                                                          opencv_helpers.graph_position_to_opencv_position(point) for point in obstacle.points] for obstacle in
                                                                                       track.obstacles] if track.obstacles else [],
                                 "small_goal": [opencv_helpers.graph_position_to_opencv_position(point) for point in track.small_goal.points] if track.small_goal else [],
                                 "big_goal": [opencv_helpers.graph_position_to_opencv_position(point) for point in track.big_goal.points] if track.big_goal else []})

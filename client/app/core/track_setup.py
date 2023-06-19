@@ -3,7 +3,7 @@ import json
 import os
 import cv2
 
-from ..core import path_algorithm as pathalg
+from . import path_algorithm as pathalg
 from ..Utils import opencv_helpers
 
 # The webcam to use

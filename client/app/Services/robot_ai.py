@@ -5,7 +5,7 @@ from typing import Tuple, Dict
 import aiohttp
 from torch import multiprocessing
 
-from ..Services import robot_api
+from . import robot_api
 from ..Utils import math_helpers, opencv_helpers
 from ..core import path_algorithm
 from ..ai import run_ai

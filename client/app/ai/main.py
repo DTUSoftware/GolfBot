@@ -6,7 +6,7 @@ import torch
 from ultralytics import YOLO
 
 from ..Utils.opencv_helpers import draw_object
-from ..ai.model_testing import save_result
+from .model_testing import save_result
 
 # The webcam to use
 VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 0))
