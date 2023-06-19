@@ -37,6 +37,7 @@ if DEBUG:
     logger.setLevel(logging.DEBUG)
 
 current_target_pos = (0, 0)
+obstacle_fuckery = 0
 
 
 def do_smooth_turn(current_direction: float, new_direction: float, reverse=False) -> Tuple[float, float]:
@@ -96,6 +97,7 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
     :param session: The AIOHTTP session used to send requests.
     :return: None
     """
+    global obstacle_fuckery
 
     track = path_algorithm.TRACK_GLOBAL
     robot_direction = track.robot_direction
@@ -137,6 +139,16 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
     if await math_helpers.is_about_to_collide_with_obstacle(track.get_front_position(), robot_direction):
         logger.debug("Robot is about to collide with an obstacle in front, driving robot backwards")
         await robot_api.set_speeds(session=session, speed_left=-ROBOT_BASE_SPEED, speed_right=-ROBOT_BASE_SPEED)
+
+        # Reset obstacle fuckery to not count hundreds
+        obstacle_fuckery = (obstacle_fuckery % 100) + 1
+
+        # If we have been stuck for five times, reset path
+        if obstacle_fuckery >= 5:
+            logger.debug("Robot is stuck in a loop, new path!")
+            obstacle_fuckery = 0
+            track.last_target_path = None
+
         # TODO: evaluate this sleep
         await asyncio.sleep(0.4)
         return
@@ -145,9 +157,26 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
     if await math_helpers.is_about_to_collide_with_obstacle(track.get_front_position(), (robot_direction + math.pi) % (2 * math.pi)):
         logger.debug("Robot is about to collide with an obstacle behind, driving robot forward")
         await robot_api.set_speeds(session=session, speed_left=ROBOT_BASE_SPEED, speed_right=ROBOT_BASE_SPEED)
+
+        # Reset obstacle fuckery to not count hundreds
+        obstacle_fuckery = (obstacle_fuckery % 100) + 1
+
+        # If we have been stuck for five times, reset path
+        if obstacle_fuckery >= 5:
+            logger.debug("Robot is stuck in a loop, new path!")
+            obstacle_fuckery = 0
+            track.last_target_path = None
+
         # TODO: evaluate this sleep
         await asyncio.sleep(0.4)
         return
+
+    # Check obstacle fuckery to escape loops
+    if obstacle_fuckery != 0:
+        obstacle_fuckery += 100
+        if obstacle_fuckery >= 1000:
+            # We escaped the loop just fine
+            obstacle_fuckery = 0
 
     # Get the distance between the two targets
     # We use the turn position (rear) of the robot as the starting point,

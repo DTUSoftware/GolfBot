@@ -10,7 +10,7 @@ VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 0))
 # The model to use
 CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/20231606-newfront")
 # The directory to save the captured results to
-DATA = os.environ.get("DATA", "datasets/RoboFlow20230614")
+DATA = os.environ.get("DATA", "datasets/CustomImages")
 
 
 def save_result(results, frame=None, missing=False):
@@ -22,6 +22,13 @@ def save_result(results, frame=None, missing=False):
     :return: None
     """
     print("Saving result...")
+
+    # When running from another directory, ie. client main, we should save in the app/ai directory
+    global DATA
+    if not DATA.startswith("app/ai/"):
+        if os.path.exists("app/ai/"):
+            DATA = "app/ai/" + DATA
+
     if not os.path.exists(DATA + "/custom/images"):
         os.makedirs(DATA + "/custom/images", exist_ok=True)
     if not os.path.exists(DATA + "/custom/labels"):
