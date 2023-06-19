@@ -987,7 +987,7 @@ class Track:
                 self.path = []
                 return
             object_nodes = [self.graph.get_node(obj[0]) for obj in objects_to_navigate_to if obj]
-            tasks = [self.graph.get_path(start_node=robot_node, dst_node=ball_node) for ball_node in object_nodes if
+            tasks = [asyncio.create_task(self.graph.get_path(start_node=robot_node, dst_node=ball_node)) for ball_node in object_nodes if
                      ball_node]
             if tasks:
                 done, pending = await asyncio.wait(tasks, timeout=TIMEOUT_GET_PATH, return_when=asyncio.ALL_COMPLETED)

@@ -10,7 +10,7 @@ from ..Utils.opencv_helpers import draw_object
 from .model_testing import save_result
 
 # The webcam to use
-VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 0))
+VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 1))
 # The model to use
 CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/20231606-newfront")
 # If logging should be disabled
