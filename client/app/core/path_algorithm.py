@@ -399,7 +399,9 @@ class Goal:
         :return: The angle to the middle of the goal.
         """
         # Get the middle and the angle
-        middle, angle_to_middle = self.get_middle_and_angle()
+        middle, angle = self.get_middle_and_angle()
+
+        angle_to_middle = (angle + math.pi) % (2*math.pi)
 
         # Get the angle to the middle
         # angle_to_middle = math_helpers.calculate_direction(to_pos=middle, from_pos=TRACK_GLOBAL.get_middle_position())
