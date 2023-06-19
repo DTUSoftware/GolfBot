@@ -138,8 +138,7 @@ async def turn_robot(session: aiohttp.ClientSession, direction: float, relative=
                 logger.debug(f"Robot failed to turn {'relatively' if relative else 'absolutely'} with response {res}, code {response.status}")
                 return False
             logger.debug(f"Robot turned {'relatively' if relative else 'absolutely'} with response: {res}")
-        # TODO: remove this sleep
-        await asyncio.sleep(10)
+        # await asyncio.sleep(10)
         return True
     except Exception as e:
         logger.error(f"Failed to turn robot {'relatively' if relative else 'absolutely'} with exception {e}")

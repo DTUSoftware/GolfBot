@@ -139,12 +139,13 @@ def has_passed_target(frompos: Tuple[int, int], target: Tuple[int, int], current
     :param currentpos: your new position
     :return: True if passed, else False
     """
-    length_to_obtain = calculate_distance(target, frompos)
-    current_length = calculate_distance(target, currentpos)
-    position_threshold = 10
-    if current_length - length_to_obtain >= position_threshold:
-        return True
     return False
+    # length_to_obtain = calculate_distance(target, frompos)
+    # current_length = calculate_distance(target, currentpos)
+    # position_threshold = 10
+    # if current_length - length_to_obtain >= position_threshold:
+    #     return True
+    # return False
 
 
 async def is_about_to_collide_with_obstacle(pos: Tuple[int, int], direction: float) -> bool:

@@ -355,11 +355,16 @@ class Goal:
         # Get middle of the goal
         middle = math_helpers.get_middle_between_two_points(self.points[0], self.points[1])
 
+        if self.points[0][1] < self.points[1][1]:
+            angle = math_helpers.calculate_direction(to_pos=self.points[1], from_pos=self.points[0])
+        else:
+            angle = math_helpers.calculate_direction(to_pos=self.points[0], from_pos=self.points[1])
+
         # Get angle to middle of the goal
         if middle[0] < TRACK_GLOBAL.bounds["x"] / 2:
-            angle = math.radians(0)
+            angle = (angle - (math.pi/2)) % (2 * math.pi)
         else:
-            angle = math.radians(180)
+            angle = (angle + (math.pi/2)) % (2 * math.pi)
 
         return middle, angle
 
@@ -410,6 +415,8 @@ class Goal:
 
         # Get the angle to the middle
         # angle_to_middle = math_helpers.calculate_direction(to_pos=middle, from_pos=TRACK_GLOBAL.get_middle_position())
+
+        # angle = math_helpers.calculate_direction(self.points[0], self.points[1])
 
         return angle_to_middle
 
@@ -1313,7 +1320,7 @@ async def check_new_path(path_queue: multiprocessing.JoinableQueue, session: aio
                 # Stop robot
                 await robot_api.set_speeds(session, 0, 0)
                 has_stopped = True
-                await asyncio.sleep(10)
+                # await asyncio.sleep(10)
             await asyncio.sleep(0)
         # If we passed the target, pop
         while track.last_target_path and len(track.last_target_path) > 1 and math_helpers.has_passed_target(track.last_target_path[0].node.get_position(),
@@ -1327,7 +1334,7 @@ async def check_new_path(path_queue: multiprocessing.JoinableQueue, session: aio
                 # Stop robot
                 await robot_api.set_speeds(session, 0, 0)
                 has_stopped = True
-                await asyncio.sleep(10)
+                # await asyncio.sleep(10)
             await asyncio.sleep(0)
 
         logger.debug(

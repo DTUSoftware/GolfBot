@@ -21,7 +21,7 @@ KD = float(os.environ.get('PID_KD', 0.05))  # Derivative gain - 0.05
 
 # Distance and direction tolerance
 DISTANCE_TOLERANCE = float(os.environ.get('DISTANCE_TOLERANCE', 1.0))  # in units
-DIRECTION_TOLERANCE = float(os.environ.get('DIRECTION_TOLERANCE', 5.0))  # degrees
+DIRECTION_TOLERANCE = float(os.environ.get('DIRECTION_TOLERANCE', 15.0))  # degrees
 DIRECTION_TOLERANCE_NEW = float(os.environ.get('DIRECTION_TOLERANCE_NEW', 5.0))  # degrees
 
 # Robot parameters
@@ -77,17 +77,18 @@ def do_smooth_turn(current_direction: float, new_direction: float, reverse=False
 
     # We make the direction diff (which can be at max math.pi * 2) into a value between 0 and 1
     # and multiply it by a multiplier to get a speed correction value between 0 and speed_correction_multiplier
-    speed_correction_multiplier = 100
+    speed_correction_multiplier = 150
     speed_correction = (diff_in_angle / (math.pi * 2)) * speed_correction_multiplier
     if not reverse:
         speed_correction = -speed_correction
 
-    logger.debug(f"DOING SMOOTH TURN WITH CORRECTION TO SPEED BEING {speed_correction}")
 
     if turn_right:
-        robot_speed_left = robot_speed_left + speed_correction
-    else:
         robot_speed_right = robot_speed_right + speed_correction
+        logger.debug(f"DOING SMOOTH TURN WITH CORRECTION TO SPEED BEING {speed_correction} TO RIGHT WHEEL")
+    else:
+        robot_speed_left = robot_speed_left + speed_correction
+        logger.debug(f"DOING SMOOTH TURN WITH CORRECTION TO SPEED BEING {speed_correction} TO LEFT WHEEL")
 
     return robot_speed_right, robot_speed_left
 
@@ -128,6 +129,7 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
             if not goal.is_in_delivery_direction():
                 logger.debug("Robot is not in delivery direction, moving robot to delivery direction")
                 await robot_api.turn_robot(session=session, direction=goal.get_angle_to_middle())
+                await asyncio.sleep(1)
                 goal_manyfucks = 0
                 return
 
@@ -243,7 +245,7 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
                 robot_speed_right, robot_speed_left = (-ROBOT_BASE_SPEED, -ROBOT_BASE_SPEED)
                 # robot_speed_right, robot_speed_left = do_smooth_turn(robot_direction, new_direction, reverse=True)
         else:
-            logger.debug("Robot is in the correct heading (within tolerance), will not stop-turn.")
+            logger.debug("Robot is in the correct heading (within tolerance), will not stop-turn, but will smooth-turn.")
             # Adjust the robot speed depending on the direction difference, adding a small offset to the speed
             # to make sure the robot is always moving towards the correct angle
             robot_speed_right, robot_speed_left = do_smooth_turn(robot_direction, new_direction)
