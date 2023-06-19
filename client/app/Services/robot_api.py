@@ -1,3 +1,4 @@
+import asyncio
 import math
 import os
 import aiohttp
@@ -134,12 +135,14 @@ async def turn_robot(session: aiohttp.ClientSession, direction: float, relative=
         async with session.post(f"{ROBOT_API_ENDPOINT}/turn?radians={direction}&relative={'true' if relative else 'false'}") as response:
             res = await response.text()
             if response.status != 200:
-                logger.debug(f"Robot failed to turn with response {res}, code {response.status}")
+                logger.debug(f"Robot failed to turn {'relatively' if relative else 'absolutely'} with response {res}, code {response.status}")
                 return False
-            logger.debug(f"Robot turned with response: {res}")
+            logger.debug(f"Robot turned {'relatively' if relative else 'absolutely'} with response: {res}")
+        # TODO: remove this sleep
+        await asyncio.sleep(10)
         return True
     except Exception as e:
-        logger.error(f"Failed to turn robot with exception {e}")
+        logger.error(f"Failed to turn robot {'relatively' if relative else 'absolutely'} with exception {e}")
         return False
 
 

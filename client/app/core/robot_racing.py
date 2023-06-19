@@ -60,7 +60,7 @@ async def calculate_and_adjust(track: path_algorithm.Track, path_queue: multipro
         return
 
     # Get the node to go to
-    if await path_algorithm.check_new_path(path_queue) and track.last_target_path and \
+    if await path_algorithm.check_new_path(path_queue, session) and track.last_target_path and \
             isinstance(track.last_target_path, list):
         # Tell the robot to drive towards the node
         # await drive_to_coordinates(next_node.node, session)

@@ -90,13 +90,13 @@ def turn():
     if radians or degrees:
         if radians:
             if robot.turn_relative(float(radians)) if relative else robot.turn_to_direction(float(radians)):
-                return "Turning to " + str(math.degrees(float(radians))) + "deg (" + radians + ")", 200
-            return "Failed to turn to " + str(math.degrees(float(radians))) + "deg (" + radians + ")", 500
+                return "Turning " + 'relative' if relative else 'absolute' + " to " + str(math.degrees(float(radians))) + " deg (" + radians + " rad)", 200
+            return "Failed to turn " + 'relative' if relative else 'absolute' + " to " + str(math.degrees(float(radians))) + " deg (" + radians + " rad)", 500
         elif degrees:
             radians = math.radians(float(degrees))
             if robot.turn_relative(float(radians)) if relative else robot.turn_to_direction(float(radians)):
-                return "Turning to " + degrees + " (" + str(radians) + " radians)", 200
-            return "Failed to turn to " + degrees + " (" + str(radians) + " radians).", 500
+                return "Turning " + 'relative' if relative else 'absolute' + " to " + degrees + " deg (" + str(radians) + " rad)", 200
+            return "Failed to turn " + 'relative' if relative else 'absolute' + " to " + degrees + " deg (" + str(radians) + " rad).", 500
     return "Please provide either 'direction', 'radians' or 'degrees'.", 400
 
 

@@ -4,6 +4,8 @@ import logging
 import math
 import os
 from typing import Any, Optional, List, Tuple, Set, Dict, Union
+
+import aiohttp
 import matplotlib.pyplot as plt
 import numpy as np
 from colorama import Fore
@@ -11,6 +13,7 @@ from colorama import Style
 from colorama import init as colorama_init
 from torch import multiprocessing
 
+from ..Services import robot_api
 from ..Utils import math_helpers, opencv_helpers
 
 # If debugging should be enabled
@@ -20,12 +23,13 @@ TIMEOUT_GET_PATH = 5  # in seconds
 PATH_OBSTACLE_DISTANCE = 100  # in units, this is where the balls should max be from the borders for robot width
 DELIVERY_DISTANCE_FAR = 150  # in units
 DELIVERY_DISTANCE = 130  # in units, this is where the middle of the robot is when delivering (241 - 113)
-DELIVERY_DISTANCE_Y = 10  # in units
+DELIVERY_DISTANCE_Y = 20  # in units
 SAFETY_LENGTH = 150  # in units
 SAFETY_LENGTH_CORNER = 200  # in units
 HEADING_DIFFERENCE_DELIVERY = 5  # in degrees
 COLLISION_DISTANCE = 30  # in units (pixels)
 DIRECTION_DIFFERENCE = 250  # in degrees
+TARGET_DIFFERENT_POSITION_DIFF_THRESHOLD = 20.0
 
 # Initialize colorama
 colorama_init()
@@ -431,9 +435,14 @@ class Goal:
     def is_in_delivery_height(self) -> bool:
         # Get the middle
         middle, _ = self.get_middle_and_angle()
-        robot_pos_y = TRACK_GLOBAL.robot_front_pos[1]
+        robot_pos = TRACK_GLOBAL.get_middle_position()
+        if not robot_pos:
+            robot_pos = TRACK_GLOBAL.get_front_position()
+        if not robot_pos:
+            logger.debug("Robot pos is none??? (￣ε(#￣)☆╰╮o(￣皿￣///)")
+            return False
 
-        if abs(middle[1] - robot_pos_y) > DELIVERY_DISTANCE_Y:
+        if abs(middle[1] - robot_pos[1]) > DELIVERY_DISTANCE_Y:
             return False
 
         return True
@@ -1267,11 +1276,12 @@ async def add_buffer_to_path(path: List[NodeData]) -> List[NodeData]:
     return new_path
 
 
-async def check_new_path(path_queue: multiprocessing.JoinableQueue) -> bool:
+async def check_new_path(path_queue: multiprocessing.JoinableQueue, session: aiohttp.ClientSession) -> bool:
     """
     Checks if the path in the track is the same as last, and if it is, updates the current path. Also updates if it isn't.
 
     :param path_queue: The queue to send the current path to the AI.
+    :param session: The aiohttp session to use for the request.
     :return: True if we should drive, else False.
     """
     track = TRACK_GLOBAL
@@ -1292,19 +1302,32 @@ async def check_new_path(path_queue: multiprocessing.JoinableQueue) -> bool:
         # If robot is at target, pop
         # if DEBUG:
         #     print("Checking if robot has reached target")
-        while track.last_target_path and not is_target_different(track, track.last_target_path[0].node,
+        has_stopped = False
+        while track.last_target_path and len(track.last_target_path) > 1 and not is_target_different(track, track.last_target_path[0].node,
                                                                  track.graph.get_node(robot_position)):
             logger.debug("Robot reached target, popping")
             track.last_target_path.pop(0)
             track.last_target_node = track.graph.get_node(robot_position)
+            # TODO: Maybe remove this
+            if not has_stopped:
+                # Stop robot
+                await robot_api.set_speeds(session, 0, 0)
+                has_stopped = True
+                await asyncio.sleep(10)
             await asyncio.sleep(0)
         # If we passed the target, pop
-        while track.last_target_path and math_helpers.has_passed_target(track.last_target_path[0].node.get_position(),
+        while track.last_target_path and len(track.last_target_path) > 1 and math_helpers.has_passed_target(track.last_target_path[0].node.get_position(),
                                                                         robot_position,
                                                                         track.last_target_node.get_position()):
             logger.debug("Robot passed target, popping")
             track.last_target_path.pop(0)
             track.last_target_node = track.graph.get_node(robot_position)
+            # TODO: Maybe remove this
+            if not has_stopped:
+                # Stop robot
+                await robot_api.set_speeds(session, 0, 0)
+                has_stopped = True
+                await asyncio.sleep(10)
             await asyncio.sleep(0)
 
         logger.debug(
@@ -1373,7 +1396,6 @@ def is_target_different(track: Track, target_node: Node, other_node: Node) -> bo
     """
     # Define a threshold for difference based on your requirements
     # Assume a difference of 1.0 cm is significant, we use pixels though, so it depends on the distance and camera
-    position_threshold = 30.0
 
     # if DEBUG:
     #     print(f"Checking if target is different between {target_node.get_position()} and {other_node.get_position()}")
@@ -1381,10 +1403,10 @@ def is_target_different(track: Track, target_node: Node, other_node: Node) -> bo
     # Calculate the position difference
     position_diff = math_helpers.calculate_distance(target_node.get_position(), other_node.get_position())
     # Calculate the direction difference
-    direction_diff = abs(target_node.get_heading(track.get_middle_position()) - other_node.get_heading(track.get_middle_position()))
+    # direction_diff = abs(target_node.get_heading(track.get_middle_position()) - other_node.get_heading(track.get_middle_position()))
 
     # Check if target is significantly different from the last target
-    if position_diff > position_threshold or direction_diff > math.pi / 4:
+    if position_diff > TARGET_DIFFERENT_POSITION_DIFF_THRESHOLD:  #or direction_diff > math.pi / 4:
         # if DEBUG:
         #     print(
         #         f"Different target: posdiff = {position_diff} > {position_threshold} | headdiff = {direction_diff} > {math.pi / 4}")

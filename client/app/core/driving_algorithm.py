@@ -82,6 +82,8 @@ def do_smooth_turn(current_direction: float, new_direction: float, reverse=False
     if not reverse:
         speed_correction = -speed_correction
 
+    logger.debug(f"DOING SMOOTH TURN WITH CORRECTION TO SPEED BEING {speed_correction}")
+
     if turn_right:
         robot_speed_left = robot_speed_left + speed_correction
     else:
@@ -105,7 +107,7 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
     robot_direction = track.robot_direction
 
     robot_speed_left = ROBOT_BASE_SPEED
-    robot_speed_right = ROBOT_BASE_SPEED
+    robot_speed_right = ROBOT_BASE_SPEED + 5
 
     logger.debug(f"Trying to get robot from {track.get_middle_position()} to {target_position}. "
                  f"Robot currently has a direction of {math.degrees(robot_direction)} deg ({robot_direction} rad)")
@@ -244,7 +246,7 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
             logger.debug("Robot is in the correct heading (within tolerance), will not stop-turn.")
             # Adjust the robot speed depending on the direction difference, adding a small offset to the speed
             # to make sure the robot is always moving towards the correct angle
-            # robot_speed_right, robot_speed_left = do_smooth_turn(robot_direction, new_direction)
+            robot_speed_right, robot_speed_left = do_smooth_turn(robot_direction, new_direction)
 
         logger.debug("Driving robot forward.")
         # Drive forward with base speed
