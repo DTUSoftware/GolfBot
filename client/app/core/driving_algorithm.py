@@ -21,7 +21,7 @@ KD = float(os.environ.get('PID_KD', 0.05))  # Derivative gain - 0.05
 
 # Distance and direction tolerance
 DISTANCE_TOLERANCE = float(os.environ.get('DISTANCE_TOLERANCE', 1.0))  # in units
-DIRECTION_TOLERANCE = float(os.environ.get('DIRECTION_TOLERANCE', 15.0))  # degrees
+DIRECTION_TOLERANCE = float(os.environ.get('DIRECTION_TOLERANCE', 5.0))  # degrees
 DIRECTION_TOLERANCE_NEW = float(os.environ.get('DIRECTION_TOLERANCE_NEW', 5.0))  # degrees
 
 # Robot parameters
