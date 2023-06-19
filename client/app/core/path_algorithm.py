@@ -430,10 +430,10 @@ class Goal:
 
     def is_in_delivery_height(self) -> bool:
         # Get the middle
-        middle_y, _ = self.get_middle_and_angle()[1]
+        middle, _ = self.get_middle_and_angle()
         robot_pos_y = TRACK_GLOBAL.robot_front_pos[1]
 
-        if abs(middle_y - robot_pos_y) > DELIVERY_DISTANCE_Y:
+        if abs(middle[1] - robot_pos_y) > DELIVERY_DISTANCE_Y:
             return False
 
         return True
