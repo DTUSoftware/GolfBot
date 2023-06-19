@@ -91,6 +91,12 @@ def run_ai(camera_queue: torch.multiprocessing.JoinableQueue, path_queue: torch.
         #     print("Predict")
         results = model.predict(frame, device=device)
 
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord('q'):
+            break
+        elif key == ord('s'):
+            save_result(results, frame)
+
         # Send the results to the driving algorithm
         # if DEBUG:
         #     print("Sending event to driving algorithm")
@@ -155,11 +161,6 @@ def run_ai(camera_queue: torch.multiprocessing.JoinableQueue, path_queue: torch.
         # print("Wait for processing of data...")
         # evt.wait()
 
-        key = cv2.waitKey(1) & 0xFF
-        if key == ord('q'):
-            break
-        elif key == ord('s'):
-            save_result(results, frame)
         # await asyncio.sleep(0)
 
     # Release the webcam when done and close window
