@@ -38,6 +38,7 @@ if DEBUG:
 
 current_target_pos = (0, 0)
 obstacle_fuckery = 0
+goal_manyfucks = 0
 
 
 def do_smooth_turn(current_direction: float, new_direction: float, reverse=False) -> Tuple[float, float]:
@@ -98,6 +99,7 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
     :return: None
     """
     global obstacle_fuckery
+    global goal_manyfucks
 
     track = path_algorithm.TRACK_GLOBAL
     robot_direction = track.robot_direction
@@ -114,18 +116,32 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
         await robot_api.set_speeds(session=session, speed_left=0, speed_right=0)
         return
 
-    if not path_algorithm.TRACK_GLOBAL.balls and path_algorithm.TRACK_GLOBAL.small_goal.is_in_delivery_distance():
+    goal = path_algorithm.TRACK_GLOBAL.small_goal
+    if not path_algorithm.TRACK_GLOBAL.balls and goal.is_in_delivery_distance():
         logger.debug("Robot is in delivery distance and no balls")
 
-        if path_algorithm.TRACK_GLOBAL.small_goal.is_in_delivery_height():
+        if goal.is_in_delivery_height():
             logger.debug("Robot is in the correct delivery height.")
 
-            if not path_algorithm.TRACK_GLOBAL.small_goal.is_in_delivery_direction():
+            if not goal.is_in_delivery_direction():
                 logger.debug("Robot is not in delivery direction, moving robot to delivery direction")
-                await robot_api.turn_robot(session=session, direction=path_algorithm.TRACK_GLOBAL.small_goal.get_angle_to_middle())
+                await robot_api.turn_robot(session=session, direction=goal.get_angle_to_middle())
+                goal_manyfucks = 0
                 return
 
-            logger.info("Robot is in delivery position, stopping robot and fans.")
+            # Check all things
+            if not goal.is_in_delivery_position():
+                logger.debug("Not in delivery position!? how did u even get here")
+                goal_manyfucks = 0
+                return
+
+            # Check all things more times
+            if goal_manyfucks < 5:
+                goal_manyfucks += 1
+                logger.info(f"Robot is still in delivery position, current count is {goal_manyfucks}.")
+                return
+
+            logger.info("Robot has been in delivery position for long enough, stopping robot and fans.")
             await robot_api.set_speeds(session=session, speed_left=0, speed_right=0)
             await robot_api.toggle_fans(session=session)
             logger.debug("Sleeping for 15 seconds to finish delivery")
@@ -139,6 +155,7 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
             return
         else:
             logger.debug("Robot is NOT in the correct delivery height, continue pursuing target...")
+            goal_manyfucks = 0
 
     # If the robot is about to drive into a wall or other obstacle, stop the robot
     if await math_helpers.is_about_to_collide_with_obstacle(track.get_front_position(), robot_direction):
