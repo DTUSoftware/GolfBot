@@ -84,7 +84,9 @@ def turn():
     relative_text = request.args.get("relative")
     if not relative_text:
         relative_text = "false"
+    # print("Relative text is: " + relative_text)
     relative = relative_text.lower() == "true"
+    # print("Relative is: " + str(relative))
     if radians or degrees:
         if radians:
             if robot.turn_relative(float(radians)) if relative else robot.turn_to_direction(float(radians)):

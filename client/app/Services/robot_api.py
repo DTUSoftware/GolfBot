@@ -131,7 +131,7 @@ async def turn_robot(session: aiohttp.ClientSession, direction: float, relative=
     :return: None
     """
     try:
-        async with session.post(f"{ROBOT_API_ENDPOINT}/turn?radians={direction}&relative={relative}") as response:
+        async with session.post(f"{ROBOT_API_ENDPOINT}/turn?radians={direction}&relative={'true' if relative else 'false'}") as response:
             res = await response.text()
             if response.status != 200:
                 logger.debug(f"Robot failed to turn with response {res}, code {response.status}")

@@ -17,12 +17,12 @@ from ..Utils import math_helpers, opencv_helpers
 DEBUG = "true" in os.environ.get('DEBUG', "True").lower()
 # The timeout for calculating a path
 TIMEOUT_GET_PATH = 5  # in seconds
-PATH_OBSTACLE_DISTANCE = 70  # in units, this is where the balls should max be from the borders for robot width
+PATH_OBSTACLE_DISTANCE = 100  # in units, this is where the balls should max be from the borders for robot width
 DELIVERY_DISTANCE_FAR = 150  # in units
 DELIVERY_DISTANCE = 130  # in units, this is where the middle of the robot is when delivering (241 - 113)
 SAFETY_LENGTH = 150  # in units
 SAFETY_LENGTH_CORNER = 200  # in units
-HEADING_DIFFERENCE_DELIVERY = 10  # in degrees
+HEADING_DIFFERENCE_DELIVERY = 5  # in degrees
 COLLISION_DISTANCE = 30  # in units (pixels)
 DIRECTION_DIFFERENCE = 250  # in degrees
 
@@ -352,9 +352,9 @@ class Goal:
 
         # Get angle to middle of the goal
         if middle[0] < TRACK_GLOBAL.bounds["x"] / 2:
-            angle = math.radians(0)
-        else:
             angle = math.radians(180)
+        else:
+            angle = math.radians(0)
 
         return middle, angle
 
@@ -399,10 +399,10 @@ class Goal:
         :return: The angle to the middle of the goal.
         """
         # Get the middle and the angle
-        middle, _ = self.get_middle_and_angle()
+        middle, angle_to_middle = self.get_middle_and_angle()
 
         # Get the angle to the middle
-        angle_to_middle = math_helpers.calculate_direction(to_pos=middle, from_pos=TRACK_GLOBAL.get_middle_position())
+        # angle_to_middle = math_helpers.calculate_direction(to_pos=middle, from_pos=TRACK_GLOBAL.get_middle_position())
 
         return angle_to_middle
 

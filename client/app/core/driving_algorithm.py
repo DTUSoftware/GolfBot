@@ -21,7 +21,7 @@ KD = float(os.environ.get('PID_KD', 0.05))  # Derivative gain - 0.05
 
 # Distance and direction tolerance
 DISTANCE_TOLERANCE = float(os.environ.get('DISTANCE_TOLERANCE', 1.0))  # in units
-DIRECTION_TOLERANCE = float(os.environ.get('DIRECTION_TOLERANCE', 45.0))  # degrees
+DIRECTION_TOLERANCE = float(os.environ.get('DIRECTION_TOLERANCE', 15.0))  # degrees
 DIRECTION_TOLERANCE_NEW = float(os.environ.get('DIRECTION_TOLERANCE_NEW', 5.0))  # degrees
 
 # Robot parameters
@@ -29,6 +29,7 @@ WHEEL_RADIUS = (float(os.environ.get('WHEEL_DIAMETER', 68.8)) / 2) / 10  # Radiu
 DIST_BETWEEN_WHEELS = float(
     os.environ.get('DIST_BETWEEN_WHEELS', 83.0 * 2)) / 10  # Distance between the robot's wheels in cm
 ROBOT_BASE_SPEED = float(os.environ.get('ROBOT_BASE_SPEED', 45.0))
+ROBOT_LENGTH_BUFFER = 10
 
 logger = logging.getLogger(__name__)
 # logger.addHandler(logging.StreamHandler(sys.stdout))
@@ -80,9 +81,9 @@ def do_smooth_turn(current_direction: float, new_direction: float, reverse=False
         speed_correction = -speed_correction
 
     if turn_right:
-        robot_speed_right = robot_speed_right + speed_correction
+        robot_speed_left = robot_speed_left + speed_correction
     else:
-        robot_speed_left = robot_speed_right + speed_correction
+        robot_speed_right = robot_speed_right + speed_correction
 
     return robot_speed_right, robot_speed_left
 
@@ -174,24 +175,25 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
         # If the direction difference is above the tolerance, turn the robot
         if direction_diff >= math.radians(direction_tolerance):
             direction = math_helpers.calculate_angle_to_turn(
-                radius=(math_helpers.calculate_distance(track.get_middle_position(), track.get_front_position())),
+                radius=(math_helpers.calculate_distance(track.get_middle_position(), track.get_front_position())) + ROBOT_LENGTH_BUFFER,
                 current_angle=robot_direction,
                 angle_to_turn=new_direction,
                 pos=track.get_middle_position()
             )
 
             if direction is not None:
-                logger.debug(f"Turning robot to {math.degrees(direction)} deg ({direction} rad), with diff being "
+                logger.debug(f"Turning robot to relative pos {math.degrees(direction)} deg ({direction} rad), with diff being "
                              f"{math.degrees(direction_diff)} deg ({direction_diff} rad)")
                 await robot_api.turn_robot(session=session, direction=direction, relative=True)
             else:
                 logger.debug("Direction is None")
-                robot_speed_right, robot_speed_left = do_smooth_turn(robot_direction, new_direction)
+                robot_speed_right, robot_speed_left = (-ROBOT_BASE_SPEED, -ROBOT_BASE_SPEED)
+                # robot_speed_right, robot_speed_left = do_smooth_turn(robot_direction, new_direction, reverse=True)
         else:
             logger.debug("Robot is in the correct heading (within tolerance), will not stop-turn.")
             # Adjust the robot speed depending on the direction difference, adding a small offset to the speed
             # to make sure the robot is always moving towards the correct angle
-            robot_speed_right, robot_speed_left = do_smooth_turn(robot_direction, new_direction)
+            # robot_speed_right, robot_speed_left = do_smooth_turn(robot_direction, new_direction)
 
         logger.debug("Driving robot forward.")
         # Drive forward with base speed
