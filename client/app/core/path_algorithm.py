@@ -352,9 +352,9 @@ class Goal:
 
         # Get angle to middle of the goal
         if middle[0] < TRACK_GLOBAL.bounds["x"] / 2:
-            angle = math.radians(180)
-        else:
             angle = math.radians(0)
+        else:
+            angle = math.radians(180)
 
         return middle, angle
 
