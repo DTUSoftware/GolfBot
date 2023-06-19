@@ -161,6 +161,36 @@ class Robot:
                 return self.toggle_fans()
         return False
 
+    def turn_relative(self, direction: float) -> bool:
+        try:
+            if self.stopped or self.busy:
+                return False
+
+            self.busy = True
+            # get which way to turn
+
+            negative = direction < 0
+
+            direction = abs(direction) % (2 * math.pi)
+            print("Turning to absolute direction: " + str(math.degrees(direction)) + " deg (" + str(direction) + " rad)\n" +
+                  "Current direction is " + str(math.degrees(self.direction)) + " deg (" + str(self.direction) + " deg)")
+
+            if negative:
+                status = self.turn_right(direction * ROBOT_TURN_RATIO, busy_override=True)
+                direction = -direction
+            else:
+                status = self.turn_left(direction * ROBOT_TURN_RATIO, busy_override=True)
+
+            # Update the direction
+            self.direction = (self.direction + direction) % (2 * math.pi)
+
+            self.busy = False
+            return status
+        except (EOFError, ReferenceError):
+            if self.refresh_conn():
+                return self.turn_to_direction(direction)
+        return False
+
     # This function is blocking!
     def turn_to_direction(self, direction: float) -> bool:
         """
@@ -174,29 +204,24 @@ class Robot:
 
             self.busy = True
             # get which way to turn
-            diff_in_angle = 0
 
             direction = direction % (2 * math.pi)
             print("Turning to direction: " + str(math.degrees(direction)) + " deg (" + str(direction) + " rad)\n" +
                   "Current direction is " + str(math.degrees(self.direction)) + " deg (" + str(self.direction) + " deg)")
 
-            status = False
-            if self.direction < direction:
-                if (direction - self.direction) > math.pi:
-                    # diff_in_angle = abs(direction - self.direction)
-                    diff_in_angle = abs((direction - 2 * math.pi) - self.direction)
-                    status = self.turn_left(diff_in_angle * ROBOT_TURN_RATIO, busy_override=True)
-                else:
-                    diff_in_angle = abs(direction - self.direction)
-                    status = self.turn_right(diff_in_angle * ROBOT_TURN_RATIO, busy_override=True)
+            diff_in_angle = abs(direction - self.direction)
+            diff_in_angle = min(diff_in_angle, 2 * math.pi - diff_in_angle)
+
+            # check if we should turn left or right, using radians
+            if direction > self.direction:
+                turn_right = direction - self.direction > math.pi
             else:
-                if (self.direction - direction) > math.pi:
-                    # diff_in_angle = abs(self.direction - direction)
-                    diff_in_angle = abs((self.direction - 2 * math.pi) - direction)
-                    status = self.turn_right(diff_in_angle * ROBOT_TURN_RATIO, busy_override=True)
-                else:
-                    diff_in_angle = abs(self.direction - direction)
-                    status = self.turn_left(diff_in_angle * ROBOT_TURN_RATIO, busy_override=True)
+                turn_right = self.direction - direction <= math.pi
+
+            if turn_right:
+                status = self.turn_right(diff_in_angle * ROBOT_TURN_RATIO, busy_override=True)
+            else:
+                status = self.turn_left(diff_in_angle * ROBOT_TURN_RATIO, busy_override=True)
 
             # Update the direction
             print("Diff in angle from current was (without ratio): " + str(math.degrees(diff_in_angle)) + " deg (" + str(diff_in_angle) + " rad)")

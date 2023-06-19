@@ -67,7 +67,10 @@ def do_smooth_turn(current_direction: float, new_direction: float, reverse=False
     diff_in_angle = min(diff_in_angle, 2 * math.pi - diff_in_angle)
 
     # check if we should turn left or right, using radians
-    turn_right = new_direction - current_direction > 0
+    if new_direction > current_direction:
+        turn_right = new_direction - current_direction > math.pi
+    else:
+        turn_right = current_direction - new_direction <= math.pi
 
     # We make the direction diff (which can be at max math.pi * 2) into a value between 0 and 1
     # and multiply it by a multiplier to get a speed correction value between 0 and speed_correction_multiplier

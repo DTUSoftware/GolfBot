@@ -81,14 +81,18 @@ def turn():
         return "Invalid direction, try 'left' or 'right'.", 400
     radians = request.args.get("radians")
     degrees = request.args.get("degrees")
+    relative_text = request.args.get("relative")
+    if not relative_text:
+        relative_text = "false"
+    relative = relative_text.lower() == "true"
     if radians or degrees:
         if radians:
-            if robot.turn_to_direction(float(radians)):
-                return "Turning to " + radians, 200
-            return "Failed to turn to " + radians, 500
+            if robot.turn_relative(float(radians)) if relative else robot.turn_to_direction(float(radians)):
+                return "Turning to " + str(math.degrees(radians)) + "deg (" + radians + ")", 200
+            return "Failed to turn to " + str(math.degrees(radians)) + "deg (" + radians + ")", 500
         elif degrees:
             radians = math.radians(float(degrees))
-            if robot.turn_to_direction(radians):
+            if robot.turn_relative(float(radians)) if relative else robot.turn_to_direction(float(radians)):
                 return "Turning to " + degrees + " (" + str(radians) + " radians)", 200
             return "Failed to turn to " + degrees + " (" + str(radians) + " radians).", 500
     return "Please provide either 'direction', 'radians' or 'degrees'.", 400
@@ -150,6 +154,7 @@ def robot_direction():
                 return "Failed to set direction to " + degrees + " (" + str(radians) + " radians).", 500
         return "Please provide either 'radians' or 'degrees'.", 400
     return "Invalid method.", 500
+
 
 @server.route("/position", methods=['GET', 'POST'])
 def robot_position():
