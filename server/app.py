@@ -88,8 +88,8 @@ def turn():
     if radians or degrees:
         if radians:
             if robot.turn_relative(float(radians)) if relative else robot.turn_to_direction(float(radians)):
-                return "Turning to " + str(math.degrees(radians)) + "deg (" + radians + ")", 200
-            return "Failed to turn to " + str(math.degrees(radians)) + "deg (" + radians + ")", 500
+                return "Turning to " + str(math.degrees(float(radians))) + "deg (" + radians + ")", 200
+            return "Failed to turn to " + str(math.degrees(float(radians))) + "deg (" + radians + ")", 500
         elif degrees:
             radians = math.radians(float(degrees))
             if robot.turn_relative(float(radians)) if relative else robot.turn_to_direction(float(radians)):

@@ -1,9 +1,20 @@
+import logging
 import math
+import os
 from typing import Tuple, Optional
 import asyncio
 import numpy as np
 
 from ..core import path_algorithm
+
+
+# If debugging should be enabled
+DEBUG = "true" in os.environ.get('DEBUG', "True").lower()
+
+logger = logging.getLogger(__name__)
+# logger.addHandler(logging.StreamHandler(sys.stdout))
+if DEBUG:
+    logger.setLevel(logging.DEBUG)
 
 
 def calculate_direction(to_pos: Tuple[int, int], from_pos: Tuple[int, int]) -> float:
@@ -178,33 +189,34 @@ def calculate_xn_and_yn(radius: float, angle: float, pos: Tuple[int, int]) -> Tu
 
 
 def calculate_angle_to_turn(radius: float, current_angle: float, angle_to_turn: float,
-                            pos: Tuple[int, int], ) -> Optional[float]:
+                            pos: Tuple[int, int]) -> Optional[float]:
     """
     Calculates the angle to turn.
     :param radius: the radius of the circle
     :param current_angle: your current angle
     :param angle_to_turn: the angle you want to turn
     :param pos: your current position
-    :return the angle to turn returns 0 if the turn is not possible:
+    :return: the angle to turn; returns 0 if the turn is not possible
     """
-    angle_array1: np.ndarray
-    angle_array2: np.ndarray
+    angle_step = math.pi / 18  # Step size for angle increments
+
+    # Calculate angle arrays based on the current angle and angle to turn
     if current_angle < angle_to_turn:
-        angle_array1 = np.arange(current_angle, angle_to_turn, math.pi / 18)
-        angle_array2 = np.arange(angle_to_turn, current_angle, -math.pi / 18)
+        angle_array1 = np.arange(current_angle, angle_to_turn, angle_step)
+        angle_array2 = np.arange(angle_to_turn, current_angle, -angle_step)
     else:
-        angle_array1 = np.arange(current_angle, angle_to_turn, -math.pi / 18)
-        angle_array2 = np.arange(angle_to_turn, current_angle, math.pi / 18)
-    short_angle_array: np.ndarray
-    long_angle_array: np.ndarray
-    if len(angle_array1) > len(angle_array2):
-        short_angle_array = angle_array2
-        long_angle_array = angle_array1
-    else:
-        short_angle_array = angle_array1
-        long_angle_array = angle_array2
-    distance_array: np.ndarray = np.arange(1, radius, 1)
+        angle_array1 = np.arange(current_angle, angle_to_turn, -angle_step)
+        angle_array2 = np.arange(angle_to_turn, current_angle, angle_step)
+
+    # Determine the shorter and longer angle arrays
+    short_angle_array = angle_array2 if len(angle_array1) > len(angle_array2) else angle_array1
+    long_angle_array = angle_array1 if short_angle_array is angle_array2 else angle_array2
+
+    distance_array = np.arange(1, radius, 1)  # Array of distances
+
     break_flag: bool = False
+
+    # Check for obstacle positions in the short angle array
     for angle in short_angle_array:
         for distance in distance_array:
             xn, yn = calculate_xn_and_yn(distance, angle, pos)
@@ -214,12 +226,16 @@ def calculate_angle_to_turn(radius: float, current_angle: float, angle_to_turn: 
         if break_flag:
             break
     else:
-        # something here i haven't figured out yet
-        return calculate_shortest_turn(current_angle, angle_to_turn)
+        # If entire loop runs without breaking
+        logger.debug("Short angle array does not contain obstacle positions.")
+        shortest_turn = calculate_shortest_turn(current_angle, angle_to_turn)
+        logger.debug(f"Angles: cur={math.degrees(current_angle)} turn={math.degrees(angle_to_turn)} shortest={math.degrees(shortest_turn)}")
+        return shortest_turn
 
     # if the short angle array is empty, then the long angle array is also empty
     # and the turn is not possible
     break_flag = False
+    # Check for obstacle positions in the long angle array
     for angle in long_angle_array:
         for distance in distance_array:
             xn, yn = calculate_xn_and_yn(distance, angle, pos)
@@ -229,7 +245,12 @@ def calculate_angle_to_turn(radius: float, current_angle: float, angle_to_turn: 
         if break_flag:
             break
     else:
-        return calculate_longest_turn(current_angle, angle_to_turn)
+        # If entire loop runs without breaking
+        logger.debug(f"Long angle array does not contain obstacle positions.")
+        longest_turn = calculate_longest_turn(current_angle, angle_to_turn)
+        logger.debug(f"Angles: cur={math.degrees(current_angle)} turn={math.degrees(angle_to_turn)} longest={math.degrees(longest_turn)}")
+        return longest_turn
+    logger.debug("No angle found without going into an obstacle!")
     return None
 
 

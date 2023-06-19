@@ -1,5 +1,6 @@
 import os
 import logging
+import sys
 from threading import Event
 import cv2
 import torch
@@ -18,7 +19,7 @@ DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "True").lower()
 DEBUG = ("true" in os.environ.get('DEBUG', "True").lower()) and not DISABLE_LOGGING
 
 logger = logging.getLogger(__name__)
-# logger.addHandler(logging.StreamHandler(sys.stdout))
+logger.addHandler(logging.StreamHandler(sys.stdout))
 if DEBUG:
     logger.setLevel(logging.DEBUG)
 
@@ -49,8 +50,11 @@ def run_ai(camera_queue: torch.multiprocessing.JoinableQueue, path_queue: torch.
         if os.path.exists("./ai/" + CURRENT_MODEL + ".pt"):
             CURRENT_MODEL = "./ai/" + CURRENT_MODEL
         else:
-            logger.debug("No model found!")
-            return
+            if os.path.exists("./app/ai/" + CURRENT_MODEL + ".pt"):
+                CURRENT_MODEL = "./app/ai/" + CURRENT_MODEL
+            else:
+                logger.debug("No model found!")
+                return
     model = YOLO(CURRENT_MODEL + ".pt")
 
     # Open a connection to the webcam

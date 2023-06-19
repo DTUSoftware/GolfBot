@@ -172,7 +172,7 @@ class Robot:
             negative = direction < 0
 
             direction = abs(direction) % (2 * math.pi)
-            print("Turning to absolute direction: " + str(math.degrees(direction)) + " deg (" + str(direction) + " rad)\n" +
+            print("Turning to relative direction: " + str(math.degrees(direction)) + " deg (" + str(direction) + " rad)\n" +
                   "Current direction is " + str(math.degrees(self.direction)) + " deg (" + str(self.direction) + " deg)")
 
             if negative:
@@ -206,7 +206,7 @@ class Robot:
             # get which way to turn
 
             direction = direction % (2 * math.pi)
-            print("Turning to direction: " + str(math.degrees(direction)) + " deg (" + str(direction) + " rad)\n" +
+            print("Turning to absolute direction: " + str(math.degrees(direction)) + " deg (" + str(direction) + " rad)\n" +
                   "Current direction is " + str(math.degrees(self.direction)) + " deg (" + str(self.direction) + " deg)")
 
             diff_in_angle = abs(direction - self.direction)

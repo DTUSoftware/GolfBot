@@ -1282,13 +1282,13 @@ async def check_new_path(path_queue: multiprocessing.JoinableQueue) -> bool:
             track.last_target_node = track.graph.get_node(robot_position)
             await asyncio.sleep(0)
         # If we passed the target, pop
-        # while track.last_target_path and math_helpers.has_passed_target(track.last_target_path[0].node.get_position(),
-        #                                                                 robot_position,
-        #                                                                 track.last_target_node.get_position()):
-        #     logger.debug("Robot passed target, popping")
-        #     track.last_target_path.pop(0)
-        #     track.last_target_node = track.graph.get_node(robot_position)
-        #     await asyncio.sleep(0)
+        while track.last_target_path and math_helpers.has_passed_target(track.last_target_path[0].node.get_position(),
+                                                                        robot_position,
+                                                                        track.last_target_node.get_position()):
+            logger.debug("Robot passed target, popping")
+            track.last_target_path.pop(0)
+            track.last_target_node = track.graph.get_node(robot_position)
+            await asyncio.sleep(0)
 
         logger.debug(
             f"Current optimized path: {[(nodedata.node.x, nodedata.node.y) for nodedata in track.last_target_path]}")
