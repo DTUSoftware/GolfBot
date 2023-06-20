@@ -1,8 +1,8 @@
 import asyncio
-import heapq
 import logging
 import math
 import os
+from collections import defaultdict
 from typing import Any, Optional, List, Tuple, Set, Dict, Union
 
 import aiohttp
@@ -580,6 +580,8 @@ class Graph:
         :param size_x: The width of the graph.
         :param size_y: The height of the graph.
         """
+        self.obstacle_proximity: Dict[Tuple[int, int], float] = {}
+
         if size_x and size_y:
             range_x = range(size_x)
             range_y = range(size_y)
@@ -755,6 +757,21 @@ class Graph:
             if node_1 in node_2.get_neighbour_nodes():
                 node_2.remove_neighbour(node_1)
 
+    def precompute_obstacles(self):
+        """
+        Precomputes the obstacle distances for all nodes.
+        Returns:
+            None
+        """
+        # Precompute obstacle proximity
+        self.obstacle_proximity = {
+            position: (
+                    1 - float(min([
+                (await obstacle.get_distance(position))[0] for obstacle in TRACK_GLOBAL.obstacles
+            ])) / max(TRACK_GLOBAL.bounds["x"], TRACK_GLOBAL.bounds["y"]))
+            for position in [(node.x, node.y) for node in self.nodes]
+        }
+
     # Modified Euclidian Distance heuristic for A*
     async def h(self, start_node: Node, dst_node: Node) -> float:
         """
@@ -765,18 +782,14 @@ class Graph:
         """
         dx = abs(start_node.x - dst_node.x)
         dy = abs(start_node.y - dst_node.y)
-        distance = math.sqrt(dx*dx + dy*dy)
+        distance = math.sqrt(dx * dx + dy * dy)
 
         # Add obstacle proximity
-        obstacle_distance_min = math.inf
-        for obstacle in TRACK_GLOBAL.obstacles: # [obstacle for obstacle in TRACK_GLOBAL.obstacles if not obstacle.is_wall]:
-            obstacle_distance = await obstacle.get_distance((start_node.x, start_node.y))
-            if obstacle_distance[0] < obstacle_distance_min:
-                obstacle_distance_min = obstacle_distance[0]
+        if not self.obstacle_proximity:
+            self.precompute_obstacles()
 
-        if obstacle_distance_min < math.inf:
-            obstacle_proximity = 1 - obstacle_distance_min / max(TRACK_GLOBAL.bounds["x"], TRACK_GLOBAL.bounds["y"])
-            distance += obstacle_proximity * OBSTACLE_WEIGHT
+        obstacle_proximity = self.obstacle_proximity[(start_node.x, start_node.y)]
+        distance += obstacle_proximity * OBSTACLE_WEIGHT
 
         return distance * HEURISTIC_WEIGHT
 
@@ -796,32 +809,28 @@ class Graph:
             start_node, 0, await self.h(start_node, dst_node), None)
 
         # Create open and closed sets
-        open_set: Set[Node] = {start_node}
+        open_set: Dict[Node, bool] = {start_node: True}
         closed_set: Dict[Node, NodeData] = {}
 
         # A dictionary to store the best known cost from start to each node
-        g_scores: Dict[Node, float] = {start_node: 0}
+        g_scores: Dict[Node, float] = defaultdict(float)
 
         # A dictionary to store the estimated total cost from start to each node
-        f_scores: Dict[Node, float] = {start_node: start_node_data.f}
+        f_scores: Dict[Node, float] = defaultdict(lambda: float('inf'))
 
         # A priority queue to efficiently extract the node with the lowest f-score
-        open_queue: List[Tuple[float, Node]] = [
-            (f_scores[start_node], start_node)]
-
-        # A counter to track the number of iterations
-        iteration = 0
+        open_queue: asyncio.PriorityQueue[Tuple[float, Node]] = asyncio.PriorityQueue()
 
         # The current node
         current_node: Node
+        iteration = 0
+
         while open_queue:
             iteration += 1
             if iteration % 500 == 0:
-                # if DEBUG:
-                #     print(f"Iteration: {iteration}")
                 await asyncio.sleep(0)
 
-            _, current_node = heapq.heappop(open_queue)
+            _, current_node = await open_queue.get()
 
             closed_set[current_node] = NodeData(
                 node=current_node,
@@ -840,13 +849,12 @@ class Graph:
                 return final_path
 
             for neighbour in current_node.neighbours:
-                neighbour_node: Node = neighbour["node"]
-                neighbour_weight: float = neighbour["weight"]
+                neighbour_node = neighbour["node"]
+                neighbour_weight = neighbour["weight"]
+                neighbour_g_score = g_scores[current_node] + neighbour_weight
 
                 if neighbour_node in closed_set:
                     continue
-
-                neighbour_g_score = g_scores[current_node] + neighbour_weight
 
                 if neighbour_node not in open_set:
                     # Add the neighbour to the open set
@@ -856,12 +864,11 @@ class Graph:
                         h=await self.h(neighbour_node, dst_node),
                         parent=current_node
                     )
-                    open_set.add(neighbour_node)
+                    open_set[neighbour_node] = True
                     closed_set[neighbour_node] = neighbour_data
                     g_scores[neighbour_node] = neighbour_g_score
                     f_scores[neighbour_node] = neighbour_data.f
-                    heapq.heappush(
-                        open_queue, (f_scores[neighbour_node], neighbour_node))
+                    await open_queue.put((f_scores[neighbour_node], neighbour_node))
                 elif neighbour_g_score < g_scores[neighbour_node]:
                     # Update the neighbour's scores and parent if a better path is found
                     neighbour_data = closed_set[neighbour_node]
@@ -869,7 +876,7 @@ class Graph:
                     neighbour_data.parent = current_node
                     g_scores[neighbour_node] = neighbour_g_score
                     f_scores[neighbour_node] = neighbour_data.f
-                    heapq.heapify(open_queue)
+                    await open_queue.put((f_scores[neighbour_node], neighbour_node))
 
         # No path found
         return []
@@ -1218,6 +1225,10 @@ class Track:
                 logger.debug(
                     f"[add_obstacle] Failed to remove all neighbours for obstacle node at {node.x}, {node.y}")
         self.obstacles.append(obstacle)
+
+        # Precompute obstacles
+        logger.debug("Precomputing obstacle distances, this will take a while...")
+        self.graph.precompute_obstacles()
 
     def add_goal(self, goal: Goal) -> None:
         """
