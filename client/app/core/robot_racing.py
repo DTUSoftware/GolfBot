@@ -49,8 +49,8 @@ async def calculate_and_adjust(track: path_algorithm.Track, path_queue: multipro
     # track.draw(True)
 
     if not track.path:
-        logger.debug("No node to travel to, setting speed to 10!")
-        await robot_api.set_speeds(session, 10, 10)
+        logger.debug("No node to travel to, setting speed to base!")
+        await robot_api.set_speeds(session, driving_algorithm.ROBOT_BASE_SPEED, driving_algorithm.ROBOT_BASE_SPEED)
 
         # if not path_queue.full():
         #     try:
