@@ -414,7 +414,7 @@ class Goal:
         if distance < DELIVERY_DISTANCE - (DELIVERY_DISTANCE_X_DIFF / 2):
             return False
 
-        if abs(self.delivery_direction_diff()) > math.radians(90):
+        if not abs(self.delivery_direction_diff()) > math.radians(90):
             return False
 
         return True
@@ -436,7 +436,7 @@ class Goal:
         if distance > DELIVERY_DISTANCE + (DELIVERY_DISTANCE_X_DIFF / 2):
             return False
 
-        if abs(self.delivery_direction_diff()) > math.radians(180):
+        if not abs(self.delivery_direction_diff()) > math.radians(180):
             return False
 
         return True
