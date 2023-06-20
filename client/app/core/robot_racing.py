@@ -87,7 +87,7 @@ async def calculate_and_adjust(track: path_algorithm.Track, path_queue: multipro
 
 
 async def do_race_iteration(track: path_algorithm.Track, ai_queue: multiprocessing.JoinableQueue,
-                            path_queue: multiprocessing.JoinableQueue, ai_event: Event, session: aiohttp.ClientSession):
+                            path_queue: multiprocessing.JoinableQueue, ai_event: Event, session: aiohttp.ClientSession, time_taken):
     try:
         # Get results from AI
         # if DEBUG:
@@ -122,7 +122,7 @@ async def do_race_iteration(track: path_algorithm.Track, ai_queue: multiprocessi
 
         objects_to_navigate_to: List[List[Tuple[int, int]]] = []
         if track.balls and (
-                len(seen_ball_queue) < 10 or len([seen_ball for seen_ball in seen_ball_queue if seen_ball]) >= 4):
+                len(seen_ball_queue) < 10 or len([seen_ball for seen_ball in seen_ball_queue if seen_ball]) >= 4) and (time_taken <= 7 * 60):
             # Get every ball that's not golden
             objects_to_navigate_to = [ball.drivePath for ball in track.balls if
                                       not ball.golden and ball.get_drive_path()]
@@ -182,7 +182,7 @@ async def race(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocess
 
     logging.info("Racing!")
     while time_taken <= 8 * 60:
-        await do_race_iteration(track, ai_queue, path_queue, ai_event, session)
+        await do_race_iteration(track, ai_queue, path_queue, ai_event, session, time_taken)
         time_taken = time.time() - start_time
         # Never remove this sleep
         await asyncio.sleep(0)
