@@ -49,7 +49,7 @@ colorama_init()
 distance_across = math.sqrt(1 ** 2 + 1 ** 2)
 
 logger = logging.getLogger(__name__)
-logger.addHandler(logging.StreamHandler(sys.stdout))
+# logger.addHandler(logging.StreamHandler(sys.stdout))
 if DEBUG:
     logger.setLevel(logging.DEBUG)
 
@@ -166,6 +166,7 @@ class Node:
         min_obstacle_distance = min(obstacle_distances)
         self.obstacle_proximity = 1 - (min_obstacle_distance / (max(TRACK_GLOBAL.bounds["x"], TRACK_GLOBAL.bounds["y"])))
         logger.debug("Done calculating obstacle proximity for node at position %s", self.get_position())
+        return self.obstacle_proximity
 
 
 class Ball:
@@ -798,7 +799,7 @@ class Graph:
         # if not start_node.obstacle_proximity:
         #     await start_node.calculate_obstacle_proximity()
         #
-        # obstacle_proximity = start_node.obstacle_proximity
+        # obstacle_proximity = await start_node.calculate_obstacle_proximity()
         # distance += obstacle_proximity * OBSTACLE_WEIGHT
 
         return distance * HEURISTIC_WEIGHT
