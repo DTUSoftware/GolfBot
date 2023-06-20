@@ -1,7 +1,7 @@
 import logging
 import math
 import os
-from typing import Tuple, Optional
+from typing import Tuple, Optional, List
 import asyncio
 import numpy as np
 
@@ -199,8 +199,8 @@ def calculate_angle_to_turn(radius: float, current_angle: float, angle_to_turn: 
     :param pos: your current position
     :return: the angle to turn; returns 0 if the turn is not possible
     """
-    angle_step = math.pi / 18  # Step size for angle increments
-
+    angle_step = math.pi / 64  # Step size for angle increments
+    point_array: List[Tuple[int, int]] = []  # Array of points on the circle
     # Calculate angle arrays based on the current angle and angle to turn
     if current_angle < angle_to_turn:
         angle_array1 = np.arange(current_angle, angle_to_turn, angle_step)
@@ -221,6 +221,10 @@ def calculate_angle_to_turn(radius: float, current_angle: float, angle_to_turn: 
     for angle in short_angle_array:
         for distance in distance_array:
             xn, yn = calculate_xn_and_yn(distance, angle, pos)
+            # removes duplicate points
+            if any([point for point in point_array if point[0] == xn and point[1] == yn]):
+                continue
+            point_array.append((xn, yn))
             if is_same_positions_as_obstacle((xn, yn)):
                 break_flag = True
                 break

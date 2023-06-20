@@ -35,7 +35,7 @@ DIRECTION_DIFFERENCE = 250  # in degrees
 TARGET_DIFFERENT_POSITION_DIFF_THRESHOLD = 20.0
 
 OBSTACLE_WEIGHT = 50  # just some ridiculously high number
-OBSTACLE_WEIGHT_DISTANCE = 50  # the weight of the nodes gets higher the closer they are to the obstacle
+OBSTACLE_WEIGHT_DISTANCE = 100  # the weight of the nodes gets higher the closer they are to the obstacle
 
 # Initialize colorama
 colorama_init()
