@@ -179,7 +179,7 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
                 logger.debug(
                     "Robot is NOT in the correct delivery height, continue pursuing target...")
                 goal_manyfucks = 0
-        elif not goal.is_in_delivery_distance_min():
+        elif goal.is_in_delivery_distance_max() and not goal.is_in_delivery_distance_min():
             # we went too far, turn back a bit
             logger.debug(
                 "We went too close to the goal, go back a little bit!")
