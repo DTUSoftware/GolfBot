@@ -150,7 +150,7 @@ def setup_track() -> pathalg.Track:
 
         # Draw past objects
         if objects:
-            for obj in objects:
+            for obj in [obj for obj in objects if "path" in obj and obj["path"]]:
                 opencv_helpers.draw_object(frame, obj["object_type"], obj["path"])
 
         # Draw on track if adding objects
@@ -190,7 +190,7 @@ def setup_track() -> pathalg.Track:
                     is_preset = True
                     break
         elif key == ord("s"):  # Save
-            objects.append({"object_type": track_setup_mode, "path": draw_path})
+            objects.append({"object_type": track_setup_mode, "path": (draw_path + [draw_path[0]]) if draw_path and (track_setup_mode == 'obstacle' or track_setup_mode == 'wall') else draw_path})
             track_setup_mode = None
             draw_path = []
             text = None
