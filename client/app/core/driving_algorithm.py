@@ -120,48 +120,55 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
         return
 
     goal = path_algorithm.TRACK_GLOBAL.small_goal
-    if not path_algorithm.TRACK_GLOBAL.balls and goal.is_in_delivery_distance():
-        logger.debug("Robot is in delivery distance and no balls")
+    if not path_algorithm.TRACK_GLOBAL.balls:
+        if goal.is_in_delivery_distance():
+            logger.debug("Robot is in delivery distance and no balls")
 
-        if goal.is_in_delivery_height():
-            logger.debug("Robot is in the correct delivery height.")
+            if goal.is_in_delivery_height():
+                logger.debug("Robot is in the correct delivery height.")
 
-            if not goal.is_in_delivery_direction():
-                logger.debug("Robot is not in delivery direction, moving robot to delivery direction")
-                # We get the relative heading and turn half of it so we don't overshoot the goal
-                angle = math_helpers.calculate_shortest_turn(robot_direction, goal.get_angle_to_middle())
-                await robot_api.turn_robot(session=session, direction=angle/2, relative=True)
+                if not goal.is_in_delivery_direction():
+                    logger.debug("Robot is not in delivery direction, moving robot to delivery direction")
+                    # We get the relative heading and turn half of it so we don't overshoot the goal
+                    angle = math_helpers.calculate_shortest_turn(robot_direction, goal.get_angle_to_middle())
+                    await robot_api.turn_robot(session=session, direction=angle/2, relative=True)
+                    await asyncio.sleep(1)
+                    goal_manyfucks = 0
+                    return
+
+                # Check all things
+                if not goal.is_in_delivery_position():
+                    logger.debug("Not in delivery position!? how did u even get here")
+                    goal_manyfucks = 0
+                    return
+
+                # Check all things more times
+                if goal_manyfucks < 5:
+                    goal_manyfucks += 1
+                    logger.info(f"Robot is still in delivery position, current count is {goal_manyfucks}.")
+                    return
+
+                logger.info("Robot has been in delivery position for long enough, stopping robot and fans.")
+                await robot_api.set_speeds(session=session, speed_left=0, speed_right=0)
+                await robot_api.toggle_fans(session=session)
+                logger.debug("Sleeping for 15 seconds to finish delivery")
+                await asyncio.sleep(15)
+                logger.debug("Done sleeping, driving backwards and starting fans again in case there are more balls")
+                # Start fans again after driving backwards for 1 second
+                await robot_api.set_speeds(session=session, speed_left=-ROBOT_BASE_SPEED, speed_right=-ROBOT_BASE_SPEED)
                 await asyncio.sleep(1)
+                await robot_api.set_speeds(session=session, speed_left=0, speed_right=0)
+                await robot_api.toggle_fans(session=session)
+                return
+            else:
+                logger.debug("Robot is NOT in the correct delivery height, continue pursuing target...")
                 goal_manyfucks = 0
-                return
-
-            # Check all things
-            if not goal.is_in_delivery_position():
-                logger.debug("Not in delivery position!? how did u even get here")
-                goal_manyfucks = 0
-                return
-
-            # Check all things more times
-            if goal_manyfucks < 5:
-                goal_manyfucks += 1
-                logger.info(f"Robot is still in delivery position, current count is {goal_manyfucks}.")
-                return
-
-            logger.info("Robot has been in delivery position for long enough, stopping robot and fans.")
-            await robot_api.set_speeds(session=session, speed_left=0, speed_right=0)
-            await robot_api.toggle_fans(session=session)
-            logger.debug("Sleeping for 15 seconds to finish delivery")
-            await asyncio.sleep(15)
-            logger.debug("Done sleeping, driving backwards and starting fans again in case there are more balls")
-            # Start fans again after driving backwards for 1 second
+        elif not goal.is_in_delivery_distance_min():
+            # we went too far, turn back a bit
+            logger.debug("We went too close to the goal, go back a little bit!")
             await robot_api.set_speeds(session=session, speed_left=-ROBOT_BASE_SPEED, speed_right=-ROBOT_BASE_SPEED)
-            await asyncio.sleep(1)
-            await robot_api.set_speeds(session=session, speed_left=0, speed_right=0)
-            await robot_api.toggle_fans(session=session)
+            await asyncio.sleep(0.25)
             return
-        else:
-            logger.debug("Robot is NOT in the correct delivery height, continue pursuing target...")
-            goal_manyfucks = 0
 
     # If the robot is about to drive into a wall or other obstacle, stop the robot
     if await math_helpers.is_about_to_collide_with_obstacle(track.get_front_position(), robot_direction):

@@ -23,6 +23,7 @@ TIMEOUT_GET_PATH = 5  # in seconds
 PATH_OBSTACLE_DISTANCE = 100  # in units, this is where the balls should max be from the borders for robot width
 DELIVERY_DISTANCE_FAR = 150  # in units
 DELIVERY_DISTANCE = 130  # in units, this is where the middle of the robot is when delivering (241 - 113)
+DELIVERY_DISTANCE_X_DIFF = 10  # in units
 DELIVERY_DISTANCE_Y = 20  # in units
 SAFETY_LENGTH = 150  # in units
 SAFETY_LENGTH_CORNER = 200  # in units
@@ -386,9 +387,10 @@ class Goal:
 
         return [point_1, point_2]
 
-    def is_in_delivery_distance(self) -> bool:
+    def is_in_delivery_distance_min(self) -> bool:
         """
-        Checks whether the robot is in the delivery distance.
+        Checks whether the robot far enough from the delivery distance.
+        We don't want the robot too close to the goal!
         :return: True if the robot is in the delivery distance, False otherwise
         """
         # Get the middle and the angle
@@ -398,7 +400,39 @@ class Goal:
         distance = math_helpers.calculate_distance(TRACK_GLOBAL.get_middle_position(), middle)
 
         # Check if robot is close enough to the middle
-        if distance > DELIVERY_DISTANCE:
+        if distance < DELIVERY_DISTANCE - (DELIVERY_DISTANCE_X_DIFF / 2):
+            return False
+
+        return True
+
+    def is_in_delivery_distance_max(self) -> bool:
+        """
+        Checks whether the robot is close enough to the delivery distance.
+        We don't want the robot too far from the goal!
+        :return: True if the robot is in the delivery distance, False otherwise
+        """
+        # Get the middle and the angle
+        middle, _ = self.get_middle_and_angle()
+
+        # Get the distance to the middle
+        distance = math_helpers.calculate_distance(TRACK_GLOBAL.get_middle_position(), middle)
+
+        # Check if robot is close enough to the middle
+        if distance > DELIVERY_DISTANCE + (DELIVERY_DISTANCE_X_DIFF / 2):
+            return False
+
+        return True
+
+    def is_in_delivery_distance(self) -> bool:
+        """
+        Checks whether the robot is in the delivery distance.
+        :return: True if the robot is in the delivery distance, False otherwise
+        """
+        # Check if robot is close enough to the middle
+        if not self.is_in_delivery_distance_min():
+            return False
+
+        if not self.is_in_delivery_distance_max():
             return False
 
         return True
