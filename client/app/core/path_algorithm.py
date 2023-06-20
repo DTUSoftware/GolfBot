@@ -20,9 +20,12 @@ from ..Utils import math_helpers, opencv_helpers
 DEBUG = "true" in os.environ.get('DEBUG', "True").lower()
 # The timeout for calculating a path
 TIMEOUT_GET_PATH = 5  # in seconds
-PATH_OBSTACLE_DISTANCE = 100  # in units, this is where the balls should max be from the borders for robot width
+# in units, this is where the balls should max be from the borders for robot width
+PATH_OBSTACLE_DISTANCE = 100
 DELIVERY_DISTANCE_FAR = 150  # in units
-DELIVERY_DISTANCE = 120  # in units, this is where the middle of the robot is when delivering (241 - 113)
+# in units, this is where the middle of the robot is when delivering (241 - 113)
+DELIVERY_DISTANCE = 120
+DELIVERY_DISTANCE_X_DIFF = 10  # in units
 DELIVERY_DISTANCE_Y = 20  # in units
 SAFETY_LENGTH = 150  # in units
 SAFETY_LENGTH_CORNER = 200  # in units
@@ -106,7 +109,8 @@ class Node:
             if self.x == node.x or self.y == node.y:
                 weight = max(abs(self.x - node.x), abs(self.y - node.y))
             else:
-                weight = math_helpers.calculate_distance(self.get_position(), node.get_position())
+                weight = math_helpers.calculate_distance(
+                    self.get_position(), node.get_position())
         self.neighbours.append({"node": node, "weight": weight})
 
     def remove_neighbour(self, node: 'Node') -> None:
@@ -192,7 +196,8 @@ class Ball:
                 # Get the distance and direction to the node
                 distance = math_helpers.calculate_distance(self_pos, node_pos)
                 if distance < PATH_OBSTACLE_DISTANCE:
-                    direction = math_helpers.calculate_direction(from_pos=node_pos, to_pos=self_pos)
+                    direction = math_helpers.calculate_direction(
+                        from_pos=node_pos, to_pos=self_pos)
 
                     # If same x, then it's a vertical line, so we want the closest node
                     if node_pos[0] == self_pos[0]:
@@ -205,7 +210,8 @@ class Ball:
                             x_node = (node_pos, distance, direction)
                             # obstacle_angle_array.append((direction, node_pos))
 
-                    logger.debug(f"Ball distance from obstacle node {node_pos} is {distance} with direction {math.degrees(direction)} deg")
+                    logger.debug(
+                        f"Ball distance from obstacle node {node_pos} is {distance} with direction {math.degrees(direction)} deg")
         if x_node[0] == (0, 0) and y_node[0] == (0, 0):
             logger.debug("Ball isn't close to an obstacle.")
             # We need to return two points to make a line, even if it's the same
@@ -257,7 +263,8 @@ class Ball:
         x1 = int(self_pos[0] + dx)
         y1 = int(self_pos[1] + dy)
         self.drivePath = [(x1, y1), self_pos]
-        logger.debug(f"Ball drive path: {self.drivePath} - angle is {math.degrees(angle)} deg")
+        logger.debug(
+            f"Ball drive path: {self.drivePath} - angle is {math.degrees(angle)} deg")
         return self.drivePath
 
 
@@ -289,7 +296,8 @@ class Obstacle:
         min_distance = math.inf
         closest_node = None
         for node in self.path:
-            distance = math_helpers.calculate_distance(position, node.get_position())
+            distance = math_helpers.calculate_distance(
+                position, node.get_position())
             if distance < min_distance:
                 min_distance = distance
                 closest_node = node
@@ -313,7 +321,7 @@ class Obstacle:
             #     return True
         return False
 
-    def is_same_position(self, pos : Tuple[int, int]) -> bool:
+    def is_same_position(self, pos: Tuple[int, int]) -> bool:
         """
         Checks whether the given position is the same as the obstacle's position.
 
@@ -353,12 +361,15 @@ class Goal:
             Tuple[Tuple[int, int], float]: The middle of the goal and the angle to it.
         """
         # Get middle of the goal
-        middle = math_helpers.get_middle_between_two_points(self.points[0], self.points[1])
+        middle = math_helpers.get_middle_between_two_points(
+            self.points[0], self.points[1])
 
         if self.points[0][1] < self.points[1][1]:
-            angle = math_helpers.calculate_direction(to_pos=self.points[1], from_pos=self.points[0])
+            angle = math_helpers.calculate_direction(
+                to_pos=self.points[1], from_pos=self.points[0])
         else:
-            angle = math_helpers.calculate_direction(to_pos=self.points[0], from_pos=self.points[1])
+            angle = math_helpers.calculate_direction(
+                to_pos=self.points[0], from_pos=self.points[1])
 
         # Get angle to middle of the goal
         if middle[0] < TRACK_GLOBAL.bounds["x"] / 2:
@@ -386,19 +397,54 @@ class Goal:
 
         return [point_1, point_2]
 
-    def is_in_delivery_distance(self) -> bool:
+    def is_in_delivery_distance_min(self) -> bool:
         """
-        Checks whether the robot is in the delivery distance.
+        Checks whether the robot far enough from the delivery distance.
+        We don't want the robot too close to the goal!
         :return: True if the robot is in the delivery distance, False otherwise
         """
         # Get the middle and the angle
         middle, _ = self.get_middle_and_angle()
 
         # Get the distance to the middle
-        distance = math_helpers.calculate_distance(TRACK_GLOBAL.get_middle_position(), middle)
+        distance = math_helpers.calculate_distance(
+            TRACK_GLOBAL.get_middle_position(), middle)
 
         # Check if robot is close enough to the middle
-        if distance > DELIVERY_DISTANCE:
+        if distance < DELIVERY_DISTANCE - (DELIVERY_DISTANCE_X_DIFF / 2):
+            return False
+
+        return True
+
+    def is_in_delivery_distance_max(self) -> bool:
+        """
+        Checks whether the robot is close enough to the delivery distance.
+        We don't want the robot too far from the goal!
+        :return: True if the robot is in the delivery distance, False otherwise
+        """
+        # Get the middle and the angle
+        middle, _ = self.get_middle_and_angle()
+
+        # Get the distance to the middle
+        distance = math_helpers.calculate_distance(
+            TRACK_GLOBAL.get_middle_position(), middle)
+
+        # Check if robot is close enough to the middle
+        if distance > DELIVERY_DISTANCE + (DELIVERY_DISTANCE_X_DIFF / 2):
+            return False
+
+        return True
+
+    def is_in_delivery_distance(self) -> bool:
+        """
+        Checks whether the robot is in the delivery distance.
+        :return: True if the robot is in the delivery distance, False otherwise
+        """
+        # Check if robot is close enough to the middle
+        if not self.is_in_delivery_distance_min():
+            return False
+
+        if not self.is_in_delivery_distance_max():
             return False
 
         return True
@@ -446,7 +492,8 @@ class Goal:
         if not robot_pos:
             robot_pos = TRACK_GLOBAL.get_front_position()
         if not robot_pos:
-            logger.debug("Robot pos is none??? (￣ε(#￣)☆╰╮o(￣皿￣///)")
+            logger.debug(
+                "Robot pos is none??? (￣ε(#￣)☆╰╮o(￣皿￣///)")
             return False
 
         if abs(middle[1] - robot_pos[1]) > DELIVERY_DISTANCE_Y:
@@ -530,7 +577,8 @@ class Graph:
         if size_x and size_y:
             range_x = range(size_x)
             range_y = range(size_y)
-            self.nodes: np.ndarray[Node] = np.empty((size_y, size_x), dtype=Node)
+            self.nodes: np.ndarray[Node] = np.empty(
+                (size_y, size_x), dtype=Node)
 
             # Create nodes
             for y in range_y:
@@ -597,7 +645,8 @@ class Graph:
         if 0 <= pos[0] < len(self.nodes[0]) and 0 <= pos[1] < len(self.nodes):
             return self.nodes[pos[1]][pos[0]]
         else:
-            logger.debug(f"Node with position {pos} not found, not within x and y bounds = ({len(self.nodes[0])}, {len(self.nodes)})")
+            logger.debug(
+                f"Node with position {pos} not found, not within x and y bounds = ({len(self.nodes[0])}, {len(self.nodes)})")
             return None
 
     def get_nodes_in_path(self, path: list) -> list:
@@ -630,7 +679,8 @@ class Graph:
                         x_max = max(x1, x2)
                         for x in range(int(x_min + 1), int(x_max)):
                             y = int(slope * float(x) + y_intercept)
-                            logger.debug(f"Adding {x}+-{node_plusminus}, {y}+-{node_plusminus}")
+                            logger.debug(
+                                f"Adding {x}+-{node_plusminus}, {y}+-{node_plusminus}")
                             for j in range(-node_plusminus, node_plusminus + 1):
                                 pos = (x + j, y + j)
                                 if pos not in path:
@@ -644,7 +694,8 @@ class Graph:
                         y_max = max(y1, y2)
                         for y in range(int(y_min + 1), int(y_max)):
                             x = int(slope * float(y) + x_intercept)
-                            logger.debug(f"Adding {x}+-{node_plusminus}, {y}+-{node_plusminus}")
+                            logger.debug(
+                                f"Adding {x}+-{node_plusminus}, {y}+-{node_plusminus}")
                             for j in range(-node_plusminus, node_plusminus + 1):
                                 pos = (x + j, y + j)
                                 if pos not in path:
@@ -700,10 +751,12 @@ class Graph:
         :param dst_node: The destination node.
         :return: A list of nodes in the path.
         """
-        logger.debug(f"Getting path between {start_node.x}, {start_node.y} and {dst_node.x}, {dst_node.y}")
+        logger.debug(
+            f"Getting path between {start_node.x}, {start_node.y} and {dst_node.x}, {dst_node.y}")
 
         # Initialize the start node data
-        start_node_data = NodeData(start_node, 0, self.h(start_node, dst_node), None)
+        start_node_data = NodeData(
+            start_node, 0, self.h(start_node, dst_node), None)
 
         # Create open and closed sets
         open_set: Set[Node] = {start_node}
@@ -716,7 +769,8 @@ class Graph:
         f_scores: Dict[Node, float] = {start_node: start_node_data.f}
 
         # A priority queue to efficiently extract the node with the lowest f-score
-        open_queue: List[Tuple[float, Node]] = [(f_scores[start_node], start_node)]
+        open_queue: List[Tuple[float, Node]] = [
+            (f_scores[start_node], start_node)]
 
         # A counter to track the number of iterations
         iteration = 0
@@ -736,7 +790,8 @@ class Graph:
                 node=current_node,
                 g=g_scores[current_node],
                 h=self.h(current_node, dst_node),
-                parent=closed_set.get(current_node, None).parent if closed_set.get(current_node, None) else None
+                parent=closed_set.get(current_node, None).parent if closed_set.get(
+                    current_node, None) else None
             )
 
             if current_node is dst_node:
@@ -768,7 +823,8 @@ class Graph:
                     closed_set[neighbour_node] = neighbour_data
                     g_scores[neighbour_node] = neighbour_g_score
                     f_scores[neighbour_node] = neighbour_data.f
-                    heapq.heappush(open_queue, (f_scores[neighbour_node], neighbour_node))
+                    heapq.heappush(
+                        open_queue, (f_scores[neighbour_node], neighbour_node))
                 elif neighbour_g_score < g_scores[neighbour_node]:
                     # Update the neighbour's scores and parent if a better path is found
                     neighbour_data = closed_set[neighbour_node]
@@ -978,7 +1034,8 @@ class Track:
         :param robot_direction: The direction of the robot
         :return: None
         """
-        logger.debug(f"Old direction: {math.degrees(self.robot_direction)} deg, new direction: {math.degrees(robot_direction)} deg")
+        logger.debug(
+            f"Old direction: {math.degrees(self.robot_direction)} deg, new direction: {math.degrees(robot_direction)} deg")
 
         self.robot_direction = robot_direction % (2 * math.pi)
 
@@ -1019,12 +1076,14 @@ class Track:
                 logger.debug("No robot node, returning empty")
                 self.path = []
                 return
-            object_nodes = [self.graph.get_node(obj[0]) for obj in objects_to_navigate_to if obj]
+            object_nodes = [self.graph.get_node(
+                obj[0]) for obj in objects_to_navigate_to if obj]
             tasks = [asyncio.create_task(self.graph.get_path(start_node=robot_node, dst_node=ball_node)) for ball_node in object_nodes if
                      ball_node]
             if tasks:
                 done, pending = await asyncio.wait(tasks, timeout=TIMEOUT_GET_PATH, return_when=asyncio.ALL_COMPLETED)
-                logger.debug(f"Done calculating paths: {len(done)} done, {len(pending)} timed out")
+                logger.debug(
+                    f"Done calculating paths: {len(done)} done, {len(pending)} timed out")
                 [task.cancel() for task in pending]
                 for task in done:
                     path_list: List[NodeData] = []
@@ -1079,7 +1138,8 @@ class Track:
             for node in obstacle.path:
                 for x in range(-1, 1 + 1):
                     for y in range(-1, 1 + 1):
-                        neighbour = self.graph.get_node((node.x + x, node.y + y))
+                        neighbour = self.graph.get_node(
+                            (node.x + x, node.y + y))
                         self.graph.add_edge(node, neighbour)
         self.obstacles = []
 
@@ -1136,8 +1196,10 @@ class Track:
 
         plt.figure()
         plt.scatter(points_in_path[0], points_in_path[1])
-        plt.xticks(np.arange(min(points_in_path[0]), max(points_in_path[0]) + 1, 1))
-        plt.yticks(np.arange(min(points_in_path[1]), max(points_in_path[1]) + 1, 1))
+        plt.xticks(
+            np.arange(min(points_in_path[0]), max(points_in_path[0]) + 1, 1))
+        plt.yticks(
+            np.arange(min(points_in_path[1]), max(points_in_path[1]) + 1, 1))
         plt.gca().invert_yaxis()
         plt.grid()
         # Add labels and title
@@ -1206,7 +1268,8 @@ async def simplify_path(path: List[NodeData]) -> List[NodeData]:
 
             # If same direction
             direction_diff = math_helpers.calculate_direction_difference(
-                current_from_node.node.get_position(), previous_node.node.get_position(), next_node.node.get_position()
+                current_from_node.node.get_position(
+                ), previous_node.node.get_position(), next_node.node.get_position()
             )
 
             # Check if the direction difference is within the tolerance
@@ -1311,7 +1374,7 @@ async def check_new_path(path_queue: multiprocessing.JoinableQueue, session: aio
         #     print("Checking if robot has reached target")
         has_stopped = False
         while track.last_target_path and len(track.last_target_path) > 1 and not is_target_different(track, track.last_target_path[0].node,
-                                                                 track.graph.get_node(robot_position)):
+                                                                                                     track.graph.get_node(robot_position)):
             logger.debug("Robot reached target, popping")
             track.last_target_path.pop(0)
             track.last_target_node = track.graph.get_node(robot_position)
@@ -1324,8 +1387,8 @@ async def check_new_path(path_queue: multiprocessing.JoinableQueue, session: aio
             await asyncio.sleep(0)
         # If we passed the target, pop
         while track.last_target_path and len(track.last_target_path) > 1 and math_helpers.has_passed_target(track.last_target_path[0].node.get_position(),
-                                                                        robot_position,
-                                                                        track.last_target_node.get_position()):
+                                                                                                            robot_position,
+                                                                                                            track.last_target_node.get_position()):
             logger.debug("Robot passed target, popping")
             track.last_target_path.pop(0)
             track.last_target_node = track.graph.get_node(robot_position)
@@ -1370,15 +1433,16 @@ async def check_new_path(path_queue: multiprocessing.JoinableQueue, session: aio
 
     # Adjust and go to
     if track.last_target_path:
-        full_path = [opencv_helpers.graph_position_to_opencv_position(nodedata.node.get_position()) for nodedata in track.last_target_path]
+        full_path = [opencv_helpers.graph_position_to_opencv_position(
+            nodedata.node.get_position()) for nodedata in track.last_target_path]
 
         if not path_queue.full():
             try:
                 path_queue.put({"path": full_path if full_path else [], "obstacles": [[
-                                                                                          opencv_helpers.graph_position_to_opencv_position(point) for point in obstacle.points] for obstacle in
-                                                                                      track.obstacles] if track.obstacles else [],
-                                "small_goal": [opencv_helpers.graph_position_to_opencv_position(point) for point in track.small_goal.points] if track.small_goal else [],
-                                "big_goal": [opencv_helpers.graph_position_to_opencv_position(point) for point in track.big_goal.points] if track.big_goal else []})
+                    opencv_helpers.graph_position_to_opencv_position(point) for point in obstacle.points] for obstacle in
+                    track.obstacles] if track.obstacles else [],
+                    "small_goal": [opencv_helpers.graph_position_to_opencv_position(point) for point in track.small_goal.points] if track.small_goal else [],
+                    "big_goal": [opencv_helpers.graph_position_to_opencv_position(point) for point in track.big_goal.points] if track.big_goal else []})
             except:
                 pass
 
@@ -1408,12 +1472,14 @@ def is_target_different(track: Track, target_node: Node, other_node: Node) -> bo
     #     print(f"Checking if target is different between {target_node.get_position()} and {other_node.get_position()}")
 
     # Calculate the position difference
-    position_diff = math_helpers.calculate_distance(target_node.get_position(), other_node.get_position())
+    position_diff = math_helpers.calculate_distance(
+        target_node.get_position(), other_node.get_position())
     # Calculate the direction difference
     # direction_diff = abs(target_node.get_heading(track.get_middle_position()) - other_node.get_heading(track.get_middle_position()))
 
     # Check if target is significantly different from the last target
-    if position_diff > TARGET_DIFFERENT_POSITION_DIFF_THRESHOLD:  #or direction_diff > math.pi / 4:
+    # or direction_diff > math.pi / 4:
+    if position_diff > TARGET_DIFFERENT_POSITION_DIFF_THRESHOLD:
         # if DEBUG:
         #     print(
         #         f"Different target: posdiff = {position_diff} > {position_threshold} | headdiff = {direction_diff} > {math.pi / 4}")
@@ -1434,7 +1500,8 @@ def setup_debug() -> None:
     track.add_ball(Ball((8, 0)))
 
     obstacle_path = [(6, 10), (7, 11), (8, 10), (9, 9), (10, 10), (11, 11), (12, 10), (11, 9), (10, 8), (11, 7),
-                     (12, 6), (11, 5), (10, 6), (9, 7), (8, 6), (7, 5), (6, 6), (7, 7), (8, 8), (8, 9), (7, 6), (8, 7),
+                     (12, 6), (11, 5), (10, 6), (9, 7), (8, 6), (7,
+                                                                 5), (6, 6), (7, 7), (8, 8), (8, 9), (7, 6), (8, 7),
                      (9, 8), (8, 9), (7, 10), (11, 10), (10, 9), (10, 7), (11, 6)]
     obstacle = Obstacle(track.graph.get_nodes_in_path(obstacle_path))
     track.add_obstacle(obstacle)

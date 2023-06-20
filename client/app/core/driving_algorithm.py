@@ -12,7 +12,8 @@ from ..Services import robot_api
 # If logging should be disabled
 DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "False").lower()
 # If debugging should be enabled
-DEBUG = ("true" in os.environ.get('DEBUG', "True").lower()) and not DISABLE_LOGGING
+DEBUG = ("true" in os.environ.get(
+    'DEBUG', "True").lower()) and not DISABLE_LOGGING
 
 # PID constants
 KP = float(os.environ.get('PID_KP', 5))  # Proportional gain  3.04
@@ -20,12 +21,16 @@ KI = float(os.environ.get('PID_KI', 0.1))  # Integral gain - 0.1
 KD = float(os.environ.get('PID_KD', 0.05))  # Derivative gain - 0.05
 
 # Distance and direction tolerance
-DISTANCE_TOLERANCE = float(os.environ.get('DISTANCE_TOLERANCE', 1.0))  # in units
-DIRECTION_TOLERANCE = float(os.environ.get('DIRECTION_TOLERANCE', 25.0))  # degrees
-DIRECTION_TOLERANCE_NEW = float(os.environ.get('DIRECTION_TOLERANCE_NEW', 5.0))  # degrees
+DISTANCE_TOLERANCE = float(os.environ.get(
+    'DISTANCE_TOLERANCE', 1.0))  # in units
+DIRECTION_TOLERANCE = float(os.environ.get(
+    'DIRECTION_TOLERANCE', 25.0))  # degrees
+DIRECTION_TOLERANCE_NEW = float(os.environ.get(
+    'DIRECTION_TOLERANCE_NEW', 5.0))  # degrees
 
 # Robot parameters
-WHEEL_RADIUS = (float(os.environ.get('WHEEL_DIAMETER', 68.8)) / 2) / 10  # Radius of the robot's wheels in cm
+WHEEL_RADIUS = (float(os.environ.get('WHEEL_DIAMETER', 68.8)) /
+                2) / 10  # Radius of the robot's wheels in cm
 DIST_BETWEEN_WHEELS = float(
     os.environ.get('DIST_BETWEEN_WHEELS', 83.0 * 2)) / 10  # Distance between the robot's wheels in cm
 ROBOT_BASE_SPEED = float(os.environ.get('ROBOT_BASE_SPEED', 45.0))
@@ -54,9 +59,11 @@ def do_smooth_turn(current_direction: float, new_direction: float, reverse=False
         the new speed, first right then left
     """
     if reverse:
-        robot_speed_right, robot_speed_left = (-ROBOT_BASE_SPEED, -ROBOT_BASE_SPEED)
+        robot_speed_right, robot_speed_left = (
+            -ROBOT_BASE_SPEED, -ROBOT_BASE_SPEED)
     else:
-        robot_speed_right, robot_speed_left = (ROBOT_BASE_SPEED, ROBOT_BASE_SPEED)
+        robot_speed_right, robot_speed_left = (
+            ROBOT_BASE_SPEED, ROBOT_BASE_SPEED)
 
     current_direction = current_direction % (2 * math.pi)
     new_direction = new_direction % (2 * math.pi)
@@ -78,17 +85,19 @@ def do_smooth_turn(current_direction: float, new_direction: float, reverse=False
 
     # We make the direction diff (which can be at max math.pi * 2) into a value between 0 and 1
     # and multiply it by a multiplier to get a speed correction value between 0 and speed_correction_multiplier
-    speed_correction = (diff_in_angle / (math.pi * 2)) * SMOOTH_SPEED_CORRECTION_MULTIPLIER
+    speed_correction = (diff_in_angle / (math.pi * 2)) * \
+        SMOOTH_SPEED_CORRECTION_MULTIPLIER
     if not reverse:
         speed_correction = -speed_correction
 
-
     if turn_right:
         robot_speed_right = robot_speed_right + speed_correction
-        logger.debug(f"DOING SMOOTH TURN WITH CORRECTION TO SPEED BEING {speed_correction} TO RIGHT WHEEL")
+        logger.debug(
+            f"DOING SMOOTH TURN WITH CORRECTION TO SPEED BEING {speed_correction} TO RIGHT WHEEL")
     else:
         robot_speed_left = robot_speed_left + speed_correction
-        logger.debug(f"DOING SMOOTH TURN WITH CORRECTION TO SPEED BEING {speed_correction} TO LEFT WHEEL")
+        logger.debug(
+            f"DOING SMOOTH TURN WITH CORRECTION TO SPEED BEING {speed_correction} TO LEFT WHEEL")
 
     return robot_speed_right, robot_speed_left
 
@@ -120,52 +129,68 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
         return
 
     goal = path_algorithm.TRACK_GLOBAL.small_goal
-    if not path_algorithm.TRACK_GLOBAL.balls and goal.is_in_delivery_distance():
-        logger.debug("Robot is in delivery distance and no balls")
+    if not path_algorithm.TRACK_GLOBAL.balls:
+        if goal.is_in_delivery_distance():
+            logger.debug("Robot is in delivery distance and no balls")
 
-        if goal.is_in_delivery_height():
-            logger.debug("Robot is in the correct delivery height.")
+            if goal.is_in_delivery_height():
+                logger.debug("Robot is in the correct delivery height.")
 
-            if not goal.is_in_delivery_direction():
-                logger.debug("Robot is not in delivery direction, moving robot to delivery direction")
-                # We get the relative heading and turn half of it so we don't overshoot the goal
-                angle = math_helpers.calculate_shortest_turn(robot_direction, goal.get_angle_to_middle())
-                await robot_api.turn_robot(session=session, direction=angle/2, relative=True)
-                # await asyncio.sleep(1)
+                if not goal.is_in_delivery_direction():
+                    logger.debug(
+                        "Robot is not in delivery direction, moving robot to delivery direction")
+                    # We get the relative heading and turn half of it so we don't overshoot the goal
+                    angle = math_helpers.calculate_shortest_turn(
+                        robot_direction, goal.get_angle_to_middle())
+                    await robot_api.turn_robot(session=session, direction=angle/2, relative=True)
+                    # await asyncio.sleep(1)
+                    goal_manyfucks = 0
+                    return
+
+                # Check all things
+                if not goal.is_in_delivery_position():
+                    logger.debug(
+                        "Not in delivery position!? how did u even get here")
+                    goal_manyfucks = 0
+                    return
+
+                # Check all things more times
+                if goal_manyfucks < 5:
+                    goal_manyfucks += 1
+                    logger.info(
+                        f"Robot is still in delivery position, current count is {goal_manyfucks}.")
+                    return
+
+                logger.info(
+                    "Robot has been in delivery position for long enough, stopping robot and fans.")
+                await robot_api.set_speeds(session=session, speed_left=0, speed_right=0)
+                await robot_api.toggle_fans(session=session)
+                logger.debug("Sleeping for 15 seconds to finish delivery")
+                await asyncio.sleep(15)
+                logger.debug(
+                    "Done sleeping, driving backwards and starting fans again in case there are more balls")
+                # Start fans again after driving backwards for 1 second
+                await robot_api.set_speeds(session=session, speed_left=-ROBOT_BASE_SPEED, speed_right=-ROBOT_BASE_SPEED)
+                await asyncio.sleep(1)
+                await robot_api.set_speeds(session=session, speed_left=0, speed_right=0)
+                await robot_api.toggle_fans(session=session)
+                return
+            else:
+                logger.debug(
+                    "Robot is NOT in the correct delivery height, continue pursuing target...")
                 goal_manyfucks = 0
-                return
-
-            # Check all things
-            if not goal.is_in_delivery_position():
-                logger.debug("Not in delivery position!? how did u even get here")
-                goal_manyfucks = 0
-                return
-
-            # Check all things more times
-            if goal_manyfucks < 5:
-                goal_manyfucks += 1
-                logger.info(f"Robot is still in delivery position, current count is {goal_manyfucks}.")
-                return
-
-            logger.info("Robot has been in delivery position for long enough, stopping robot and fans.")
-            await robot_api.set_speeds(session=session, speed_left=0, speed_right=0)
-            await robot_api.toggle_fans(session=session)
-            logger.debug("Sleeping for 15 seconds to finish delivery")
-            await asyncio.sleep(15)
-            logger.debug("Done sleeping, driving backwards and starting fans again in case there are more balls")
-            # Start fans again after driving backwards for 1 second
+        elif not goal.is_in_delivery_distance_min():
+            # we went too far, turn back a bit
+            logger.debug(
+                "We went too close to the goal, go back a little bit!")
             await robot_api.set_speeds(session=session, speed_left=-ROBOT_BASE_SPEED, speed_right=-ROBOT_BASE_SPEED)
-            await asyncio.sleep(1)
-            await robot_api.set_speeds(session=session, speed_left=0, speed_right=0)
-            await robot_api.toggle_fans(session=session)
+            await asyncio.sleep(0.25)
             return
-        else:
-            logger.debug("Robot is NOT in the correct delivery height, continue pursuing target...")
-            goal_manyfucks = 0
 
     # If the robot is about to drive into a wall or other obstacle, stop the robot
     if await math_helpers.is_about_to_collide_with_obstacle(track.get_front_position(), robot_direction):
-        logger.debug("Robot is about to collide with an obstacle in front, driving robot backwards")
+        logger.debug(
+            "Robot is about to collide with an obstacle in front, driving robot backwards")
         await robot_api.set_speeds(session=session, speed_left=-ROBOT_BASE_SPEED, speed_right=-ROBOT_BASE_SPEED)
 
         # Reset obstacle fuckery to not count hundreds
@@ -183,7 +208,8 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
 
     # If the robot is about to drive into a wall or other obstacle, stop the robot
     if await math_helpers.is_about_to_collide_with_obstacle(track.get_front_position(), (robot_direction + math.pi) % (2 * math.pi)):
-        logger.debug("Robot is about to collide with an obstacle behind, driving robot forward")
+        logger.debug(
+            "Robot is about to collide with an obstacle behind, driving robot forward")
         await robot_api.set_speeds(session=session, speed_left=ROBOT_BASE_SPEED, speed_right=ROBOT_BASE_SPEED)
 
         # Reset obstacle fuckery to not count hundreds
@@ -209,14 +235,17 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
     # Get the distance between the two targets
     # We use the turn position (rear) of the robot as the starting point,
     # as that is our turning point, so we turn at that point
-    distance = math_helpers.calculate_distance(position1=track.get_middle_position(), position2=target_position)
+    distance = math_helpers.calculate_distance(
+        position1=track.get_middle_position(), position2=target_position)
 
-    logger.debug(f"The distance between the robot and the target is {distance} units")
+    logger.debug(
+        f"The distance between the robot and the target is {distance} units")
 
     # If the distance is above distance tolerance
     if distance >= DISTANCE_TOLERANCE:
         # Get difference in direction, if any
-        new_direction = math_helpers.calculate_direction(to_pos=target_position, from_pos=track.get_middle_position())
+        new_direction = math_helpers.calculate_direction(
+            to_pos=target_position, from_pos=track.get_middle_position())
 
         direction_diff = abs(robot_direction - new_direction)
         # logger.debug(f"The angle from robot to target is {math.degrees(new_direction)} deg ({new_direction} rad). "
@@ -232,7 +261,8 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
         # If the direction difference is above the tolerance, turn the robot
         if direction_diff >= math.radians(direction_tolerance):
             direction = math_helpers.calculate_angle_to_turn(
-                radius=(math_helpers.calculate_distance(track.get_middle_position(), track.get_front_position())) + ROBOT_LENGTH_BUFFER,
+                radius=(math_helpers.calculate_distance(
+                    track.get_middle_position(), track.get_front_position())) + ROBOT_LENGTH_BUFFER,
                 current_angle=robot_direction,
                 angle_to_turn=new_direction,
                 pos=track.get_middle_position()
@@ -248,19 +278,23 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
                 return
             else:
                 logger.debug("Direction is None")
-                robot_speed_right, robot_speed_left = (-ROBOT_BASE_SPEED, -ROBOT_BASE_SPEED)
+                robot_speed_right, robot_speed_left = (
+                    -ROBOT_BASE_SPEED, -ROBOT_BASE_SPEED)
                 # robot_speed_right, robot_speed_left = do_smooth_turn(robot_direction, new_direction, reverse=True)
         else:
-            logger.debug("Robot is in the correct heading (within tolerance), will not stop-turn, but will smooth-turn.")
+            logger.debug(
+                "Robot is in the correct heading (within tolerance), will not stop-turn, but will smooth-turn.")
             # Adjust the robot speed depending on the direction difference, adding a small offset to the speed
             # to make sure the robot is always moving towards the correct angle
-            robot_speed_right, robot_speed_left = do_smooth_turn(robot_direction, new_direction)
+            robot_speed_right, robot_speed_left = do_smooth_turn(
+                robot_direction, new_direction)
 
         logger.debug("Driving robot forward.")
         # Drive forward with base speed
         await robot_api.set_speeds(session=session, speed_left=robot_speed_left, speed_right=robot_speed_right)
     else:
-        logger.debug("Robot has reached the target (within tolerance), stopping robot.")
+        logger.debug(
+            "Robot has reached the target (within tolerance), stopping robot.")
         # Stop robot
         await robot_api.set_speeds(session=session, speed_left=0, speed_right=0)
 
