@@ -35,7 +35,9 @@ DIRECTION_DIFFERENCE = 250  # in degrees
 TARGET_DIFFERENT_POSITION_DIFF_THRESHOLD = 20.0
 
 OBSTACLE_WEIGHT = 50  # just some ridiculously high number
-OBSTACLE_WEIGHT_DISTANCE = 50  # the weight of the nodes gets higher the closer they are to the obstacle
+# OBSTACLE_WEIGHT_DISTANCE = 50  # the weight of the nodes gets higher the closer they are to the obstacle
+
+HEURISTIC_WEIGHT = 10  # Adjust the weight factor as needed
 
 # Initialize colorama
 colorama_init()
@@ -659,53 +661,59 @@ class Graph:
         :param path: The path to get the nodes from.
         :return: A list of nodes in the path.
         """
-        node_plusminus = 1
         nodes_in_path = []
+
+        # Helper function to check if a position is within the path
+        def is_position_in_path(pos):
+            return pos in path
+
         for i in range(len(path)):
             pos = path[i]
             node = self.get_node(pos)
-            if node:
-                logger.debug(f"Adding {pos[0]}, {pos[1]}")
-                nodes_in_path.append(node)
-                if i >= 1:
-                    # Get all nodes between the current node and the previous node
-                    # Time for good-ol high school algebra for equation for line between two points, yaaay
-                    y1 = float(path[i - 1][1])
-                    y2 = float(pos[1])
-                    x1 = float(path[i - 1][0])
-                    x2 = float(pos[0])
 
-                    # Are they even apart by more than 1?
-                    if abs(x1 - x2) > 1:
-                        slope = (y1 - y2) / (x1 - x2)
-                        y_intercept = (x1 * y2 - x2 * y1) / (x1 - x2)
-                        x_min = min(x1, x2)
-                        x_max = max(x1, x2)
-                        for x in range(int(x_min + 1), int(x_max)):
-                            y = int(slope * float(x) + y_intercept)
-                            logger.debug(
-                                f"Adding {x}+-{node_plusminus}, {y}+-{node_plusminus}")
-                            for j in range(-node_plusminus, node_plusminus + 1):
-                                pos = (x + j, y + j)
-                                if pos not in path:
-                                    node = self.get_node(pos)
-                                    if node:
-                                        nodes_in_path.append(node)
-                    if abs(y1 - y2) > 1:
-                        slope = (x1 - x2) / (y1 - y2)
-                        x_intercept = (y1 * x2 - y2 * x1) / (y1 - y2)
-                        y_min = min(y1, y2)
-                        y_max = max(y1, y2)
-                        for y in range(int(y_min + 1), int(y_max)):
-                            x = int(slope * float(y) + x_intercept)
-                            logger.debug(
-                                f"Adding {x}+-{node_plusminus}, {y}+-{node_plusminus}")
-                            for j in range(-node_plusminus, node_plusminus + 1):
-                                pos = (x + j, y + j)
-                                if pos not in path:
-                                    node = self.get_node(pos)
-                                    if node:
-                                        nodes_in_path.append(node)
+            if node:
+                nodes_in_path.append(node)
+
+                if i >= 1:
+                    prev_pos = path[i - 1]
+                    x1, y1 = prev_pos
+                    x2, y2 = pos
+
+                    # Calculate the absolute differences in x and y
+                    dx = abs(x2 - x1)
+                    dy = abs(y2 - y1)
+
+                    # Check if the x-coordinate or y-coordinate changed
+                    if dx > 0 or dy > 0:
+                        # Calculate the direction of change for x and y
+                        sign_x = 1 if x2 > x1 else -1
+                        sign_y = 1 if y2 > y1 else -1
+
+                        # Determine the range of x and y coordinates between the two points
+                        range_x = range(x1 + sign_x, x2, sign_x)
+                        range_y = range(y1 + sign_y, y2, sign_y)
+
+                        # Iterate over the x-coordinate range and find corresponding y-coordinates
+                        for x in range_x:
+                            y = round(y1 + (y2 - y1) * (x - x1) / dx)
+                            pos = (x, y)
+
+                            # Add the nodes at the positions that are not in the path
+                            if not is_position_in_path(pos):
+                                node = self.get_node(pos)
+                                if node:
+                                    nodes_in_path.append(node)
+
+                        # Iterate over the y-coordinate range and find corresponding x-coordinates
+                        for y in range_y:
+                            x = round(x1 + (x2 - x1) * (y - y1) / dy)
+                            pos = (x, y)
+
+                            # Add the nodes at the positions that are not in the path
+                            if not is_position_in_path(pos):
+                                node = self.get_node(pos)
+                                if node:
+                                    nodes_in_path.append(node)
 
         return list(set(nodes_in_path))
 
@@ -735,17 +743,30 @@ class Graph:
             if node_1 in node_2.get_neighbour_nodes():
                 node_2.remove_neighbour(node_1)
 
-    # Manhattan Distance heuristic for A*
-    def h(self, start_node: Node, dst_node: Node) -> float:
+    # Modified Euclidian Distance heuristic for A*
+    async def h(self, start_node: Node, dst_node: Node) -> float:
         """
-        The heuristic function for A*. This is the Manhattan Distance.
+        The heuristic function for A*. This is the Euclidian Distance.
         :param start_node: The start node.
         :param dst_node: The destination node.
         :return: The heuristic value.
         """
         dx = abs(start_node.x - dst_node.x)
         dy = abs(start_node.y - dst_node.y)
-        return dx + dy
+        distance = math.sqrt(dx*dx + dy*dy)
+
+        # Add obstacle proximity
+        obstacle_distance_min = math.inf
+        for obstacle in TRACK_GLOBAL.obstacles: # [obstacle for obstacle in TRACK_GLOBAL.obstacles if not obstacle.is_wall]:
+            obstacle_distance = await obstacle.get_distance((start_node.x, start_node.y))
+            if obstacle_distance[0] < obstacle_distance_min:
+                obstacle_distance_min = obstacle_distance[0]
+
+        if obstacle_distance_min < math.inf:
+            obstacle_proximity = 1 - obstacle_distance_min / max(TRACK_GLOBAL.bounds["x"], TRACK_GLOBAL.bounds["y"])
+            distance += obstacle_proximity * OBSTACLE_WEIGHT
+
+        return distance * HEURISTIC_WEIGHT
 
     # Get path and cost using A*
     async def get_path(self, start_node: Node, dst_node: Node) -> List[NodeData]:
@@ -760,7 +781,7 @@ class Graph:
 
         # Initialize the start node data
         start_node_data = NodeData(
-            start_node, 0, self.h(start_node, dst_node), None)
+            start_node, 0, await self.h(start_node, dst_node), None)
 
         # Create open and closed sets
         open_set: Set[Node] = {start_node}
@@ -793,7 +814,7 @@ class Graph:
             closed_set[current_node] = NodeData(
                 node=current_node,
                 g=g_scores[current_node],
-                h=self.h(current_node, dst_node),
+                h=await self.h(current_node, dst_node),
                 parent=closed_set.get(current_node, None).parent if closed_set.get(
                     current_node, None) else None
             )
@@ -820,7 +841,7 @@ class Graph:
                     neighbour_data = NodeData(
                         node=neighbour_node,
                         g=neighbour_g_score,
-                        h=self.h(neighbour_node, dst_node),
+                        h=await self.h(neighbour_node, dst_node),
                         parent=current_node
                     )
                     open_set.add(neighbour_node)
@@ -1161,21 +1182,21 @@ class Track:
             # print(f"Removing node edges for node at {node.x}, {node.y}")
 
             # If it's an obstacle which is not a wall, we want to raise the weight of the nodes around it
-            if not obstacle.is_wall:
-                # First we raise the weight of any neighbours and their neighbors, up to a given distance
-                for x in range(-OBSTACLE_WEIGHT_DISTANCE, OBSTACLE_WEIGHT_DISTANCE):
-                    for y in range(-OBSTACLE_WEIGHT_DISTANCE, OBSTACLE_WEIGHT_DISTANCE):
-                        neighbour = self.graph.get_node((node.x + x, node.y + y))
-                        new_weight = OBSTACLE_WEIGHT / ((abs(x) + abs(y)) / (OBSTACLE_WEIGHT_DISTANCE*2))
-                        if neighbour:
-                            for neighbour_neighbour in neighbour.neighbours:
-                                # If old weight was lower than current, change it
-                                if neighbour_neighbour["weight"] < new_weight:
-                                    # If a low weight such as 3, add the weight (so we still get cross edges at different weights)
-                                    if neighbour_neighbour["weight"] < 3:
-                                        neighbour_neighbour["weight"] += new_weight
-                                    else:
-                                        neighbour_neighbour["weight"] = new_weight
+            # if not obstacle.is_wall:
+            #     # First we raise the weight of any neighbours and their neighbors, up to a given distance
+            #     for x in range(-OBSTACLE_WEIGHT_DISTANCE, OBSTACLE_WEIGHT_DISTANCE):
+            #         for y in range(-OBSTACLE_WEIGHT_DISTANCE, OBSTACLE_WEIGHT_DISTANCE):
+            #             neighbour = self.graph.get_node((node.x + x, node.y + y))
+            #             new_weight = OBSTACLE_WEIGHT / ((abs(x) + abs(y)) / (OBSTACLE_WEIGHT_DISTANCE*2))
+            #             if neighbour:
+            #                 for neighbour_neighbour in neighbour.neighbours:
+            #                     # If old weight was lower than current, change it
+            #                     if neighbour_neighbour["weight"] < new_weight:
+            #                         # If a low weight such as 3, add the weight (so we still get cross edges at different weights)
+            #                         if neighbour_neighbour["weight"] < 3:
+            #                             neighbour_neighbour["weight"] += new_weight
+            #                         else:
+            #                             neighbour_neighbour["weight"] = new_weight
 
             # And just as a safety precaution we remove the edges around the thing itself
             for neighbour in node.neighbours:
