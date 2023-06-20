@@ -704,6 +704,12 @@ class Graph:
                                 if node:
                                     nodes_in_path.append(node)
 
+                        # Add the last point (x2, y2) if it is not already in the path
+                        if not is_position_in_path(pos):
+                            node = self.get_node((x2, y2))
+                            if node:
+                                nodes_in_path.append(node)
+
                         # Iterate over the y-coordinate range and find corresponding x-coordinates
                         for y in range_y:
                             x = round(x1 + (x2 - x1) * (y - y1) / dy)
@@ -714,6 +720,12 @@ class Graph:
                                 node = self.get_node(pos)
                                 if node:
                                     nodes_in_path.append(node)
+
+                        # Add the last point (x2, y2) if it is not already in the path
+                        if not is_position_in_path(pos):
+                            node = self.get_node((x2, y2))
+                            if node:
+                                nodes_in_path.append(node)
 
         return list(set(nodes_in_path))
 
