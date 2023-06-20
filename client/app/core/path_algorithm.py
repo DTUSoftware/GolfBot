@@ -677,7 +677,7 @@ class Graph:
 
         # Helper function to check if a position is within the path
         def is_position_in_path(pos):
-            return pos in path
+            return pos in nodes_in_path
 
         for i in range(len(path)):
             pos = path[i]
@@ -707,14 +707,15 @@ class Graph:
 
                         # Iterate over the x-coordinate range and find corresponding y-coordinates
                         for x in range_x:
-                            y = round(y1 + (y2 - y1) * (x - x1) / dx)
-                            pos = (x, y)
+                            y_float = y1 + (y2 - y1) * (x - x1) / dx
+                            for y in range(round(y_float) - 1, round(y_float) + 2):
+                                pos = (x, y)
 
-                            # Add the nodes at the positions that are not in the path
-                            if not is_position_in_path(pos):
-                                node = self.get_node(pos)
-                                if node:
-                                    nodes_in_path.append(node)
+                                # Add the nodes at the positions that are not in the path
+                                if not is_position_in_path(pos):
+                                    node = self.get_node(pos)
+                                    if node:
+                                        nodes_in_path.append(node)
 
                         # Add the last point (x2, y2) if it is not already in the path
                         if not is_position_in_path(pos):
@@ -724,14 +725,15 @@ class Graph:
 
                         # Iterate over the y-coordinate range and find corresponding x-coordinates
                         for y in range_y:
-                            x = round(x1 + (x2 - x1) * (y - y1) / dy)
-                            pos = (x, y)
+                            x_float = x1 + (x2 - x1) * (y - y1) / dy
+                            for x in range(round(x_float) - 1, round(x_float) + 2):
+                                pos = (x, y)
 
-                            # Add the nodes at the positions that are not in the path
-                            if not is_position_in_path(pos):
-                                node = self.get_node(pos)
-                                if node:
-                                    nodes_in_path.append(node)
+                                # Add the nodes at the positions that are not in the path
+                                if not is_position_in_path(pos):
+                                    node = self.get_node(pos)
+                                    if node:
+                                        nodes_in_path.append(node)
 
                         # Add the last point (x2, y2) if it is not already in the path
                         if not is_position_in_path(pos):
