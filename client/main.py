@@ -36,7 +36,7 @@ async def main(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocess
 
     # Precompute obstacles
     logger.debug("Precomputing obstacle distances, this will take a while...")
-    await track.graph.precompute_obstacles()
+    # await track.graph.precompute_obstacles()
 
     path_queue.put("Done!")
 

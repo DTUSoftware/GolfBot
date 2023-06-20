@@ -794,11 +794,11 @@ class Graph:
         distance = math.sqrt(dx * dx + dy * dy)
 
         # Add obstacle proximity
-        if not start_node.obstacle_proximity:
-            await start_node.calculate_obstacle_proximity()
-
-        obstacle_proximity = start_node.obstacle_proximity
-        distance += obstacle_proximity * OBSTACLE_WEIGHT
+        # if not start_node.obstacle_proximity:
+        #     await start_node.calculate_obstacle_proximity()
+        #
+        # obstacle_proximity = start_node.obstacle_proximity
+        # distance += obstacle_proximity * OBSTACLE_WEIGHT
 
         return distance * HEURISTIC_WEIGHT
 
