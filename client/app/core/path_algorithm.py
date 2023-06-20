@@ -756,15 +756,15 @@ class Graph:
         distance = math.sqrt(dx*dx + dy*dy)
 
         # Add obstacle proximity
-        obstacle_distance_min = math.inf
-        for obstacle in TRACK_GLOBAL.obstacles: # [obstacle for obstacle in TRACK_GLOBAL.obstacles if not obstacle.is_wall]:
-            obstacle_distance = await obstacle.get_distance((start_node.x, start_node.y))
-            if obstacle_distance[0] < obstacle_distance_min:
-                obstacle_distance_min = obstacle_distance[0]
-
-        if obstacle_distance_min < math.inf:
-            obstacle_proximity = 1 - obstacle_distance_min / max(TRACK_GLOBAL.bounds["x"], TRACK_GLOBAL.bounds["y"])
-            distance += obstacle_proximity * OBSTACLE_WEIGHT
+        # obstacle_distance_min = math.inf
+        # for obstacle in TRACK_GLOBAL.obstacles: # [obstacle for obstacle in TRACK_GLOBAL.obstacles if not obstacle.is_wall]:
+        #     obstacle_distance = await obstacle.get_distance((start_node.x, start_node.y))
+        #     if obstacle_distance[0] < obstacle_distance_min:
+        #         obstacle_distance_min = obstacle_distance[0]
+        #
+        # if obstacle_distance_min < math.inf:
+        #     obstacle_proximity = 1 - obstacle_distance_min / max(TRACK_GLOBAL.bounds["x"], TRACK_GLOBAL.bounds["y"])
+        #     distance += obstacle_proximity * OBSTACLE_WEIGHT
 
         return distance * HEURISTIC_WEIGHT
 
