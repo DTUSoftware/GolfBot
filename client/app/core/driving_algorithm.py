@@ -21,7 +21,7 @@ KD = float(os.environ.get('PID_KD', 0.05))  # Derivative gain - 0.05
 
 # Distance and direction tolerance
 DISTANCE_TOLERANCE = float(os.environ.get('DISTANCE_TOLERANCE', 1.0))  # in units
-DIRECTION_TOLERANCE = float(os.environ.get('DIRECTION_TOLERANCE', 15.0))  # degrees
+DIRECTION_TOLERANCE = float(os.environ.get('DIRECTION_TOLERANCE', 25.0))  # degrees
 DIRECTION_TOLERANCE_NEW = float(os.environ.get('DIRECTION_TOLERANCE_NEW', 5.0))  # degrees
 
 # Robot parameters
@@ -30,6 +30,7 @@ DIST_BETWEEN_WHEELS = float(
     os.environ.get('DIST_BETWEEN_WHEELS', 83.0 * 2)) / 10  # Distance between the robot's wheels in cm
 ROBOT_BASE_SPEED = float(os.environ.get('ROBOT_BASE_SPEED', 45.0))
 ROBOT_LENGTH_BUFFER = 10
+SMOOTH_SPEED_CORRECTION_MULTIPLIER = 500
 
 logger = logging.getLogger(__name__)
 # logger.addHandler(logging.StreamHandler(sys.stdout))
@@ -77,8 +78,7 @@ def do_smooth_turn(current_direction: float, new_direction: float, reverse=False
 
     # We make the direction diff (which can be at max math.pi * 2) into a value between 0 and 1
     # and multiply it by a multiplier to get a speed correction value between 0 and speed_correction_multiplier
-    speed_correction_multiplier = 150
-    speed_correction = (diff_in_angle / (math.pi * 2)) * speed_correction_multiplier
+    speed_correction = (diff_in_angle / (math.pi * 2)) * SMOOTH_SPEED_CORRECTION_MULTIPLIER
     if not reverse:
         speed_correction = -speed_correction
 
@@ -131,7 +131,7 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
                 # We get the relative heading and turn half of it so we don't overshoot the goal
                 angle = math_helpers.calculate_shortest_turn(robot_direction, goal.get_angle_to_middle())
                 await robot_api.turn_robot(session=session, direction=angle/2, relative=True)
-                await asyncio.sleep(1)
+                # await asyncio.sleep(1)
                 goal_manyfucks = 0
                 return
 
@@ -239,9 +239,13 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
             )
 
             if direction is not None:
+                # todo: reevaluate this
+                direction = direction / 2
+
                 logger.debug(f"Turning robot to relative pos {math.degrees(direction)} deg ({direction} rad), with diff being "
                              f"{math.degrees(direction_diff)} deg ({direction_diff} rad)")
                 await robot_api.turn_robot(session=session, direction=direction, relative=True)
+                return
             else:
                 logger.debug("Direction is None")
                 robot_speed_right, robot_speed_left = (-ROBOT_BASE_SPEED, -ROBOT_BASE_SPEED)
