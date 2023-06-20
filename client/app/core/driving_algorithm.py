@@ -128,7 +128,9 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
 
             if not goal.is_in_delivery_direction():
                 logger.debug("Robot is not in delivery direction, moving robot to delivery direction")
-                await robot_api.turn_robot(session=session, direction=goal.get_angle_to_middle())
+                # We get the relative heading and turn half of it so we don't overshoot the goal
+                angle = math_helpers.calculate_shortest_turn(robot_direction, goal.get_angle_to_middle())
+                await robot_api.turn_robot(session=session, direction=angle/2, relative=True)
                 await asyncio.sleep(1)
                 goal_manyfucks = 0
                 return
