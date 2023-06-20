@@ -12,7 +12,7 @@ from .model_testing import save_result
 # The webcam to use
 VIDEO_INPUT = int(os.environ.get('VIDEO_INPUT', 1))
 # The model to use
-CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/20232006-works.pt")
+CURRENT_MODEL = os.environ.get("CURRENT_MODEL", "models/20232006-works")
 # If logging should be disabled
 DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "True").lower()
 # If debugging should be enabled

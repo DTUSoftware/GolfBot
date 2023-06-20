@@ -24,9 +24,9 @@ TIMEOUT_GET_PATH = 5  # in seconds
 PATH_OBSTACLE_DISTANCE = 100
 DELIVERY_DISTANCE_FAR = 150  # in units
 # in units, this is where the middle of the robot is when delivering (241 - 113)
-DELIVERY_DISTANCE = 120
-DELIVERY_DISTANCE_X_DIFF = 10  # in units
-DELIVERY_DISTANCE_Y = 20  # in units
+DELIVERY_DISTANCE = 110
+DELIVERY_DISTANCE_X_DIFF = 15  # in units
+DELIVERY_DISTANCE_Y = 30  # in units
 SAFETY_LENGTH = 150  # in units
 SAFETY_LENGTH_CORNER = 200  # in units
 HEADING_DIFFERENCE_DELIVERY = 1  # in degrees
