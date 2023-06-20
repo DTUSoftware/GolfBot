@@ -34,6 +34,9 @@ COLLISION_DISTANCE = 30  # in units (pixels)
 DIRECTION_DIFFERENCE = 250  # in degrees
 TARGET_DIFFERENT_POSITION_DIFF_THRESHOLD = 20.0
 
+OBSTACLE_WEIGHT = 1000000  # just some ridiculously high number
+OBSTACLE_WEIGHT_DISTANCE = 100  # the weight of the nodes gets higher the closer they are to the obstacle
+
 # Initialize colorama
 colorama_init()
 # Calculate the distance across a square
@@ -269,7 +272,7 @@ class Ball:
 
 
 class Obstacle:
-    def __init__(self, path: List[Node], points: Optional[List[Tuple[int, int]]] = None) -> None:
+    def __init__(self, path: List[Node], points: Optional[List[Tuple[int, int]]] = None, is_wall=False) -> None:
         """
         Initializes a new instance of the Obstacle class.
 
@@ -282,6 +285,7 @@ class Obstacle:
         """
         self.path: List[Node] = path
         self.points: Optional[List[Tuple[int, int]]] = points
+        self.is_wall = is_wall
 
     async def get_distance(self, position: Tuple[int, int]) -> Tuple[float, Node]:
         """
@@ -373,9 +377,9 @@ class Goal:
 
         # Get angle to middle of the goal
         if middle[0] < TRACK_GLOBAL.bounds["x"] / 2:
-            angle = (angle - (math.pi/2)) % (2 * math.pi)
+            angle = (angle - (math.pi / 2)) % (2 * math.pi)
         else:
-            angle = (angle + (math.pi/2)) % (2 * math.pi)
+            angle = (angle + (math.pi / 2)) % (2 * math.pi)
 
         return middle, angle
 
@@ -457,7 +461,7 @@ class Goal:
         # Get the middle and the angle
         middle, angle = self.get_middle_and_angle()
 
-        angle_to_middle = (angle + math.pi) % (2*math.pi)
+        angle_to_middle = (angle + math.pi) % (2 * math.pi)
 
         # Get the angle to the middle
         # angle_to_middle = math_helpers.calculate_direction(to_pos=middle, from_pos=TRACK_GLOBAL.get_middle_position())
@@ -1039,7 +1043,8 @@ class Track:
 
         self.robot_direction = robot_direction % (2 * math.pi)
 
-    def set_robot_pos(self, middle: Tuple[int, int], front: Optional[Tuple[int, int]] = None, rear: Optional[Tuple[int, int]] = None) -> None:
+    def set_robot_pos(self, middle: Tuple[int, int], front: Optional[Tuple[int, int]] = None,
+                      rear: Optional[Tuple[int, int]] = None) -> None:
         """
         Set the position of the robot
         :param middle: The middle position of the robot
@@ -1078,7 +1083,8 @@ class Track:
                 return
             object_nodes = [self.graph.get_node(
                 obj[0]) for obj in objects_to_navigate_to if obj]
-            tasks = [asyncio.create_task(self.graph.get_path(start_node=robot_node, dst_node=ball_node)) for ball_node in object_nodes if
+            tasks = [asyncio.create_task(self.graph.get_path(start_node=robot_node, dst_node=ball_node)) for ball_node
+                     in object_nodes if
                      ball_node]
             if tasks:
                 done, pending = await asyncio.wait(tasks, timeout=TIMEOUT_GET_PATH, return_when=asyncio.ALL_COMPLETED)
@@ -1132,6 +1138,8 @@ class Track:
     def clear_obstacles(self) -> None:
         """
         Clear all obstacles from the track
+        DOES NOT CLEAR WEIGHTS!!!
+        WE DON'T USE THIS FUNCTION IN THE RACE, SO IT'S NOT IMPLEMENTED TO DO SO!
         :return: None
         """
         for obstacle in self.obstacles:
@@ -1151,10 +1159,22 @@ class Track:
         """
         for node in obstacle.path:
             # print(f"Removing node edges for node at {node.x}, {node.y}")
-            for x in range(-1, 1 + 1):
-                for y in range(-1, 1 + 1):
-                    neighbour = self.graph.get_node((node.x + x, node.y + y))
-                    self.graph.remove_edge(node, neighbour)
+
+            # If it's an obstacle which is not a wall, we want to raise the weight of the nodes around it
+            if not obstacle.is_wall:
+                # First we raise the weight of any neighbours and their neighbors, up to a given distance
+                for x in range(-OBSTACLE_WEIGHT_DISTANCE, OBSTACLE_WEIGHT_DISTANCE):
+                    for y in range(-OBSTACLE_WEIGHT_DISTANCE, OBSTACLE_WEIGHT_DISTANCE):
+                        neighbour = self.graph.get_node((node.x + x, node.y + y))
+                        new_weight = OBSTACLE_WEIGHT / ((abs(x) + abs(y)) / (OBSTACLE_WEIGHT_DISTANCE*2))
+                        if neighbour:
+                            for neighbour_neighbour in neighbour.neighbours:
+                                neighbour_neighbour["weight"] = new_weight
+
+            # And just as a safety precaution we remove the edges around the thing itself
+            for neighbour in node.neighbours:
+                self.graph.remove_edge(node, neighbour["node"])
+
             if node.neighbours:
                 logger.debug(
                     f"[add_obstacle] Failed to remove all neighbours for obstacle node at {node.x}, {node.y}")
@@ -1373,8 +1393,11 @@ async def check_new_path(path_queue: multiprocessing.JoinableQueue, session: aio
         # if DEBUG:
         #     print("Checking if robot has reached target")
         has_stopped = False
-        while track.last_target_path and len(track.last_target_path) > 1 and not is_target_different(track, track.last_target_path[0].node,
-                                                                                                     track.graph.get_node(robot_position)):
+        while track.last_target_path and len(track.last_target_path) > 1 and not is_target_different(track,
+                                                                                                     track.last_target_path[
+                                                                                                         0].node,
+                                                                                                     track.graph.get_node(
+                                                                                                         robot_position)):
             logger.debug("Robot reached target, popping")
             track.last_target_path.pop(0)
             track.last_target_node = track.graph.get_node(robot_position)
@@ -1386,9 +1409,10 @@ async def check_new_path(path_queue: multiprocessing.JoinableQueue, session: aio
                 # await asyncio.sleep(10)
             await asyncio.sleep(0)
         # If we passed the target, pop
-        while track.last_target_path and len(track.last_target_path) > 1 and math_helpers.has_passed_target(track.last_target_path[0].node.get_position(),
-                                                                                                            robot_position,
-                                                                                                            track.last_target_node.get_position()):
+        while track.last_target_path and len(track.last_target_path) > 1 and math_helpers.has_passed_target(
+                track.last_target_path[0].node.get_position(),
+                robot_position,
+                track.last_target_node.get_position()):
             logger.debug("Robot passed target, popping")
             track.last_target_path.pop(0)
             track.last_target_node = track.graph.get_node(robot_position)
@@ -1439,16 +1463,20 @@ async def check_new_path(path_queue: multiprocessing.JoinableQueue, session: aio
         if not path_queue.full():
             try:
                 path_queue.put({"path": full_path if full_path else [], "obstacles": [[
-                    opencv_helpers.graph_position_to_opencv_position(point) for point in obstacle.points] for obstacle in
+                    opencv_helpers.graph_position_to_opencv_position(point) for point in obstacle.points] for obstacle
+                    in
                     track.obstacles] if track.obstacles else [],
-                    "small_goal": [opencv_helpers.graph_position_to_opencv_position(point) for point in track.small_goal.points] if track.small_goal else [],
-                    "big_goal": [opencv_helpers.graph_position_to_opencv_position(point) for point in track.big_goal.points] if track.big_goal else []})
+                                "small_goal": [opencv_helpers.graph_position_to_opencv_position(point) for point in
+                                               track.small_goal.points] if track.small_goal else [],
+                                "big_goal": [opencv_helpers.graph_position_to_opencv_position(point) for point in
+                                             track.big_goal.points] if track.big_goal else []})
             except:
                 pass
 
         track.last_target_node = track.last_target_path[-1].node
 
-        while track.last_target_path and not is_target_different(track, track.last_target_path[0].node, track.graph.get_node(robot_position)):
+        while track.last_target_path and not is_target_different(track, track.last_target_path[0].node,
+                                                                 track.graph.get_node(robot_position)):
             logger.debug("Robot reached target, popping")
             track.last_target_path.pop(0)
             track.last_target_node = track.graph.get_node(robot_position)
