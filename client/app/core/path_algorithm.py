@@ -1,4 +1,5 @@
 import asyncio
+import heapq
 import logging
 import math
 import os
@@ -818,28 +819,32 @@ class Graph:
             start_node, 0, await self.h(start_node, dst_node), None)
 
         # Create open and closed sets
-        open_set: Dict[Node, bool] = {start_node: True}
+        open_set: Set[Node] = {start_node}
         closed_set: Dict[Node, NodeData] = {}
 
         # A dictionary to store the best known cost from start to each node
-        g_scores: Dict[Node, float] = defaultdict(float)
+        g_scores: Dict[Node, float] = {start_node: 0}
 
         # A dictionary to store the estimated total cost from start to each node
-        f_scores: Dict[Node, float] = defaultdict(lambda: float('inf'))
+        f_scores: Dict[Node, float] = {start_node: start_node_data.f}
 
         # A priority queue to efficiently extract the node with the lowest f-score
-        open_queue: asyncio.PriorityQueue[Tuple[float, Node]] = asyncio.PriorityQueue()
+        open_queue: List[Tuple[float, Node]] = [
+            (f_scores[start_node], start_node)]
+
+        # A counter to track the number of iterations
+        iteration = 0
 
         # The current node
         current_node: Node
-        iteration = 0
-
         while open_queue:
             iteration += 1
             if iteration % 500 == 0:
+                # if DEBUG:
+                #     print(f"Iteration: {iteration}")
                 await asyncio.sleep(0)
 
-            _, current_node = await open_queue.get()
+            _, current_node = heapq.heappop(open_queue)
 
             closed_set[current_node] = NodeData(
                 node=current_node,
@@ -858,12 +863,13 @@ class Graph:
                 return final_path
 
             for neighbour in current_node.neighbours:
-                neighbour_node = neighbour["node"]
-                neighbour_weight = neighbour["weight"]
-                neighbour_g_score = g_scores[current_node] + neighbour_weight
+                neighbour_node: Node = neighbour["node"]
+                neighbour_weight: float = neighbour["weight"]
 
                 if neighbour_node in closed_set:
                     continue
+
+                neighbour_g_score = g_scores[current_node] + neighbour_weight
 
                 if neighbour_node not in open_set:
                     # Add the neighbour to the open set
@@ -873,11 +879,12 @@ class Graph:
                         h=await self.h(neighbour_node, dst_node),
                         parent=current_node
                     )
-                    open_set[neighbour_node] = True
+                    open_set.add(neighbour_node)
                     closed_set[neighbour_node] = neighbour_data
                     g_scores[neighbour_node] = neighbour_g_score
                     f_scores[neighbour_node] = neighbour_data.f
-                    await open_queue.put((f_scores[neighbour_node], neighbour_node))
+                    heapq.heappush(
+                        open_queue, (f_scores[neighbour_node], neighbour_node))
                 elif neighbour_g_score < g_scores[neighbour_node]:
                     # Update the neighbour's scores and parent if a better path is found
                     neighbour_data = closed_set[neighbour_node]
@@ -885,7 +892,7 @@ class Graph:
                     neighbour_data.parent = current_node
                     g_scores[neighbour_node] = neighbour_g_score
                     f_scores[neighbour_node] = neighbour_data.f
-                    await open_queue.put((f_scores[neighbour_node], neighbour_node))
+                    heapq.heapify(open_queue)
 
         # No path found
         return []
