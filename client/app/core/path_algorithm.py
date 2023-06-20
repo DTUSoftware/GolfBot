@@ -414,6 +414,9 @@ class Goal:
         if distance < DELIVERY_DISTANCE - (DELIVERY_DISTANCE_X_DIFF / 2):
             return False
 
+        if abs(self.delivery_direction_diff()) > math.radians(90):
+            return False
+
         return True
 
     def is_in_delivery_distance_max(self) -> bool:
@@ -431,6 +434,9 @@ class Goal:
 
         # Check if robot is close enough to the middle
         if distance > DELIVERY_DISTANCE + (DELIVERY_DISTANCE_X_DIFF / 2):
+            return False
+
+        if abs(self.delivery_direction_diff()) > math.radians(180):
             return False
 
         return True
