@@ -260,7 +260,7 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
 
         # If the direction difference is above the tolerance, turn the robot
         if direction_diff >= math.radians(direction_tolerance):
-            direction = math_helpers.calculate_angle_to_turn(
+            angle_to_turn = math_helpers.calculate_angle_to_turn(
                 radius=(math_helpers.calculate_distance(
                     track.get_middle_position(), track.get_front_position())) + ROBOT_LENGTH_BUFFER,
                 current_angle=robot_direction,
@@ -268,13 +268,13 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
                 pos=track.get_middle_position()
             )
 
-            if direction is not None:
+            if angle_to_turn is not None:
                 # todo: reevaluate this
-                direction = direction / 2
+                angle_to_turn = angle_to_turn / 2
 
-                logger.debug(f"Turning robot to relative pos {math.degrees(direction)} deg ({direction} rad), with diff being "
+                logger.debug(f"Turning robot to relative pos {math.degrees(angle_to_turn)} deg ({angle_to_turn} rad), with diff being "
                              f"{math.degrees(direction_diff)} deg ({direction_diff} rad)")
-                await robot_api.turn_robot(session=session, direction=direction, relative=True)
+                await robot_api.turn_robot(session=session, direction=angle_to_turn, relative=True)
                 return
             else:
                 logger.debug("Direction is None")

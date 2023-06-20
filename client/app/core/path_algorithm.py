@@ -1182,6 +1182,7 @@ class Track:
             # print(f"Removing node edges for node at {node.x}, {node.y}")
 
             # If it's an obstacle which is not a wall, we want to raise the weight of the nodes around it
+<<<<<<< HEAD
             # if not obstacle.is_wall:
             #     # First we raise the weight of any neighbours and their neighbors, up to a given distance
             #     for x in range(-OBSTACLE_WEIGHT_DISTANCE, OBSTACLE_WEIGHT_DISTANCE):
@@ -1197,6 +1198,23 @@ class Track:
             #                             neighbour_neighbour["weight"] += new_weight
             #                         else:
             #                             neighbour_neighbour["weight"] = new_weight
+=======
+            if not obstacle.is_wall:
+                # First we raise the weight of any neighbours and their neighbors, up to a given distance
+                for x in range(-OBSTACLE_WEIGHT_DISTANCE, OBSTACLE_WEIGHT_DISTANCE):
+                    for y in range(-OBSTACLE_WEIGHT_DISTANCE, OBSTACLE_WEIGHT_DISTANCE):
+                        neighbour = self.graph.get_node((node.x + x, node.y + y))
+                        new_weight = OBSTACLE_WEIGHT / (((abs(x) + abs(y)) / (OBSTACLE_WEIGHT_DISTANCE*2)) + 1)
+                        if neighbour:
+                            for neighbour_neighbour in neighbour.neighbours:
+                                # If old weight was lower than current, change it
+                                if neighbour_neighbour["weight"] < new_weight:
+                                    # If a low weight such as 3, add the weight (so we still get cross edges at different weights)
+                                    if neighbour_neighbour["weight"] < 3:
+                                        neighbour_neighbour["weight"] += new_weight
+                                    else:
+                                        neighbour_neighbour["weight"] = new_weight
+>>>>>>> 220ac131dd6dfc6873dab2cabcfb3372f7f365e1
 
             # And just as a safety precaution we remove the edges around the thing itself
             for neighbour in node.neighbours:
