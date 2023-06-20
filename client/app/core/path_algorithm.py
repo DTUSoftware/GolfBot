@@ -1166,7 +1166,7 @@ class Track:
                 for x in range(-OBSTACLE_WEIGHT_DISTANCE, OBSTACLE_WEIGHT_DISTANCE):
                     for y in range(-OBSTACLE_WEIGHT_DISTANCE, OBSTACLE_WEIGHT_DISTANCE):
                         neighbour = self.graph.get_node((node.x + x, node.y + y))
-                        new_weight = OBSTACLE_WEIGHT / ((abs(x) + abs(y)) / (OBSTACLE_WEIGHT_DISTANCE*2))
+                        new_weight = OBSTACLE_WEIGHT / (((abs(x) + abs(y)) / (OBSTACLE_WEIGHT_DISTANCE*2)) + 1)
                         if neighbour:
                             for neighbour_neighbour in neighbour.neighbours:
                                 neighbour_neighbour["weight"] = new_weight
