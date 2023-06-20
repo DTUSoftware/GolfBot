@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 5
+names: ['orange', 'robot', 'robot-front', 'robot-rear', 'white']
+
+roboflow:
+  workspace: this-is-it-guys
+  project: the-golden-version-template
+  version: 7
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/this-is-it-guys/the-golden-version-template/dataset/7
