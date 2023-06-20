@@ -88,7 +88,7 @@ def setup_track_mouse_input(event, x, y, flags, param):
         draw_path.append((x, y))
 
 
-def setup_track() -> pathalg.Track:
+async def setup_track() -> pathalg.Track:
     """
     Sets up the track for capturing mouse input.
 
@@ -222,7 +222,7 @@ def setup_track() -> pathalg.Track:
             nodes_in_path = track.graph.get_nodes_in_path(path)
             # print(f"Nodes in obstacle path: {[(node.x, node.y) for node in nodes_in_path]}")
             obstacle = pathalg.Obstacle(nodes_in_path, path, is_wall=object_type == "wall")
-            track.add_obstacle(obstacle)
+            await track.add_obstacle(obstacle)
         elif object_type == "small_goal":
             goal = pathalg.Goal(track.graph.get_nodes_in_path(path), path, small=True)
             track.add_goal(goal)

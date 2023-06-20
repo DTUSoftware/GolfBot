@@ -2,7 +2,9 @@ import asyncio
 import logging
 import math
 import os
+import sys
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Optional, List, Tuple, Set, Dict, Union
 
 import aiohttp
@@ -11,6 +13,7 @@ import numpy as np
 from colorama import Fore
 from colorama import Style
 from colorama import init as colorama_init
+from sympy import Float
 from torch import multiprocessing
 
 from ..Services import robot_api
@@ -45,7 +48,7 @@ colorama_init()
 distance_across = math.sqrt(1 ** 2 + 1 ** 2)
 
 logger = logging.getLogger(__name__)
-# logger.addHandler(logging.StreamHandler(sys.stdout))
+logger.addHandler(logging.StreamHandler(sys.stdout))
 if DEBUG:
     logger.setLevel(logging.DEBUG)
 
@@ -64,6 +67,7 @@ class Node:
         self.x = coordinates[0]
         self.y = coordinates[1]
         self.neighbours: List[Dict[str, Union['Node', float]]] = []
+        self.obstacle_proximity: Optional[Float] = None
 
     def __lt__(self, other: Any) -> bool:
         """
@@ -128,10 +132,11 @@ class Node:
         Returns:
             None
         """
+        adjust = 0
         for i in range(len(self.neighbours)):
-            if self.neighbours[i]["node"] == node:
-                self.neighbours.pop(i)
-                return
+            if self.neighbours[i+adjust]["node"].get_position() == node.get_position():
+                self.neighbours.pop(i+adjust)
+                adjust -= 1
 
     def get_neighbour_nodes(self) -> List['Node']:
         """
@@ -153,6 +158,13 @@ class Node:
             float: The heading in radians.
         """
         return math_helpers.calculate_direction(from_pos=from_position, to_pos=self.get_position())
+
+    async def calculate_obstacle_proximity(self):
+        # logger.debug("Calculating obstacle proximity for node at position %s", self.get_position())
+        obstacle_distances = [(await obstacle.get_distance(self.get_position()))[0] for obstacle in TRACK_GLOBAL.obstacles]
+        min_obstacle_distance = min(obstacle_distances)
+        self.obstacle_proximity = 1 - (min_obstacle_distance / (max(TRACK_GLOBAL.bounds["x"], TRACK_GLOBAL.bounds["y"])))
+        logger.debug("Done calculating obstacle proximity for node at position %s", self.get_position())
 
 
 class Ball:
@@ -307,7 +319,6 @@ class Obstacle:
             if distance < min_distance:
                 min_distance = distance
                 closest_node = node
-            await asyncio.sleep(0)
         return min_distance, closest_node
 
     async def is_about_to_collide(self, position: Tuple[int, int], heading: float) -> bool:
@@ -580,8 +591,6 @@ class Graph:
         :param size_x: The width of the graph.
         :param size_y: The height of the graph.
         """
-        self.obstacle_proximity: Dict[Tuple[int, int], float] = {}
-
         if size_x and size_y:
             range_x = range(size_x)
             range_y = range(size_y)
@@ -751,26 +760,26 @@ class Graph:
         :param node_2: The second node.
         :return: None
         """
-        if node_1 is not node_2 and node_1 and node_2:
-            if node_2 in node_1.get_neighbour_nodes():
+        if node_1 and node_2:
+            while node_2 in node_1.get_neighbour_nodes():
                 node_1.remove_neighbour(node_2)
-            if node_1 in node_2.get_neighbour_nodes():
+            while node_1 in node_2.get_neighbour_nodes():
                 node_2.remove_neighbour(node_1)
 
-    def precompute_obstacles(self):
+    async def precompute_obstacles(self):
         """
         Precomputes the obstacle distances for all nodes.
         Returns:
             None
         """
         # Precompute obstacle proximity
-        self.obstacle_proximity = {
-            position: (
-                    1 - float(min([
-                (await obstacle.get_distance(position))[0] for obstacle in TRACK_GLOBAL.obstacles
-            ])) / max(TRACK_GLOBAL.bounds["x"], TRACK_GLOBAL.bounds["y"]))
-            for position in [(node.x, node.y) for node in self.nodes]
-        }
+        executor = ThreadPoolExecutor(max_workers=multiprocessing.cpu_count())
+        logger.debug("Calculating proximities...")
+        rows, cols = self.nodes.shape
+        tasks = [asyncio.create_task(self.nodes[y, x].calculate_obstacle_proximity()) for y in range(rows) for x in
+                 range(cols)]
+        await asyncio.get_event_loop().run_in_executor(executor, asyncio.gather, *tasks)
+        logger.debug("Done calculating proximities!")
 
     # Modified Euclidian Distance heuristic for A*
     async def h(self, start_node: Node, dst_node: Node) -> float:
@@ -785,10 +794,10 @@ class Graph:
         distance = math.sqrt(dx * dx + dy * dy)
 
         # Add obstacle proximity
-        if not self.obstacle_proximity:
-            self.precompute_obstacles()
+        if not start_node.obstacle_proximity:
+            await start_node.calculate_obstacle_proximity()
 
-        obstacle_proximity = self.obstacle_proximity[(start_node.x, start_node.y)]
+        obstacle_proximity = start_node.obstacle_proximity
         distance += obstacle_proximity * OBSTACLE_WEIGHT
 
         return distance * HEURISTIC_WEIGHT
@@ -1191,7 +1200,7 @@ class Track:
                         self.graph.add_edge(node, neighbour)
         self.obstacles = []
 
-    def add_obstacle(self, obstacle: Obstacle) -> None:
+    async def add_obstacle(self, obstacle: Obstacle) -> None:
         """
         Add an obstacle to the track
         :param obstacle: The obstacle to add
@@ -1218,17 +1227,13 @@ class Track:
             #                             neighbour_neighbour["weight"] = new_weight
 
             # And just as a safety precaution we remove the edges around the thing itself
-            for neighbour in node.neighbours:
-                self.graph.remove_edge(node, neighbour["node"])
+            for neighbour in node.get_neighbour_nodes():
+                self.graph.remove_edge(node, neighbour)
 
             if node.neighbours:
                 logger.debug(
                     f"[add_obstacle] Failed to remove all neighbours for obstacle node at {node.x}, {node.y}")
         self.obstacles.append(obstacle)
-
-        # Precompute obstacles
-        logger.debug("Precomputing obstacle distances, this will take a while...")
-        self.graph.precompute_obstacles()
 
     def add_goal(self, goal: Goal) -> None:
         """

@@ -21,8 +21,7 @@ if DEBUG:
     logger.setLevel(logging.DEBUG)
 
 
-async def main(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue, ai_event: Event,
-               track):
+async def main(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocessing.JoinableQueue, ai_event: Event):
     """
     The main function
     :param ai_queue:  The queue to get the AI results from AI to robot
@@ -31,8 +30,18 @@ async def main(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocess
     :param track: The track to run on
     :return: None
     """
-    # Update TRACK_GLOBAL in path algorithm since we just joined an async loop
-    path_algorithm.TRACK_GLOBAL = track
+    # Setup the track
+    logger.info("Setting up track...")
+    track = await track_setup.setup_track()
+
+    # Precompute obstacles
+    logger.debug("Precomputing obstacle distances, this will take a while...")
+    await track.graph.precompute_obstacles()
+
+    path_queue.put("Done!")
+
+    # # Update TRACK_GLOBAL in path algorithm since we just joined an async loop
+    # path_algorithm.TRACK_GLOBAL = track
     logger.info("Running main...")
     try:
         async with aiohttp.ClientSession() as session:
@@ -66,16 +75,11 @@ def main_entrypoint(ai_queue: multiprocessing.JoinableQueue, path_queue: multipr
     """
     logger.info("Running main entrypoint")
 
-    # Setup the track
-    logger.info("Setting up track...")
-    track = track_setup.setup_track()
-    path_queue.put("Done!")
-
     # Run main task in async
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-    asyncio.run(main(ai_queue, path_queue, ai_event, track))
+    asyncio.run(main(ai_queue, path_queue, ai_event))
 
 
 if __name__ == '__main__':
