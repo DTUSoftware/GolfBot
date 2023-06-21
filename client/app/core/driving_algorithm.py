@@ -148,6 +148,8 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
                 return
 
             logger.info("Robot has been in delivery position for long enough, stopping robot and fans.")
+            await robot_api.set_speeds(session=session, speed_left=-ROBOT_BASE_SPEED, speed_right=-ROBOT_BASE_SPEED)
+            await asyncio.sleep(0.25)
             await robot_api.set_speeds(session=session, speed_left=0, speed_right=0)
             await robot_api.toggle_fans(session=session)
             logger.debug("Sleeping for 15 seconds to finish delivery")
