@@ -22,7 +22,7 @@ KD = float(os.environ.get('PID_KD', 0.05))  # Derivative gain - 0.05
 # Distance and direction tolerance
 DISTANCE_TOLERANCE = float(os.environ.get('DISTANCE_TOLERANCE', 1.0))  # in units
 DIRECTION_TOLERANCE = float(os.environ.get('DIRECTION_TOLERANCE', 25.0))  # degrees
-DIRECTION_TOLERANCE_NEW = float(os.environ.get('DIRECTION_TOLERANCE_NEW', 5.0))  # degrees
+DIRECTION_TOLERANCE_NEW = float(os.environ.get('DIRECTION_TOLERANCE_NEW', 10.0))  # degrees
 
 # Robot parameters
 WHEEL_RADIUS = (float(os.environ.get('WHEEL_DIAMETER', 68.8)) / 2) / 10  # Radius of the robot's wheels in cm
@@ -108,7 +108,7 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
     robot_direction = track.robot_direction
 
     robot_speed_left = ROBOT_BASE_SPEED
-    robot_speed_right = ROBOT_BASE_SPEED + 5
+    robot_speed_right = ROBOT_BASE_SPEED
 
     logger.debug(f"Trying to get robot from {track.get_middle_position()} to {target_position}. "
                  f"Robot currently has a direction of {math.degrees(robot_direction)} deg ({robot_direction} rad)")
@@ -148,8 +148,8 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
                 return
 
             logger.info("Robot has been in delivery position for long enough, stopping robot and fans.")
-            await robot_api.set_speeds(session=session, speed_left=-ROBOT_BASE_SPEED, speed_right=-ROBOT_BASE_SPEED)
-            await asyncio.sleep(0.2)
+            # await robot_api.set_speeds(session=session, speed_left=-ROBOT_BASE_SPEED, speed_right=-ROBOT_BASE_SPEED)
+            # await asyncio.sleep(0.2)
             await robot_api.set_speeds(session=session, speed_left=0, speed_right=0)
             await robot_api.toggle_fans(session=session)
             logger.debug("Sleeping for 15 seconds to finish delivery")
@@ -159,6 +159,7 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
             await robot_api.set_speeds(session=session, speed_left=-ROBOT_BASE_SPEED, speed_right=-ROBOT_BASE_SPEED)
             await asyncio.sleep(1)
             await robot_api.set_speeds(session=session, speed_left=0, speed_right=0)
+            await asyncio.sleep(2)
             await robot_api.toggle_fans(session=session)
             return
         else:
@@ -260,7 +261,7 @@ async def drive_decision(target_position: Tuple[int, int], session: aiohttp.Clie
 
         logger.debug("Driving robot forward.")
         # Drive forward with base speed
-        await robot_api.set_speeds(session=session, speed_left=robot_speed_left, speed_right=robot_speed_right)
+        await robot_api.set_speeds(session=session, speed_left=robot_speed_left, speed_right=robot_speed_right+5)
     else:
         logger.debug("Robot has reached the target (within tolerance), stopping robot.")
         # Stop robot
