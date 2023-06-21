@@ -26,7 +26,7 @@ DISTANCE_TOLERANCE = float(os.environ.get(
 DIRECTION_TOLERANCE = float(os.environ.get(
     'DIRECTION_TOLERANCE', 25.0))  # degrees
 DIRECTION_TOLERANCE_NEW = float(os.environ.get(
-    'DIRECTION_TOLERANCE_NEW', 5.0))  # degrees
+    'DIRECTION_TOLERANCE_NEW', 10.0))  # degrees
 
 # Robot parameters
 WHEEL_RADIUS = (float(os.environ.get('WHEEL_DIAMETER', 68.8)) /
