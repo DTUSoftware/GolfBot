@@ -419,8 +419,12 @@ def get_motors() -> Optional[MoveTank]:
     """
     if not conn or not ev3_motor:
         return None
-    return ev3_motor.MoveTank(left_motor_port=ev3_motor.OUTPUT_A,
+    tank = ev3_motor.MoveTank(left_motor_port=ev3_motor.OUTPUT_A,
                               right_motor_port=ev3_motor.OUTPUT_D)  # Motor on output port A and D
+
+    tank.ramp_up_sp = 500
+    tank.ramp_down_sp = 500
+    return tank
 
 
 def get_fan_motor() -> Optional[Motor]:
