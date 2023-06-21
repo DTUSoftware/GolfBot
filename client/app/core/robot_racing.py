@@ -214,9 +214,9 @@ async def race(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocess
     start_time = time.time()
     time_taken = 0
 
-    logger.info("FUCK THE OBSTACLE")
-    await robot_api.set_speeds(session, 60, 60)
-    await asyncio.sleep(10)
+    # logger.info("FUCK THE OBSTACLE")
+    # await robot_api.set_speeds(session, 60, 70)
+    # await asyncio.sleep(10)
 
     logger.info("Toggling fans!")
     await robot_api.toggle_fans(session)
