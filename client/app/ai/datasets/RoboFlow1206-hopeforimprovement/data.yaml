@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 4
+names: ['orange-golf-balls', 'robot', 'robot-front', 'white-golf-balls']
+
+roboflow:
+  workspace: cdio
+  project: cdio-3-ugers
+  version: 20
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/cdio/cdio-3-ugers/dataset/20

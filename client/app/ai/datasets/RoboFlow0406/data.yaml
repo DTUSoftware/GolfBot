@@ -1,0 +1,14 @@
+names:
+- orange-golfball
+- robot
+- white-golfball
+nc: 3
+roboflow:
+  license: CC BY 4.0
+  project: cdio-3-ugers
+  url: https://universe.roboflow.com/cdio/dataset/1
+  version: 1
+  workspace: cdio
+test: ../test/images
+train: train/images
+val: valid/images

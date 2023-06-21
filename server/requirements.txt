@@ -1,0 +1,5 @@
+python-ev3dev2
+rpyc==3.3.0
+colorama
+Flask
+gunicorn

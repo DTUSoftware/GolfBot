@@ -1,0 +1,53 @@
+@startuml
+'https://plantuml.com/activity-diagram-beta
+
+
+start
+:drive_decision(target_position);
+:get robot position and direction;
+if (is robot or target position invalid) then (true)
+    :robot_api.set_speeds(0, 0);
+    stop
+else (false)
+endif
+
+if (is in delivery distance) then (true)
+    while (is not in delivery direction) is (true)
+        :path_algorithm.get_angle_to_delivery();
+        :robot_api.turn_robot(angle_to_delivery);
+    endwhile (false)
+    :robot_api.set_speeds(0, 0);
+    :robot_api.toggle_fans();
+    :sleep(15);
+    :robot_api.set_speeds(-BASE_SPEED, -BASE_SPEED);
+    :sleep(1);
+    :robot_api.set_speeds(0, 0);
+    :robot_api.toggle_fans();
+    stop
+else (false)
+endif
+
+if (is about to collide with obstacle) then (true)
+    :calculate speeds to get away from obstacle;
+    :robot_api.set_speeds(speed_away, speed_away);
+    stop
+else (false)
+endif
+
+:math_helpers.calculate_distance(robot_position, target_position);
+
+if (distance >= distance_tolerance) then (true)
+    :math_helpers.calculate_direction(robot_position, target_position);
+    if (direction >= direction_tolerance) then (true)
+        :robot_api.turn_robot(direction);
+    else (false)
+    endif
+
+    :robot_api.set_speeds(BASE_SPEED, BASE_SPEED);
+else (false)
+    :robot_api.set_speeds(0, 0);
+endif
+
+stop
+
+@enduml
