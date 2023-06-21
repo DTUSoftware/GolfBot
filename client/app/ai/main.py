@@ -100,6 +100,8 @@ def run_ai(camera_queue: torch.multiprocessing.JoinableQueue, path_queue: torch.
             save_result(results, frame)
         elif key == ord('r'):
             start_flag = True
+        elif key == ord('c'):
+            start_flag = False
 
         # Send the results to the driving algorithm
         # if DEBUG:

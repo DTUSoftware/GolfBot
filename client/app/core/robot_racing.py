@@ -86,9 +86,13 @@ async def calculate_and_adjust(track: path_algorithm.Track, path_queue: multipro
     # if DEBUG:
     #     print("Done calculating path and adjusting speed")
 
+is_running = True
+
 
 async def do_race_iteration(track: path_algorithm.Track, ai_queue: multiprocessing.JoinableQueue,
-                            path_queue: multiprocessing.JoinableQueue, ai_event: Event, session: aiohttp.ClientSession, time_taken):
+                            path_queue: multiprocessing.JoinableQueue, ai_event: Event, session: aiohttp.ClientSession,
+                            time_taken):
+    global is_running
     try:
         # Get results from AI
         # if DEBUG:
@@ -99,11 +103,17 @@ async def do_race_iteration(track: path_algorithm.Track, ai_queue: multiprocessi
             return
 
         ai_results_elem = ai_queue.get_nowait()
-        if not ai_results_elem or not "results" in ai_results_elem or not ai_results_elem["results"]:
+        if not ai_results_elem or "results" not in ai_results_elem or not ai_results_elem["results"]:
             logger.debug("No results in AI queue")
             ai_results = []
         else:
             ai_results = ai_results_elem["results"]
+            should_run = ai_results_elem["start"]
+
+            if is_running != should_run:
+                logger.info("Change of run mode! Resetting?!?")
+                await robot_api.toggle_fans(session)
+                is_running = should_run
 
         # if DEBUG:
         #     print("Got results from AI!")
@@ -111,6 +121,11 @@ async def do_race_iteration(track: path_algorithm.Track, ai_queue: multiprocessi
         # if DEBUG:
         #     # Get robot status
         #     get_robot_status()
+
+        if not is_running:
+            logger.info("Robot mode is set to: Not run! Standing still! Press 'r' on AI to start!")
+            await robot_api.set_speeds(session, 0, 0)
+            return
 
         # Parse the results
         robot_results, golf_ball_results, golden_ball_results = await robot_ai.parse_ai_results(ai_results)
@@ -129,7 +144,8 @@ async def do_race_iteration(track: path_algorithm.Track, ai_queue: multiprocessi
 
         objects_to_navigate_to: List[List[Tuple[int, int]]] = []
         if track.balls and (
-                len(seen_ball_queue) < 10 or len([seen_ball for seen_ball in seen_ball_queue if seen_ball]) >= 4) and time_taken <= 6 * 60:
+                len(seen_ball_queue) < 10 or len(
+            [seen_ball for seen_ball in seen_ball_queue if seen_ball]) >= 4) and time_taken <= 6 * 60:
             # Get every ball that's not golden
             objects_to_navigate_to = [ball.drivePath for ball in track.balls if
                                       not ball.golden and ball.get_drive_path()]
