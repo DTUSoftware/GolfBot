@@ -87,6 +87,7 @@ async def calculate_and_adjust(track: path_algorithm.Track, path_queue: multipro
     #     print("Done calculating path and adjusting speed")
 
 is_running = True
+has_been_to_big_goal = False
 
 
 async def do_race_iteration(track: path_algorithm.Track, ai_queue: multiprocessing.JoinableQueue,
@@ -145,7 +146,17 @@ async def do_race_iteration(track: path_algorithm.Track, ai_queue: multiprocessi
             seen_ball_queue.append(False)
 
         objects_to_navigate_to: List[List[Tuple[int, int]]] = []
-        if track.balls and (
+        global has_been_to_big_goal
+        if not has_been_to_big_goal:
+            goal_path = await track.big_goal.deliver_path()
+            if goal_path:
+                objects_to_navigate_to = [goal_path]
+
+                if not path_algorithm.is_target_different(track.robot_front_pos, objects_to_navigate_to[-1]):
+                    has_been_to_big_goal = True
+                    logger.info("Has been to big goal!")
+                    objects_to_navigate_to = []
+        elif track.balls and (
                 len(seen_ball_queue) < 10 or len(
             [seen_ball for seen_ball in seen_ball_queue if seen_ball]) >= 4) and time_taken <= 6 * 60:
             # Get every ball that's not golden
@@ -213,10 +224,6 @@ async def race(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocess
     logger.info("Starting race!")
     start_time = time.time()
     time_taken = 0
-
-    logger.info("FUCK THE OBSTACLE")
-    await robot_api.set_speeds(session, 60, 60)
-    await asyncio.sleep(10)
 
     logger.info("Toggling fans!")
     await robot_api.toggle_fans(session)
