@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import sys
 import time
 import traceback
 from multiprocessing import Event
@@ -17,7 +18,7 @@ DISABLE_LOGGING = "true" in os.environ.get('DISABLE_LOGGING', "False").lower()
 DEBUG = ("true" in os.environ.get('DEBUG', "True").lower()) and not DISABLE_LOGGING
 
 logger = logging.getLogger(__name__)
-# logger.addHandler(logging.StreamHandler(sys.stdout))
+logger.addHandler(logging.StreamHandler(sys.stdout))
 if DEBUG:
     logger.setLevel(logging.DEBUG)
 
@@ -171,18 +172,40 @@ async def race(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocess
     logger.debug("AI thread ready.")
 
     # input("Ready! Press Enter to start race!")
-    logging.info("Starting race!")
+    # logger.info("STARTING ROBOT IN 10 SECONDS!")
+    # await asyncio.sleep(1)
+    # logger.info("STARTING ROBOT IN 9 SECONDS!")
+    # await asyncio.sleep(1)
+    # logger.info("STARTING ROBOT IN 8 SECONDS!")
+    # await asyncio.sleep(1)
+    # logger.info("STARTING ROBOT IN 7 SECONDS!")
+    # await asyncio.sleep(1)
+    # logger.info("STARTING ROBOT IN 6 SECONDS!")
+    # await asyncio.sleep(1)
+    # logger.info("STARTING ROBOT IN 5 SECONDS!")
+    # await asyncio.sleep(1)
+    # logger.info("STARTING ROBOT IN 4 SECONDS!")
+    # await asyncio.sleep(1)
+    # logger.info("STARTING ROBOT IN 3 SECONDS!")
+    # await asyncio.sleep(1)
+    # logger.info("STARTING ROBOT IN 2 SECONDS!")
+    # await asyncio.sleep(1)
+    # logger.info("STARTING ROBOT IN 1 SECONDS!")
+    # await asyncio.sleep(1)
+
+    logger.info("Starting race!")
     start_time = time.time()
     time_taken = 0
 
-    logging.info("Toggling fans!")
+
+    logger.info("Toggling fans!")
     await robot_api.toggle_fans(session)
 
-    logging.info("Racing!")
+    logger.info("Racing!")
     while time_taken <= 8 * 60:
         await do_race_iteration(track, ai_queue, path_queue, ai_event, session, time_taken)
         time_taken = time.time() - start_time
         # Never remove this sleep
         await asyncio.sleep(0)
-    logging.info("Done with race!")
+    logger.info("Done with race!")
     robot_api.set_robot_stop()
