@@ -34,7 +34,7 @@ DELIVERY_DISTANCE_Y = 20  # in units
 SAFETY_LENGTH = 150  # in units
 SAFETY_LENGTH_CORNER = 200  # in units
 HEADING_DIFFERENCE_DELIVERY = 1  # in degrees
-COLLISION_DISTANCE = 30  # in units (pixels)
+COLLISION_DISTANCE = 20  # in units (pixels)
 DIRECTION_DIFFERENCE = 250  # in degrees
 TARGET_DIFFERENT_POSITION_DIFF_THRESHOLD = 20.0
 
@@ -431,7 +431,8 @@ class Goal:
 
         # Check if robot is close enough to the middle
         if distance < DELIVERY_DISTANCE - (DELIVERY_DISTANCE_X_DIFF / 2):
-            return False
+            if not abs(self.delivery_direction_diff()) < math.radians(15):
+                return False
 
         return True
 
@@ -450,6 +451,9 @@ class Goal:
 
         # Check if robot is close enough to the middle
         if distance > DELIVERY_DISTANCE + (DELIVERY_DISTANCE_X_DIFF / 2):
+            return False
+
+        if not abs(self.delivery_direction_diff()) < math.radians(180):
             return False
 
         return True

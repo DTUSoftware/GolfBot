@@ -49,7 +49,7 @@ async def calculate_and_adjust(track: path_algorithm.Track, path_queue: multipro
     # track.draw(True)
 
     if not track.path:
-        logger.debug("No node to travel to, setting speed to base!")
+        logger.debug("No node to travel to, setting speed to base speed!")
         await robot_api.set_speeds(session, driving_algorithm.ROBOT_BASE_SPEED, driving_algorithm.ROBOT_BASE_SPEED)
 
         # if not path_queue.full():
@@ -87,7 +87,8 @@ async def calculate_and_adjust(track: path_algorithm.Track, path_queue: multipro
 
 
 async def do_race_iteration(track: path_algorithm.Track, ai_queue: multiprocessing.JoinableQueue,
-                            path_queue: multiprocessing.JoinableQueue, ai_event: Event, session: aiohttp.ClientSession, time_taken):
+                            path_queue: multiprocessing.JoinableQueue, ai_event: Event, session: aiohttp.ClientSession,
+                            time_taken):
     try:
         # Get results from AI
         # if DEBUG:
@@ -122,7 +123,7 @@ async def do_race_iteration(track: path_algorithm.Track, ai_queue: multiprocessi
 
         objects_to_navigate_to: List[List[Tuple[int, int]]] = []
         if track.balls and (
-                len(seen_ball_queue) < 10 or len([seen_ball for seen_ball in seen_ball_queue if seen_ball]) >= 4) and (time_taken <= 7 * 60):
+                len(seen_ball_queue) < 10 or len([seen_ball for seen_ball in seen_ball_queue if seen_ball]) >= 4) and time_taken <= 6 * 60:
             # Get every ball that's not golden
             objects_to_navigate_to = [ball.drivePath for ball in track.balls if
                                       not ball.golden and ball.get_drive_path()]
