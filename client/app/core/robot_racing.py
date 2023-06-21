@@ -132,10 +132,12 @@ async def do_race_iteration(track: path_algorithm.Track, ai_queue: multiprocessi
                 logger.debug("Couldn't get a drive path for any white balls, trying the golden ball")
                 # Include the golden ball
                 objects_to_navigate_to = [ball.drivePath for ball in track.balls if ball.get_drive_path()]
-        else:
+        elif track.small_goal:
             goal_path = await track.small_goal.deliver_path()
             if goal_path:
                 objects_to_navigate_to = [goal_path]
+        else:
+            logger.warning("NO GOAL????")
 
         if objects_to_navigate_to:
             # Calculate track path and give the robot directions

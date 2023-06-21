@@ -88,7 +88,7 @@ def setup_track_mouse_input(event, x, y, flags, param):
         draw_path.append((x, y))
 
 
-def setup_track() -> pathalg.Track:
+async def setup_track() -> pathalg.Track:
     """
     Sets up the track for capturing mouse input.
 
@@ -145,12 +145,12 @@ def setup_track() -> pathalg.Track:
         if text:
             put_text = text
         else:
-            put_text = "q = quit, o = obstacle, s = small goal, b = big goal, u = undo, w = write/save, a = abort/abandon"
+            put_text = "q = quit, o = obstacle, w = wall, g = (small) goal, b = big goal, u = undo, s = save/write, a = abort/abandon"
         cv2.putText(frame, put_text, (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255))
 
         # Draw past objects
         if objects:
-            for obj in objects:
+            for obj in [obj for obj in objects if "path" in obj and obj["path"]]:
                 opencv_helpers.draw_object(frame, obj["object_type"], obj["path"])
 
         # Draw on track if adding objects
@@ -165,13 +165,16 @@ def setup_track() -> pathalg.Track:
             break
         elif key == ord("o"):  # Obstacle
             track_setup_mode = "obstacle"
-            text = "Inserting obstacle... u = undo, w = write/save, a = abort - Double-click to add a point"
-        elif key == ord("s"):  # Small goal
+            text = "Inserting obstacle... u = undo, s = write/save, a = abort - Double-click to add a point"
+        elif key == ord("w"):  # Wall
+            track_setup_mode = "wall"
+            text = "Inserting wall... u = undo, s = write/save, a = abort - Double-click to add a point"
+        elif key == ord("g"):  # Small goal
             track_setup_mode = "small_goal"
-            text = "Inserting small goal... u = undo, w = write/save, a = abort - Double-click to add a point"
+            text = "Inserting small goal... u = undo, s = write/save, a = abort - Double-click to add a point"
         elif key == ord("b"):  # Big goal
             track_setup_mode = "big_goal"
-            text = "Inserting big goal... u = undo, w = write/save, a = abort - Double-click to add a point"
+            text = "Inserting big goal... u = undo, s = write/save, a = abort - Double-click to add a point"
         elif key == ord("u"):  # Undo
             if track_setup_mode and draw_path:
                 # Remove last added item
@@ -186,8 +189,8 @@ def setup_track() -> pathalg.Track:
                     load_preset(preset)
                     is_preset = True
                     break
-        elif key == ord("w"):  # Save
-            objects.append({"object_type": track_setup_mode, "path": draw_path})
+        elif key == ord("s"):  # Save
+            objects.append({"object_type": track_setup_mode, "path": (draw_path + [draw_path[0]]) if draw_path and (track_setup_mode == 'obstacle' or track_setup_mode == 'wall') else draw_path})
             track_setup_mode = None
             draw_path = []
             text = None
@@ -213,13 +216,13 @@ def setup_track() -> pathalg.Track:
     for obj in objects:
         object_type = obj["object_type"]
         path = [opencv_helpers.opencv_position_to_graph_position(point) for point in obj["path"]]
-        if object_type == "obstacle":
+        if object_type == "obstacle" or object_type == "wall":
             # print(f"Adding obstacle path {obj['path']} to track")
             # print(f"Adding obstacle path {path} to track")
             nodes_in_path = track.graph.get_nodes_in_path(path)
             # print(f"Nodes in obstacle path: {[(node.x, node.y) for node in nodes_in_path]}")
-            obstacle = pathalg.Obstacle(nodes_in_path, path)
-            track.add_obstacle(obstacle)
+            obstacle = pathalg.Obstacle(nodes_in_path, path, is_wall=object_type == "wall")
+            await track.add_obstacle(obstacle)
         elif object_type == "small_goal":
             goal = pathalg.Goal(track.graph.get_nodes_in_path(path), path, small=True)
             track.add_goal(goal)
