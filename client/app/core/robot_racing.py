@@ -98,7 +98,13 @@ async def do_race_iteration(track: path_algorithm.Track, ai_queue: multiprocessi
             #     print("AI queue empty")
             return
 
-        ai_results = ai_queue.get_nowait()
+        ai_results_elem = ai_queue.get_nowait()
+        if not ai_results_elem or not "results" in ai_results_elem or not ai_results_elem["results"]:
+            logger.debug("No results in AI queue")
+            ai_results = []
+        else:
+            ai_results = ai_results_elem["results"]
+
         # if DEBUG:
         #     print("Got results from AI!")
 
@@ -171,32 +177,24 @@ async def race(ai_queue: multiprocessing.JoinableQueue, path_queue: multiprocess
     ai_event.set()
     logger.debug("AI thread ready.")
 
-    # input("Ready! Press Enter to start race!")
-    # logger.info("STARTING ROBOT IN 10 SECONDS!")
-    # await asyncio.sleep(1)
-    # logger.info("STARTING ROBOT IN 9 SECONDS!")
-    # await asyncio.sleep(1)
-    # logger.info("STARTING ROBOT IN 8 SECONDS!")
-    # await asyncio.sleep(1)
-    # logger.info("STARTING ROBOT IN 7 SECONDS!")
-    # await asyncio.sleep(1)
-    # logger.info("STARTING ROBOT IN 6 SECONDS!")
-    # await asyncio.sleep(1)
-    # logger.info("STARTING ROBOT IN 5 SECONDS!")
-    # await asyncio.sleep(1)
-    # logger.info("STARTING ROBOT IN 4 SECONDS!")
-    # await asyncio.sleep(1)
-    # logger.info("STARTING ROBOT IN 3 SECONDS!")
-    # await asyncio.sleep(1)
-    # logger.info("STARTING ROBOT IN 2 SECONDS!")
-    # await asyncio.sleep(1)
-    # logger.info("STARTING ROBOT IN 1 SECONDS!")
-    # await asyncio.sleep(1)
+    logger.info("Waiting for ready (press 'r' on AI!)...")
+    while True:
+        if not ai_queue.empty():
+            try:
+                result = ai_queue.get_nowait()
+                if result and "start" in result and result["start"]:
+                    ai_queue.task_done()
+                    ai_event.set()
+                    break
+                ai_queue.task_done()
+                ai_event.set()
+            except:
+                pass
+        await asyncio.sleep(0)
 
     logger.info("Starting race!")
     start_time = time.time()
     time_taken = 0
-
 
     logger.info("Toggling fans!")
     await robot_api.toggle_fans(session)

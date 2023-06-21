@@ -76,6 +76,8 @@ def run_ai(camera_queue: torch.multiprocessing.JoinableQueue, path_queue: torch.
     # Store current path for drawing
     current_objects = []
 
+    start_flag = False
+
     while cap.isOpened():
         # Capture a frame from the webcam
         # if DEBUG:
@@ -96,6 +98,8 @@ def run_ai(camera_queue: torch.multiprocessing.JoinableQueue, path_queue: torch.
             break
         elif key == ord('s'):
             save_result(results, frame)
+        elif key == ord('r'):
+            start_flag = True
 
         # Send the results to the driving algorithm
         # if DEBUG:
@@ -112,7 +116,7 @@ def run_ai(camera_queue: torch.multiprocessing.JoinableQueue, path_queue: torch.
 
                 ai_event.clear()
                 try:
-                    camera_queue.put_nowait(shared_results)
+                    camera_queue.put_nowait({"start": start_flag, "results": shared_results})
                 except Exception as e:
                     ai_event.set()  # set the flag back
                     logger.debug("Queue full, cannot store image")
