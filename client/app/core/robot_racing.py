@@ -125,6 +125,8 @@ async def do_race_iteration(track: path_algorithm.Track, ai_queue: multiprocessi
         if not is_running:
             logger.info("Robot mode is set to: Not run! Standing still! Press 'r' on AI to start!")
             await robot_api.set_speeds(session, 0, 0)
+            ai_queue.task_done()
+            ai_event.set()
             return
 
         # Parse the results
